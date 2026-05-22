@@ -180,7 +180,7 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
               style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;position:relative;">
         ⚑ Fouls<span id="crit-badge" style="display:none;margin-left:5px;padding:1px 5px;border-radius:10px;font-size:10px;font-weight:700;background:#0a84c8;color:#fff;vertical-align:middle;"></span>
       </button>
-      <button class="btn-s" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showStatPopup(['Goal (Reg)','Goal (6-5)','5M Goal'],'⚽ Goals')">
+      <button class="btn-s" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showStatPopup(['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)'],'⚽ Goals')">
         ⚽ Goals <span id="stat-goals" style="margin-left:4px;padding:1px 5px;border-radius:10px;font-size:10px;font-weight:700;background:#1a3a5a;color:#7abcdc;vertical-align:middle;">0</span>
       </button>
       <button class="btn-s" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showStatPopup(['Assist'],'🤝 Assists')">
@@ -458,6 +458,7 @@ state.players = state.players.map(p => {
 const EVENT_DEFS = {
   'goal-reg':       {label:'Goal (Reg)',       flow:['cap','zone','gm']},
   'goal-65':        {label:'Goal (6-5)',        flow:['cap','zone','gm']},
+  'goal-5m':        {label:'Goal (5M)',         flow:['cap','zone','gm']},
   'miss':           {label:'Missed Shot',       flow:['cap','zone']},
   'ejection':       {label:'Ejection',          flow:['cap']},
   '5m-penalty':     {label:'5M Penalty',        flow:['cap','5m-result']},
@@ -726,7 +727,7 @@ function nextStep(field,val,label,playerId){
   else finalizeEvent();
 }
 
-const AUTO_PAUSE_TYPES = new Set(['Goal (Reg)','Goal (6-5)','5M Goal','5M Foul']);
+const AUTO_PAUSE_TYPES = new Set(['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)','5M Foul']);
 
 function autoPauseIfNeeded(eventLabel){
   if(!AUTO_PAUSE_TYPES.has(eventLabel)) return;
@@ -1259,7 +1260,7 @@ function renderGameUI(){
   const dkCap=ag.dark, whCap=ag.white;
 
   function prefEnabled(prefs, type){
-    if(type==='goal-reg'||type==='goal-65') return prefs.goals          !== false;
+    if(type==='goal-reg'||type==='goal-65'||type==='goal-5m') return prefs.goals !== false;
     if(type==='miss')                        return prefs.miss           !== false;
     if(type==='ejection')                    return prefs.ejection       !== false;
     if(type==='ejection-drawn')              return prefs.ejectionDrawn  !== false;
@@ -1274,7 +1275,7 @@ function renderGameUI(){
     return true;
   }
 
-  const stdBtns=['goal-reg','goal-65','miss','ejection','ejection-drawn','5m-penalty','5m-drawn','steal','turnover','assist','field-block','sprint-won'];
+  const stdBtns=['goal-reg','goal-65','goal-5m','miss','ejection','ejection-drawn','5m-penalty','5m-drawn','steal','turnover','assist','field-block','sprint-won'];
   let dHtml='', wHtml='';
 
   stdBtns.forEach(t=>{
@@ -1741,7 +1742,7 @@ function updateStatChips() {
   state.events.forEach(ev => {
     const expanded = eventToRows({...ev, gameId:'', date:''});
     expanded.forEach(r => {
-      if (['Goal (Reg)','Goal (6-5)','5M Goal'].includes(r.event)) goals++;
+      if (['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)'].includes(r.event)) goals++;
       if (r.event === 'Assist') assists++;
       if (r.event === 'Steal') steals++;
       if (r.event === 'Turnover') tos++;
@@ -1817,7 +1818,7 @@ function showShotChart(side) {
   const {VBW, VBH, X, Y, W, H} = POOL;
   const L = POOL_LINES;
   const gCx = X + W/2, gW = W*0.15, gLeft = gCx - gW/2, gRight = gCx + gW/2;
-  const GOAL_TYPES = ['Goal (Reg)','Goal (6-5)','5M Goal'];
+  const GOAL_TYPES = ['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)'];
 
   const shots    = state.events.filter(e => e.team === teamName &&
     (GOAL_TYPES.includes(e.type) || e.type === 'Missed Shot'));
@@ -1895,7 +1896,7 @@ function showShotChart(side) {
 
 function renderShotChartMarkers(filterCap) {
   const {X, Y, W, H} = POOL;
-  const GOAL_TYPES = ['Goal (Reg)','Goal (6-5)','5M Goal'];
+  const GOAL_TYPES = ['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)'];
   if (!_scData) return;
   const posCount = {};
   let html = '';
