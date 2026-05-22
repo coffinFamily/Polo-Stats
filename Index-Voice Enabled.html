@@ -1244,16 +1244,19 @@ function togglePref(side, key){
 }
 
 function evtIcon(type){
-  // Inline SVG water polo ball — pass fill/stroke colors
+  // Inline SVG water polo ball
   function wpBall(fill, stroke){
     return `<svg width="13" height="13" viewBox="0 0 14 14" style="vertical-align:middle;margin-right:3px;flex-shrink:0;display:inline-block;"><circle cx="7" cy="7" r="6.5" fill="${fill}" stroke="${stroke}" stroke-width="0.6"/><path d="M1.5 5Q7 1.5 12.5 5" fill="none" stroke="${stroke}" stroke-width="0.8"/><path d="M1.5 9Q7 12.5 12.5 9" fill="none" stroke="${stroke}" stroke-width="0.8"/><path d="M4.5 1Q2 7 4.5 13" fill="none" stroke="${stroke}" stroke-width="0.8"/><path d="M9.5 1Q12 7 9.5 13" fill="none" stroke="${stroke}" stroke-width="0.8"/></svg>`;
   }
+  // Inline SVG red frown face
+  const redFrown = `<svg width="13" height="13" viewBox="0 0 14 14" style="vertical-align:middle;margin-right:3px;flex-shrink:0;display:inline-block;"><circle cx="7" cy="7" r="6.5" fill="#ef4444" stroke="#b03030" stroke-width="0.6"/><circle cx="4.8" cy="5.5" r="0.9" fill="#fff"/><circle cx="9.2" cy="5.5" r="0.9" fill="#fff"/><path d="M4.2 10Q7 7.5 9.8 10" fill="none" stroke="#fff" stroke-width="1.1" stroke-linecap="round"/></svg>`;
+
   if(type==='goal-reg'||type==='goal-65'||type==='goal-5m') return wpBall('#f5c518','#c8960e');
   if(type==='miss')                                          return wpBall('#ef4444','#b03030');
   if(type==='assist')                                        return '👍 ';
-  if(type==='ejection'||type==='ejection-drawn')             return '😟 ';
-  if(type==='5m-penalty'||type==='5m-drawn')                 return '😟 ';
-  if(type==='turnover')                                      return '😟 ';
+  if(type==='ejection'||type==='ejection-drawn')             return redFrown;
+  if(type==='5m-penalty'||type==='5m-drawn')                 return redFrown;
+  if(type==='turnover')                                      return redFrown;
   if(type==='steal')                                         return '🏴‍☠️ ';
   if(type==='sprint-won')                                    return '⚡ ';
   if(type==='field-block'||type==='goalie-block')            return '😄 ';
