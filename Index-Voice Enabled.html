@@ -1,0 +1,2655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>🤽 Water Polo Stats (Voice)</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:system-ui,-apple-system,sans-serif;background:#0d1b2a;color:#e8edf2;font-size:14px;min-height:100vh;}
+button{cursor:pointer;border:none;font-family:inherit;font-size:13px;border-radius:6px;transition:all 0.15s;}
+input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-radius:6px;padding:7px 10px;background:#0d1b2a;color:#e8edf2;width:100%;}
+.nav{display:flex;gap:4px;padding:10px 12px;background:#111d2c;border-bottom:1px solid #1e3a5a;align-items:center;position:sticky;top:0;z-index:50;}
+.nav-btn{padding:6px 14px;border-radius:20px;background:transparent;color:#7a9bb8;border:1px solid transparent;font-weight:500;}
+.nav-btn.active{background:#0a84c8;color:#fff;border-color:#0a84c8;}
+.nav-btn:hover:not(.active){background:#1e3a5a;}
+.page{padding:12px;max-width:700px;margin:0 auto;}
+.card{background:#111d2c;border:1px solid #1e3a5a;border-radius:10px;padding:14px;margin-bottom:10px;}
+.btn-p{padding:8px 16px;border-radius:6px;background:#0a84c8;color:#fff;font-weight:500;}
+.btn-p:hover{background:#0972ad;}
+.btn-s{padding:8px 14px;border-radius:6px;background:#1e3a5a;color:#b0c8e0;border:1px solid #2a4a6a;}
+.btn-s:hover{background:#2a4a6a;}
+.btn-d{padding:6px 12px;border-radius:6px;background:#8b1a1a;color:#ffaaaa;}
+.btn-d:hover{background:#a02020;}
+.btn-round{border-radius:50%;width:32px;height:32px;padding:0;font-size:16px;background:#1e3a5a;color:#b0c8e0;border:1px solid #2a4a6a;}
+.evt-dk{padding:10px 6px;border-radius:8px;font-weight:600;font-size:12px;text-align:center;line-height:1.3;background:#0e1d56;color:#ffffff;border:1px solid #4060b0;}
+.evt-dk:hover{background:#162878;}
+.evt-wh{padding:10px 6px;border-radius:8px;font-weight:600;font-size:12px;text-align:center;line-height:1.3;background:#dde8f0;color:#1a2a3a;border:1px solid #aac0d0;}
+.evt-wh:hover{background:#c8d8e8;}
+.evt-nt{padding:10px 6px;border-radius:8px;font-weight:600;font-size:12px;text-align:center;line-height:1.3;background:#0d3a2a;color:#6ee7b7;border:1px solid #1a5a3a;}
+.evt-nt:hover{background:#1a4a3a;}
+.timer{font-size:52px;font-weight:300;font-variant-numeric:tabular-nums;letter-spacing:3px;}
+.timer.run{color:#22c55e;}
+.timer.low{color:#ef4444;}
+.stitle{font-size:11px;color:#5a7a9a;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;margin-bottom:6px;margin-top:14px;}
+.bdg{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;}
+.bdg-dk{background:#0e1d56;color:#ffffff;border:1px solid #4060b0;}
+.bdg-wh{background:#dde8f0;color:#1a2a3a;border:1px solid #aac0d0;}
+.bdg-nt{background:#0d3a2a;color:#6ee7b7;border:1px solid #1a5a3a;}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:1000;}
+.modal{background:#111d2c;border-radius:14px;padding:16px;max-width:520px;width:98%;max-height:98vh;overflow-y:auto;border:1px solid #1e3a5a;}
+.modal h3{font-size:16px;font-weight:600;margin-bottom:10px;}
+.cap-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;}
+.cap-btn{display:block;border:none;padding:2px;background:transparent;cursor:pointer;width:100%;border-radius:6px;-webkit-tap-highlight-color:transparent;transition:transform 0.12s,filter 0.12s;}
+.cap-btn:hover{transform:scale(1.1);}
+.cap-btn:active{transform:scale(0.93);}
+.cap-btn svg{pointer-events:none;display:block;width:100%;height:auto;}
+.zone-btn{padding:8px 4px;border-radius:6px;font-size:11px;text-align:center;background:#0d2a3e;color:#7abcdc;border:1px solid #1a4060;}
+.zone-btn:hover{background:#0a84c8;color:#fff;}
+.pool-row{display:flex;gap:4px;margin-bottom:4px;}
+.team-pick{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.team-dk{padding:20px 8px;font-size:15px;font-weight:600;border-radius:10px;background:#0e1d56;color:#ffffff;border:1px solid #4060b0;}
+.team-dk:hover{background:#162878;}
+.team-wh{padding:20px 8px;font-size:15px;font-weight:600;border-radius:10px;background:#dde8f0;color:#1a2a3a;border:1px solid #aac0d0;}
+.sync{font-size:11px;padding:3px 10px;border-radius:10px;font-weight:500;}
+.sync-idle{background:#1e3a5a;color:#7a9bb8;}
+.sync-send{background:#1a3a1a;color:#6ee7b7;}
+.sync-ok{background:#0d3a2a;color:#6ee7b7;}
+.sync-err{background:#3a1a1a;color:#ffaaaa;}
+.tbl{width:100%;border-collapse:collapse;font-size:12px;min-width:500px;}
+.tbl th{text-align:left;padding:5px 7px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;white-space:nowrap;}
+.tbl td{padding:5px 7px;border-bottom:1px solid #162535;}
+.tbl tr:hover td{background:#162535;}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.warn{background:#1a1400;border:1px solid #3a2a0a;color:#e8c84a;border-radius:8px;padding:10px 14px;font-size:12px;margin-bottom:10px;}
+.tab-panel{display:none;}.tab-panel.active{display:block;}
+.rb-row{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #162535;}
+.rb-row:last-child{border-bottom:none;}
+.rb-row.absent{opacity:0.38;}
+.rb-cap{width:58px;flex:0 0 58px;text-align:center;font-weight:600;}
+.rb-name{flex:1;font-size:13px;}
+.rb-check{width:18px;height:18px;accent-color:#0a84c8;cursor:pointer;flex:0 0 18px;}
+.team-pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:12px;border:1px solid #2a4a6a;background:#0d1b2a;cursor:pointer;margin:3px;}
+.team-pill input{width:14px;height:14px;accent-color:#0a84c8;margin:0;flex:0 0 14px;}
+.team-pill.checked{background:#0a1e30;border-color:#0a84c8;color:#5bc8f0;}
+.merge-card{border-color:#2a1a3a;background:#0f1120;}
+.pill-id{font-size:9px;color:#3a5a7a;font-family:monospace;margin-top:2px;}
+/* Voice button */
+.voice-btn{width:40px;height:40px;border-radius:50%;background:#1e3a5a;color:#7abcdc;font-size:18px;border:2px solid #2a4a6a;display:flex;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none;touch-action:none;flex:0 0 40px;cursor:pointer;transition:all 0.15s;}
+.voice-btn.listening{background:#5a1a1a;color:#ffaaaa;border-color:#ff4444;animation:vpulse 1s infinite;}
+.voice-btn.processing{background:#1a3a1a;color:#6ee7b7;border-color:#22c55e;}
+@keyframes vpulse{0%,100%{box-shadow:0 0 0 0 rgba(255,68,68,0.4);}50%{box-shadow:0 0 0 14px rgba(255,68,68,0);}}
+.voice-area{display:flex;align-items:center;gap:12px;padding:4px 0;}
+.voice-info{flex:1;min-width:0;}
+.voice-hint{font-size:11px;color:#3a5a7a;margin-bottom:3px;}
+.voice-transcript{font-size:13px;color:#7abcdc;min-height:18px;line-height:1.4;word-break:break-word;}
+.voice-parsed{background:#0a1e10;border:1px solid #1a4a2a;border-radius:8px;padding:10px 12px;margin-top:8px;}
+.vtok{display:inline-block;background:#1a3a1a;color:#6ee7b7;border-radius:4px;padding:2px 8px;margin:2px;font-size:12px;font-weight:600;}
+.vtok.unresolved{background:#3a1a1a;color:#ffaaaa;}
+.disambig-btn{padding:11px 14px;border-radius:8px;background:#1e3a5a;color:#b0c8e0;border:1px solid #2a4a6a;width:100%;text-align:left;margin-bottom:6px;font-size:13px;}
+.disambig-btn:hover{background:#2a4a6a;}
+/* Pref toggles */
+.pref-toggle{padding:7px 13px;border-radius:20px;font-size:12px;font-weight:600;border:2px solid;transition:all 0.15s;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent;}
+.pref-toggle.on{background:#0a1e30;color:#5bc8f0;border-color:#0a84c8;}
+.pref-toggle.off{background:#0d1520;color:#374a56;border-color:#1a2a38;}
+.pref-toggle.off .pref-label{text-decoration:line-through;opacity:0.6;}
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <span style="font-size:18px;margin-right:4px;">🤽</span>
+  <button class="nav-btn active" onclick="showTab('game')">Game</button>
+  <button class="nav-btn" onclick="showTab('setup')">Setup</button>
+  <button class="nav-btn" onclick="showTab('roster')">Roster</button>
+  <button class="nav-btn" onclick="showTab('prefs')">Prefs</button>
+  <span id="game-label" style="margin-left:auto;font-size:11px;color:#5a7a9a;"></span>
+</div>
+
+<!-- ═══ GAME TAB ═══════════════════════════════════════════════════════ -->
+<div id="tab-game" class="tab-panel active page">
+  <div class="card">
+    <div class="row" style="justify-content:space-between;flex-wrap:nowrap;">
+      <div style="text-align:center;min-width:60px;">
+        <div style="font-size:11px;color:#5a7a9a;margin-bottom:2px;" id="dark-name-score">Dark</div>
+        <div id="dark-score" style="font-size:36px;font-weight:300;color:#e8d5a3;">0</div>
+      </div>
+      <div style="text-align:center;flex:1;">
+        <div style="display:flex;align-items:center;justify-content:center;gap:10px;">
+          <div id="timer-display" class="timer">8:00</div>
+          <button class="btn-p" id="start-btn" onclick="toggleTimer()" style="padding:10px 14px;font-size:15px;border-radius:8px;min-width:72px;">▶ Start</button>
+        </div>
+        <div class="row" style="justify-content:center;margin-top:8px;gap:5px;">
+          <button class="btn-s" onclick="resetTimer()">Reset 8m</button>
+          <button class="btn-s" onclick="adjustTimer(5)">+5s</button>
+          <button class="btn-s" onclick="adjustTimer(-5)">−5s</button>
+          <button class="btn-s" onclick="adjustTimer(30)">+30s</button>
+          <button class="btn-s" onclick="adjustTimer(-30)">−30s</button>
+        </div>
+      </div>
+      <div style="text-align:center;min-width:60px;">
+        <div style="font-size:11px;color:#5a7a9a;margin-bottom:2px;" id="white-name-score">White</div>
+        <div id="white-score" style="font-size:36px;font-weight:300;">0</div>
+      </div>
+    </div>
+    <div class="row" style="justify-content:space-between;margin-top:10px;border-top:1px solid #1e3a5a;padding-top:10px;">
+      <div class="row" style="gap:8px;">
+        <button class="btn-round" onclick="changeQ(-1)">‹</button>
+        <span id="q-display" style="font-weight:600;font-size:15px;">Q1</span>
+        <button class="btn-round" onclick="changeQ(1)">›</button>
+      </div>
+      <span id="sync-pill" class="sync sync-idle">Sheets: not connected</span>
+    </div>
+  </div>
+
+  <div id="no-sheet-warn" class="warn" style="display:none;">
+    ⚠️ No Game Stats sheet connected. Go to <strong>Setup</strong> to add your Apps Script URL.
+  </div>
+
+  <!-- Shot Chart full-screen overlay -->
+  <div id="shot-chart-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:#08141e;overflow-y:auto;">
+    <div style="padding:12px 14px 6px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+      <div>
+        <div id="sc-title" style="font-size:17px;font-weight:700;color:#e0f0ff;"></div>
+        <div id="sc-summary" style="font-size:12px;color:#5a7a9a;margin-top:3px;"></div>
+      </div>
+      <button onclick="document.getElementById('shot-chart-overlay').style.display='none'"
+        style="flex:0 0 auto;width:40px;height:40px;border-radius:50%;background:#1e3a5a;border:2px solid #2a5a7a;color:#90c8e8;font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1;">✕</button>
+    </div>
+    <div id="sc-svg-container" style="padding:0 6px;"></div>
+    <div id="sc-legend" style="padding:6px 16px 10px;"></div>
+    <div style="padding:0 16px 10px;">
+      <div style="font-size:11px;color:#5a7a9a;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Filter by player</div>
+      <div id="sc-filters" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+    </div>
+    <div id="sc-nozone" style="padding:0 16px 24px;font-size:11px;color:#3a5a7a;"></div>
+  </div>
+
+  <div class="stitle" id="dark-btn-title">Dark events</div>
+  <div class="grid4" id="dark-btns"></div>
+  <div class="stitle" id="white-btn-title">White events</div>
+  <div class="grid4" id="white-btns"></div>
+  <div class="stitle">Shared events</div>
+  <div class="grid4" id="shared-btns"></div>
+
+  <!-- Critical stats + Voice capture -->
+  <div class="card" id="voice-card" style="display:none;padding:8px 10px;margin-top:10px;">
+    <!-- Single row: stat chips + mic pushed right -->
+    <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
+      <button class="btn-s" id="crit-stats-btn" onclick="showCriticalStats()"
+              style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;position:relative;">
+        ⚑ Fouls<span id="crit-badge" style="display:none;margin-left:5px;padding:1px 5px;border-radius:10px;font-size:10px;font-weight:700;background:#0a84c8;color:#fff;vertical-align:middle;"></span>
+      </button>
+      <button class="btn-s" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showStatPopup(['Goal (Reg)','Goal (6-5)','5M Goal'],'⚽ Goals')">
+        ⚽ Goals <span id="stat-goals" style="margin-left:4px;padding:1px 5px;border-radius:10px;font-size:10px;font-weight:700;background:#1a3a5a;color:#7abcdc;vertical-align:middle;">0</span>
+      </button>
+      <button class="btn-s" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showStatPopup(['Assist'],'🤝 Assists')">
+        🤝 Assists <span id="stat-assists" style="margin-left:4px;padding:1px 5px;border-radius:10px;font-size:10px;font-weight:700;background:#1a3a5a;color:#7abcdc;vertical-align:middle;">0</span>
+      </button>
+      <button class="btn-s" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showStatPopup(['Steal'],'✊ Steals')">
+        ✊ Steals <span id="stat-steals" style="margin-left:4px;padding:1px 5px;border-radius:10px;font-size:10px;font-weight:700;background:#1a3a5a;color:#7abcdc;vertical-align:middle;">0</span>
+      </button>
+      <button class="btn-s" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showStatPopup(['Turnover'],'🔄 Turnovers')">
+        🔄 TOs <span id="stat-tos" style="margin-left:4px;padding:1px 5px;border-radius:10px;font-size:10px;font-weight:700;background:#1a3a5a;color:#7abcdc;vertical-align:middle;">0</span>
+      </button>
+      <button class="btn-s" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showShotChartPicker()">
+        📊 Shot Chart
+      </button>
+      <!-- Mic pushed to far right -->
+      <div style="margin-left:auto;display:flex;align-items:center;gap:6px;flex:0 0 auto;">
+        <button class="voice-btn" id="voice-btn" style="display:none;"
+          onmousedown="startVoice(event)" onmouseup="stopVoice(event)" onmouseleave="stopVoice(event)"
+          ontouchstart="startVoice(event)" ontouchend="stopVoice(event)" ontouchcancel="stopVoice(event)">
+          🎙
+        </button>
+        <div class="voice-hint" id="voice-hint" style="display:none;font-size:10px;color:#3a5a7a;line-height:1.3;">Hold to<br>record</div>
+      </div>
+    </div>
+    <div class="voice-transcript" id="voice-transcript" style="margin-top:4px;"></div>
+    <div id="voice-result"></div>
+  </div>
+
+  <div class="card" style="margin-top:10px;">
+    <div class="row" style="justify-content:space-between;margin-bottom:10px;">
+      <span style="font-weight:600;font-size:14px;">Event log <span id="event-count" style="color:#5a7a9a;font-weight:400;">(0)</span></span>
+      <div class="row" style="gap:6px;">
+        <button class="btn-s" style="padding:4px 10px;font-size:11px;" onclick="exportCSV()">⬇ CSV</button>
+        <button class="btn-d" onclick="clearEvents()">Clear</button>
+      </div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="tbl">
+        <thead><tr>
+          <th>Q</th><th>Time</th><th>Event</th><th>Team</th><th>Cap</th><th>Zone</th><th>GM</th><th>Detail</th>
+        </tr></thead>
+        <tbody id="event-tbody"></tbody>
+      </table>
+    </div>
+    <p id="no-events-msg" style="text-align:center;color:#5a7a9a;padding:18px 0;font-size:13px;">No events yet — tap a button above</p>
+  </div>
+</div>
+
+<!-- ═══ SETUP TAB ══════════════════════════════════════════════════════ -->
+<div id="tab-setup" class="tab-panel page">
+
+  <!-- Master Roster Sheet (permanent) -->
+  <div class="card" style="border-color:#1a3a5a;">
+    <div class="stitle" style="margin-top:0;">Master Roster Sheet <span style="color:#3a5a7a;font-weight:400;text-transform:none;letter-spacing:0;">(permanent — teams &amp; players)</span></div>
+    <p style="font-size:12px;color:#7a9bb8;margin-bottom:8px;line-height:1.6;">
+      One-time setup per device. Paste the URL from your <strong>roster-script.gs</strong> deployment.
+      Teams and players sync here automatically. Any device with this URL can load the shared roster.
+    </p>
+    <div class="row" style="margin-bottom:6px;">
+      <input id="roster-url-input" placeholder="https://script.google.com/macros/s/…/exec" style="flex:1;" />
+      <button class="btn-s" style="flex:0 0 auto;" onclick="saveRosterUrl()">Save</button>
+    </div>
+    <div class="row" style="gap:6px;flex-wrap:wrap;">
+      <button class="btn-s" style="font-size:11px;padding:5px 10px;" onclick="testRosterConnection()">Test connection</button>
+      <button class="btn-p" style="font-size:11px;padding:5px 12px;" onclick="loadRosterFromSheet(true)">⬇ Load from sheet</button>
+      <button class="btn-s" style="font-size:11px;padding:5px 12px;" onclick="pushRosterToSheet()">⬆ Push local to sheet</button>
+      <span id="roster-test-result" style="font-size:12px;"></span>
+    </div>
+    <p id="roster-last-sync" style="font-size:11px;color:#3a6a4a;margin-top:8px;display:none;"></p>
+  </div>
+
+  <!-- Game Stats Sheet (per game) -->
+  <div class="card">
+    <div class="stitle" style="margin-top:0;">Game Stats Sheet <span style="color:#3a5a7a;font-weight:400;text-transform:none;letter-spacing:0;">(per game — live event sync)</span></div>
+    <p style="font-size:12px;color:#7a9bb8;margin-bottom:8px;line-height:1.6;">
+      Paste your game stats Apps Script URL. Each event posts here live during the game.
+    </p>
+    <div class="row" style="margin-bottom:6px;">
+      <input id="sheet-url-input" placeholder="https://script.google.com/macros/s/…/exec" style="flex:1;" />
+      <button class="btn-s" style="flex:0 0 auto;" onclick="saveGameSheetUrl()">Save</button>
+    </div>
+    <div class="row">
+      <button class="btn-s" onclick="testGameConnection()">Test connection</button>
+      <span id="test-result" style="font-size:12px;"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="stitle" style="margin-top:0;">Game date</div>
+    <input type="date" id="game-date" />
+  </div>
+
+  <!-- Voice: primary team -->
+  <div class="card" id="primary-team-card" style="display:none;">
+    <div class="stitle" style="margin-top:0;">Voice — stats taker team</div>
+    <p style="font-size:12px;color:#7a9bb8;margin-bottom:10px;line-height:1.6;">
+      Which team are you tracking? Voice commands will look up player names from this team's roster first. Opponent players are looked up by number.
+    </p>
+    <div class="grid2">
+      <button id="primary-dark-btn" class="btn-s" onclick="setPrimaryTeam('dark')">Dark caps</button>
+      <button id="primary-white-btn" class="btn-s" onclick="setPrimaryTeam('white')">White caps</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="stitle" style="margin-top:0;">Dark caps team</div>
+    <input id="dark-team-name" placeholder="Display name for this game (e.g. Stanford Red)" style="margin-bottom:8px;" />
+    <select id="dark-team-roster" onchange="buildRosterUI('dark')" style="margin-bottom:10px;">
+      <option value="">Select team to load roster…</option>
+    </select>
+    <div id="dark-roster-builder" style="display:none;">
+      <div style="font-size:11px;color:#5a7a9a;margin-bottom:6px;">Check players active today · assign cap numbers for this game</div>
+      <div id="dark-rb-rows"></div>
+      <p id="dark-rb-empty" style="font-size:12px;color:#5a7a9a;display:none;">No players on this team yet. Add players in the Roster tab.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="stitle" style="margin-top:0;">White caps team</div>
+    <input id="white-team-name" placeholder="Display name for this game (e.g. CCU)" style="margin-bottom:8px;" />
+    <select id="white-team-roster" onchange="buildRosterUI('white')" style="margin-bottom:10px;">
+      <option value="">Select team to load roster…</option>
+    </select>
+    <div id="white-roster-builder" style="display:none;">
+      <div style="font-size:11px;color:#5a7a9a;margin-bottom:6px;">Check players active today · assign cap numbers for this game</div>
+      <div id="white-rb-rows"></div>
+      <p id="white-rb-empty" style="font-size:12px;color:#5a7a9a;display:none;">No players on this team yet. Add players in the Roster tab.</p>
+    </div>
+  </div>
+
+  <button class="btn-p" style="width:100%;padding:12px;font-size:15px;" onclick="saveGame()">Save game setup →</button>
+</div>
+
+<!-- ═══ ROSTER TAB ═════════════════════════════════════════════════════ -->
+<div id="tab-roster" class="tab-panel page">
+  <div class="row" style="margin-bottom:12px;">
+    <button id="rview-players-btn" class="btn-p" onclick="rosterView('players')">Players</button>
+    <button id="rview-teams-btn" class="btn-s" onclick="rosterView('teams')">Teams</button>
+  </div>
+
+  <div id="roster-players">
+    <div class="card">
+      <div class="stitle" style="margin-top:0;">Add player</div>
+      <div class="row">
+        <input id="p-first" placeholder="First name" style="flex:1 1 100px;" />
+        <input id="p-last" placeholder="Last name" style="flex:1 1 100px;" />
+        <input id="p-dob" type="date" style="flex:1 1 120px;" />
+        <button class="btn-p" style="flex:0 0 auto;" onclick="addPlayer()">Add</button>
+      </div>
+    </div>
+    <div id="players-list"></div>
+
+    <!-- Merge duplicates -->
+    <div class="card merge-card" id="merge-section" style="display:none;margin-top:4px;">
+      <div class="stitle" style="margin-top:0;color:#8a6aaa;">Merge duplicate players</div>
+      <p style="font-size:12px;color:#9a8aba;margin-bottom:12px;line-height:1.5;">
+        If a player was added twice, pick the duplicate to remove and the correct record to keep.
+        All historical events will be silently reassigned to the kept record.
+      </p>
+      <div class="grid2" style="margin-bottom:10px;">
+        <div>
+          <div style="font-size:11px;color:#5a7a9a;margin-bottom:4px;">Remove (duplicate)</div>
+          <select id="merge-from"><option value="">Select player…</option></select>
+        </div>
+        <div>
+          <div style="font-size:11px;color:#5a7a9a;margin-bottom:4px;">Keep (canonical)</div>
+          <select id="merge-to"><option value="">Select player…</option></select>
+        </div>
+      </div>
+      <button class="btn-d" style="width:100%;padding:9px;" onclick="mergePlayers()">Merge players →</button>
+    </div>
+  </div>
+
+  <div id="roster-teams" style="display:none;">
+    <div class="card">
+      <div class="stitle" style="margin-top:0;">Add team</div>
+      <div class="row">
+        <input id="t-name" placeholder="e.g. Stanford Red 18U" style="flex:1 1 160px;" />
+        <button class="btn-p" style="flex:0 0 auto;" onclick="addTeam()">Add</button>
+      </div>
+    </div>
+    <div id="teams-list"></div>
+  </div>
+</div>
+
+<!-- ═══ PREFS TAB ═════════════════════════════════════════════════════ -->
+<div id="tab-prefs" class="tab-panel page">
+  <div class="card" style="margin-bottom:10px;">
+    <p style="font-size:12px;color:#7a9bb8;line-height:1.7;">
+      Select which stats to capture per team. Deselected stats are hidden from the game screen to keep data entry fast. Changes take effect immediately.
+    </p>
+  </div>
+  <div id="prefs-content"></div>
+</div>
+
+<!-- ═══ MODAL ══════════════════════════════════════════════════════════ -->
+<div id="modal-overlay" class="overlay" style="display:none;" onclick="closeModal()">
+  <div class="modal" onclick="event.stopPropagation()">
+    <div class="row" style="justify-content:space-between;margin-bottom:14px;">
+      <h3 id="modal-title">Event</h3>
+      <button class="btn-s" style="padding:3px 10px;" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  DEFAULT URLs — paste your permanent Apps Script URLs here.
+//  Any device that opens the app will get these automatically.
+// ═══════════════════════════════════════════════════════════
+const DEFAULT_ROSTER_URL = 'https://script.google.com/macros/s/AKfycbw-tUTt2rgO9Lqd_afyNRZWm5ywto6z0sLSr0sssFBmvyX6HJdupiSdch0TC9FKX0E/exec';  // paste your Master Roster script URL here
+const DEFAULT_SHEET_URL  = 'https://script.google.com/macros/s/AKfycbx3Cg-UlcQeE-pQTz9o1OMQzLTjFqXnAbFjOWxHni8MEOhIGvx8M37GeRHf31oj6kPjNw/exec';  // paste your Game Stats script URL here
+
+// ═══════════════════════════════════════════════════════════
+//  UTILITIES
+// ═══════════════════════════════════════════════════════════
+const ls = (k,d)=>{ try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;} };
+const ss = (k,v)=>{ try{localStorage.setItem(k,JSON.stringify(v));}catch{}; };
+
+function genId() {
+  try { return crypto.randomUUID(); } catch(e) {}
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════
+let state = {
+  timerSecs: ls('wp-secs', 480),
+  running: false,
+  q: ls('wp-q', 1),
+  events: ls('wp-events', []),
+  game: ls('wp-game', {darkTeam:'Dark',whiteTeam:'White',darkRoster:[],whiteRoster:[],sheetUrl:'',date:''}),
+  players: ls('wp-players', []),
+  teams: ls('wp-teams', []),
+  rosterSheetUrl: ls('wp-roster-url', '') || DEFAULT_ROSTER_URL,
+  primaryTeam: ls('wp-primary-team', 'dark'),
+  activeGoalie: ls('wp-active-goalie', {dark: null, white: null}),
+  prefs: ls('wp-prefs', null),
+  flow: null, flowIdx: 0, flowCtx: {}, pendingData: {},
+};
+
+// Always push hardcoded defaults so stale localStorage values on other devices get overwritten
+if(DEFAULT_ROSTER_URL) { state.rosterSheetUrl=DEFAULT_ROSTER_URL; ss('wp-roster-url', DEFAULT_ROSTER_URL); }
+if(DEFAULT_SHEET_URL)  { state.game.sheetUrl=DEFAULT_SHEET_URL;   ss('wp-sheet-url',  DEFAULT_SHEET_URL);  ss('wp-game', state.game); }
+
+// Ensure prefs exist with full defaults
+{
+  const defTeam = () => ({goals:true,miss:true,assist:true,ejection:true,fiveM:true,steal:true,turnover:true});
+  const defShared = () => ({goalieBlock:true,fieldBlock:true,sprintWon:true});
+  if(!state.prefs) state.prefs = {};
+  if(!state.prefs.dark)   state.prefs.dark   = defTeam();
+  if(!state.prefs.white)  state.prefs.white  = defTeam();
+  if(!state.prefs.shared) state.prefs.shared = defShared();
+  // Fill in any keys added later that may not exist in stored prefs
+  Object.assign(state.prefs.dark,   Object.fromEntries(Object.entries(defTeam()).filter(([k])=>!(k in state.prefs.dark))));
+  Object.assign(state.prefs.white,  Object.fromEntries(Object.entries(defTeam()).filter(([k])=>!(k in state.prefs.white))));
+  Object.assign(state.prefs.shared, Object.fromEntries(Object.entries(defShared()).filter(([k])=>!(k in state.prefs.shared))));
+}
+
+// Migrate old aff-based players to teamIds format
+state.players = state.players.map(p => {
+  if (!p.teamIds) {
+    p.teamIds = (p.aff||[]).map(a => Number(a.teamId));
+    delete p.aff;
+  }
+  return p;
+});
+
+// ═══════════════════════════════════════════════════════════
+//  EVENT DEFINITIONS
+// ═══════════════════════════════════════════════════════════
+const EVENT_DEFS = {
+  'goal-reg':    {label:'Goal (Reg)',    flow:['cap','zone','gm','assist']},
+  'goal-65':     {label:'Goal (6-5)',    flow:['cap','zone','gm','assist']},
+  'miss':        {label:'Missed Shot',   flow:['cap','zone']},
+  'ejection':    {label:'Ejection',      flow:['cap','drawn']},
+  '5m-penalty':  {label:'5M Penalty',   flow:['cap','drawn','5m-shooter','5m-result']},
+  'steal':       {label:'Steal',         flow:['cap','turnover']},
+  'turnover':    {label:'Turnover',      flow:['cap','stolen-by']},
+  'goalie-block':{label:'Goalie Block',  flow:['goalie-team','goalie-cap']},
+  'field-block': {label:'Field Block',   flow:['cap']},
+  'sprint-won':  {label:'Sprint Won',    flow:['cap']},
+};
+
+// Pool SVG constants — 23 yards (~21m) wide × 25m long; showing attacking half (12.5m)
+// Correct aspect ratio W:H = 21:12.5 = 1.68 (pool is wider than half its length)
+const POOL = { VBW:300, VBH:210, X:40, Y:42, W:252, H:150 };
+// y positions of distance lines within viewBox (fractions of 12.5m half-pool)
+const POOL_LINES = {
+  '2m':  POOL.Y + POOL.H*(2/12.5),
+  '5m':  POOL.Y + POOL.H*(5/12.5),
+  '6m':  POOL.Y + POOL.H*(6/12.5),
+  'half':POOL.Y + POOL.H,
+};
+const GM_ZONES = ['Top L','Top Ctr','Top R','Mid L','Mid Ctr','Mid R','Bot L','Bot Ctr','Bot R'];
+
+// ═══════════════════════════════════════════════════════════
+//  TIMER
+// ═══════════════════════════════════════════════════════════
+let timerInterval = null;
+
+function fmt(s){
+  const m=Math.floor(Math.abs(s)/60), sec=Math.abs(s)%60;
+  return `${m}:${sec.toString().padStart(2,'0')}`;
+}
+
+function updateTimerDisplay(){
+  const el = document.getElementById('timer-display');
+  el.textContent = fmt(state.timerSecs);
+  el.className = 'timer' + (state.running?' run':'') + (state.timerSecs<60&&!state.running?' low':'');
+  ss('wp-secs', state.timerSecs);
+}
+
+function toggleTimer(){
+  state.running = !state.running;
+  document.getElementById('start-btn').textContent = state.running ? '⏸ Pause' : '▶ Start';
+  if(state.running){
+    timerInterval = setInterval(()=>{
+      if(state.timerSecs > 0) state.timerSecs--;
+      else { state.running=false; clearInterval(timerInterval); document.getElementById('start-btn').textContent='▶ Start'; }
+      updateTimerDisplay();
+    },1000);
+  } else {
+    clearInterval(timerInterval);
+  }
+  updateTimerDisplay();
+}
+
+function resetTimer(){
+  state.running=false; clearInterval(timerInterval);
+  document.getElementById('start-btn').textContent='▶ Start';
+  state.timerSecs=480; updateTimerDisplay();
+}
+
+function adjustTimer(d){ state.timerSecs=Math.max(0,state.timerSecs+d); updateTimerDisplay(); }
+
+function changeQ(d){
+  state.q=Math.min(6,Math.max(1,state.q+d));
+  document.getElementById('q-display').textContent='Q'+state.q+(state.q>4?' (OT)':'');
+  ss('wp-q',state.q);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  TAB SWITCHING
+// ═══════════════════════════════════════════════════════════
+function showTab(name){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b=>{ if(b.textContent.toLowerCase()===name) b.classList.add('active'); });
+  if(name==='game') renderGameUI();
+  if(name==='setup') renderSetupUI();
+  if(name==='roster') renderRosterUI();
+  if(name==='prefs') renderPrefsTab();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SHEETS SYNC — Game Stats
+// ═══════════════════════════════════════════════════════════
+function setSyncStatus(s){
+  const el=document.getElementById('sync-pill');
+  const map={idle:['sync-idle','Sheets: not connected'],send:['sync-send','⟳ Syncing…'],ok:['sync-ok','✓ Synced'],err:['sync-err','✕ Sync error']};
+  el.className='sync '+map[s][0]; el.textContent=map[s][1];
+}
+
+async function pushToSheet(body){
+  const url=state.game.sheetUrl; if(!url) return;
+  setSyncStatus('send');
+  try {
+    await fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body)});
+    setSyncStatus('ok'); setTimeout(()=>setSyncStatus('idle'),3000);
+  } catch(e){ setSyncStatus('err'); setTimeout(()=>setSyncStatus('idle'),4000); }
+}
+
+function saveGameSheetUrl(){
+  const url=document.getElementById('sheet-url-input').value.trim();
+  ss('wp-sheet-url',url);
+  state.game.sheetUrl=url;
+  ss('wp-game',state.game);
+  const res=document.getElementById('test-result');
+  res.style.color='#6ee7b7'; res.textContent='✓ Saved.';
+  setTimeout(()=>res.textContent='',2000);
+}
+
+async function testGameConnection(){
+  const url=document.getElementById('sheet-url-input').value.trim();
+  const res=document.getElementById('test-result');
+  if(!url){res.style.color='#ffaaaa';res.textContent='Enter a URL first';return;}
+  res.style.color='#6ee7b7';res.textContent='Testing…';
+  try {
+    await fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'init',darkTeam:document.getElementById('dark-team-name').value||'Dark',
+        whiteTeam:document.getElementById('white-team-name').value||'White',
+        date:document.getElementById('game-date').value})});
+    res.style.color='#6ee7b7';res.textContent='✓ Connected — sheet initialized!';
+  } catch(e){res.style.color='#ffaaaa';res.textContent='✕ Could not connect';}
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SHEETS SYNC — Master Roster
+// ═══════════════════════════════════════════════════════════
+function saveRosterUrl(){
+  state.rosterSheetUrl=document.getElementById('roster-url-input').value.trim();
+  ss('wp-roster-url',state.rosterSheetUrl);
+  const res=document.getElementById('roster-test-result');
+  res.style.color='#6ee7b7'; res.textContent='Saved — loading roster…';
+  loadRosterFromSheet(false).then(()=>{
+    res.style.color='#6ee7b7'; res.textContent='✓ Saved & roster loaded';
+    setTimeout(()=>res.textContent='',3000);
+  });
+}
+
+async function testRosterConnection(){
+  const url=document.getElementById('roster-url-input').value.trim();
+  const res=document.getElementById('roster-test-result');
+  if(!url){res.style.color='#ffaaaa';res.textContent='Enter a URL first';return;}
+  res.style.color='#6ee7b7';res.textContent='Testing…';
+  try {
+    await fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'ping'})});
+    res.style.color='#6ee7b7';res.textContent='✓ Connected!';
+  } catch(e){res.style.color='#ffaaaa';res.textContent='✕ Could not connect';}
+}
+
+async function loadRosterFromSheet(showFeedback){
+  const url=state.rosterSheetUrl;
+  if(!url){
+    if(showFeedback) alert('No Master Roster URL saved yet.\nGo to Setup → Master Roster Sheet and save your URL first.');
+    return;
+  }
+  const res=document.getElementById('roster-test-result');
+  if(showFeedback){res.style.color='#6ee7b7';res.textContent='Loading…';}
+  try {
+    const response=await fetch(url+'?action=getRoster');
+    if(!response.ok) throw new Error('HTTP '+response.status);
+    const data=await response.json();
+    if(data.teams&&Array.isArray(data.teams)){ state.teams=data.teams; ss('wp-teams',state.teams); }
+    if(data.players&&Array.isArray(data.players)){ state.players=data.players; ss('wp-players',state.players); }
+    const now=new Date().toLocaleString();
+    ss('wp-roster-synced',now);
+    updateLastSyncLabel(now);
+    populateTeamDropdowns();
+    if(showFeedback){
+      res.style.color='#6ee7b7';res.textContent='✓ Roster loaded!';
+      setTimeout(()=>res.textContent='',3000);
+    }
+  } catch(e){
+    if(showFeedback){res.style.color='#ffaaaa';res.textContent='✕ Could not load roster';}
+    console.warn('loadRosterFromSheet error:',e);
+  }
+}
+
+function updateLastSyncLabel(timestamp){
+  const el=document.getElementById('roster-last-sync');
+  if(!el) return;
+  if(timestamp){ el.textContent='Last synced: '+timestamp; el.style.display='block'; }
+  else { el.style.display='none'; }
+}
+
+async function rosterPost(body){
+  const url=state.rosterSheetUrl; if(!url) return;
+  try {
+    await fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify(body)});
+  } catch(e){}
+}
+
+function syncTeamToSheet(team){ rosterPost({action:'upsert-team',team}); }
+function deleteTeamFromSheet(id){ rosterPost({action:'delete-team',id}); }
+
+async function pushRosterToSheet(){
+  const url=state.rosterSheetUrl;
+  const res=document.getElementById('roster-test-result');
+  if(!url){ res.style.color='#ffaaaa'; res.textContent='Save a roster URL first.'; return; }
+  if(!state.teams.length&&!state.players.length){ res.style.color='#ffaaaa'; res.textContent='No local data to push.'; return; }
+  res.style.color='#6ee7b7'; res.textContent='Pushing…';
+  const teamPromises=state.teams.map(t=>rosterPost({action:'upsert-team',team:t}));
+  const playerPromises=state.players.map(p=>{
+    const teamNames=(p.teamIds||[]).map(tid=>state.teams.find(t=>String(t.id)===String(tid))?.name).filter(Boolean);
+    return rosterPost({action:'upsert-player',player:{...p,teamNames}});
+  });
+  await Promise.all([...teamPromises,...playerPromises]);
+  res.style.color='#6ee7b7';
+  res.textContent=`✓ Pushed ${state.teams.length} team${state.teams.length!==1?'s':''} & ${state.players.length} player${state.players.length!==1?'s':''}`;
+  setTimeout(()=>res.textContent='',4000);
+}
+
+function syncPlayerToSheet(player){
+  const teamNames=(player.teamIds||[]).map(tid=>state.teams.find(t=>t.id===tid)?.name).filter(Boolean);
+  rosterPost({action:'upsert-player',player:{...player,teamNames}});
+}
+function deletePlayerFromSheet(id){ rosterPost({action:'delete-player',id}); }
+
+// ═══════════════════════════════════════════════════════════
+//  EVENT FLOW
+// ═══════════════════════════════════════════════════════════
+function applyPrefFilters(flow, side){
+  // Remove flow steps the user has turned off for this team side ('dark'|'white')
+  if(!side) return flow;
+  const tp = (state.prefs||{})[side] || {};
+  return flow.filter(s => {
+    if(s==='assist') return tp.assist !== false;
+    return true; // all other steps always kept (event button wouldn't exist if disabled)
+  });
+}
+
+function startFlow(type,forceTeam){
+  const def=EVENT_DEFS[type];
+  let flow=[...def.flow];
+  // Apply pref filters when team is known up-front
+  if(forceTeam) flow = applyPrefFilters(flow, forceTeam);
+  // Goalie Block doesn't force a team — the goalie-team step handles it
+  if(!forceTeam && type!=='goalie-block') flow=['team-pick',...flow];
+  state.flow=flow; state.flowIdx=0;
+  state.flowCtx={eventType:type,eventLabel:def.label,team:forceTeam||null};
+  state.pendingData=forceTeam?{teamLabel:forceTeam==='dark'?state.game.darkTeam:state.game.whiteTeam}:{};
+  showModalStep(flow[0]);
+}
+
+function nextStep(field,val,label,playerId){
+  const d=state.pendingData;
+  if(field==='team'){
+    state.flowCtx.team=val; d.teamLabel=label;
+    // Apply pref filters for the chosen team to remaining flow steps
+    const remaining = state.flow.slice(state.flowIdx+1);
+    const filtered = applyPrefFilters(remaining, val);
+    state.flow = [...state.flow.slice(0, state.flowIdx+1), ...filtered];
+  }
+  else if(field==='goalieTeam'){state.flowCtx.goalieTeam=val;d.goalieTeamLabel=label;}
+  else if(field==='cap'){d.cap=val;d.capName=label;d.playerId=playerId||null;}
+  else if(field==='goalieCap'){d.goalieCap=val;d.goalieCapName=label;d.goaliePlayerId=playerId||null;}
+  else if(field==='shooterCap'){d.shooterCap=val;d.shooterCapName=label;d.shooterPlayerId=playerId||null;}
+  else if(field==='drawn'){d.drawnBy=val;d.drawnByName=label;d.drawnPlayerId=playerId||null;}
+  else if(field==='fiveMShooter'){d.fiveMShooterCap=val;d.fiveMShooterName=label;d.fiveMShooterPlayerId=playerId||null;}
+  else if(field==='turnover'){d.turnoverBy=val;d.turnoverByName=label;d.turnoverPlayerId=playerId||null;}
+  else if(field==='stolenBy'){d.stolenBy=val;d.stolenByName=label;d.stolenPlayerId=playerId||null;}
+  else if(field==='assist'){d.assist=val;d.assistName=label;d.assistPlayerId=playerId||null;}
+  else if(field==='zone'){d.zone=label;}
+  else if(field==='gm'){d.gm=label;}
+  state.flowIdx++;
+  if(state.flowIdx<state.flow.length) showModalStep(state.flow[state.flowIdx]);
+  else finalizeEvent();
+}
+
+const AUTO_PAUSE_TYPES = new Set(['Goal (Reg)','Goal (6-5)','5M Goal','5M Foul']);
+
+function autoPauseIfNeeded(eventLabel){
+  if(!AUTO_PAUSE_TYPES.has(eventLabel)) return;
+  if(state.running){
+    state.running=false;
+    clearInterval(timerInterval);
+    document.getElementById('start-btn').textContent='▶ Start';
+    updateTimerDisplay();
+  }
+}
+
+function finalizeEvent(){
+  // 5M Penalty has its own multi-event finalization
+  if(state.flowCtx.eventType==='5m-penalty'){ finalize5mPenalty(); return; }
+
+  const d=state.pendingData;
+  const row={
+    id:Date.now(), q:state.q, time:fmt(state.timerSecs),
+    type:state.flowCtx.eventLabel,
+    team:d.teamLabel||d.goalieTeamLabel||'',
+    cap:d.cap||d.goalieCap||'', capName:d.capName||d.goalieCapName||'',
+    playerId:d.playerId||d.goaliePlayerId||null,
+    zone:d.zone||'', gm:d.gm||'',
+    assist:d.assist?'#'+d.assist:'', assistName:d.assistName||'', assistPlayerId:d.assistPlayerId||null,
+    drawnBy:d.drawnBy?'#'+d.drawnBy:'', drawnByName:d.drawnByName||'', drawnPlayerId:d.drawnPlayerId||null,
+    turnoverBy:d.turnoverBy?'#'+d.turnoverBy:'', turnoverPlayerId:d.turnoverPlayerId||null,
+    stolenBy:d.stolenBy?'#'+d.stolenBy:'', stolenByName:d.stolenByName||'', stolenPlayerId:d.stolenPlayerId||null,
+    shooterCap:d.shooterCap?'#'+d.shooterCap:'', shooterPlayerId:d.shooterPlayerId||null,
+  };
+  state.events.push(row);
+  ss('wp-events',state.events);
+  autoPauseIfNeeded(row.type);
+  closeModal(); renderEventLog(); updateScores();
+  // Push to sheet after UI update so sheet errors never block the UI
+  pushToSheet({action:'events', rows:eventToRows({...row, gameId:state.game.gameId||'', date:state.game.date||''})});
+}
+
+function handle5mResult(result){
+  state.pendingData.fiveMResult = result;
+  if(result==='make'){
+    // Insert gm step into flow right after current position, then advance
+    state.flow.splice(state.flowIdx+1, 0, 'gm');
+    state.flowIdx++;
+    showModalStep('gm');
+  } else {
+    // Miss — finalize immediately (no more steps needed)
+    finalize5mPenalty();
+  }
+}
+
+function finalize5mPenalty(){
+  const d=state.pendingData;
+  const ctx=state.flowCtx;
+  const g=state.game;
+  const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
+  const foulingTeam=ctx.team; // 'dark' or 'white'
+  const foulingTeamName=foulingTeam==='dark'?dN:wN;
+  const shootingTeam=foulingTeam==='dark'?'white':'dark';
+  const shootingTeamName=foulingTeam==='dark'?wN:dN;
+  const now=Date.now();
+  const time=fmt(state.timerSecs);
+  const q=state.q;
+  const gameId=g.gameId||'';
+  const date=g.date||'';
+
+  // Event 1: 5M Foul — against the player who committed the foul
+  const foulRow={
+    id:now, q, time,
+    type:'5M Foul',
+    team:foulingTeamName,
+    cap:d.cap||'', capName:d.capName||'',
+    playerId:d.playerId||null,
+    zone:'', gm:'', assist:'',
+    drawnBy:d.drawnBy?'#'+d.drawnBy:'',
+    drawnByName:d.drawnByName||'',
+    drawnPlayerId:d.drawnPlayerId||null,
+    turnoverBy:'', shooterCap:'',
+  };
+
+  // Event 2: 5M Goal or 5M Block
+  let resultRow;
+  if(d.fiveMResult==='make'){
+    // Shooter cap — use explicitly picked shooter; fall back to drawn-by player
+    const shooterCap    = d.fiveMShooterCap    || d.drawnBy    || '';
+    const shooterName   = d.fiveMShooterName   || d.drawnByName|| '';
+    const shooterPid    = d.fiveMShooterPlayerId!==undefined ? d.fiveMShooterPlayerId : (d.drawnPlayerId||null);
+    resultRow={
+      id:now+1, q, time,
+      type:'5M Goal',
+      team:shootingTeamName,
+      cap:shooterCap, capName:shooterName,
+      playerId:shooterPid,
+      zone:'', gm:d.gm||'', assist:'',
+      drawnBy:'', drawnByName:'', drawnPlayerId:null,
+      turnoverBy:'', shooterCap:'',
+    };
+  } else {
+    // Miss — credit active goalie with 5M Block
+    const goalieCapNum=(state.activeGoalie||{})[foulingTeam];
+    const goalieRoster=foulingTeam==='dark'?(g.darkRoster||[]):(g.whiteRoster||[]);
+    const goaliePlayer=goalieCapNum?goalieRoster.find(p=>p.cap===goalieCapNum):null;
+    resultRow={
+      id:now+1, q, time,
+      type:'5M Block',
+      team:foulingTeamName, // goalie defends for the fouling team
+      cap:goalieCapNum||'',
+      capName:goaliePlayer?goaliePlayer.name:(goalieCapNum?'#'+goalieCapNum:'Unknown GK'),
+      playerId:goaliePlayer?goaliePlayer.playerId:null,
+      zone:'', gm:'', assist:'',
+      drawnBy:'', drawnByName:'', drawnPlayerId:null,
+      turnoverBy:'', shooterCap:'',
+    };
+  }
+
+  state.events.push(foulRow, resultRow);
+  ss('wp-events', state.events);
+  autoPauseIfNeeded(d.fiveMResult==='make'?'5M Goal':'5M Foul');
+  closeModal(); renderEventLog(); updateScores();
+  // Push to sheet after UI update so sheet errors never block the UI
+  pushToSheet({action:'events', rows:[...eventToRows({...foulRow,gameId,date}),...eventToRows({...resultRow,gameId,date})]});
+}
+
+function quickGoalieBlock(team, cap){
+  const g=state.game;
+  const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
+  const teamName=team==='dark'?dN:wN;
+  const roster=team==='dark'?(g.darkRoster||[]):(g.whiteRoster||[]);
+  const player=roster.find(p=>p.cap===cap);
+  const row={
+    id:Date.now(), q:state.q, time:fmt(state.timerSecs),
+    type:'Goalie Block',
+    team:teamName,
+    cap, capName:player?player.name:'#'+cap,
+    playerId:player?player.playerId:null,
+    zone:'', gm:'', assist:'',
+    drawnBy:'', drawnByName:'', drawnPlayerId:null,
+    turnoverBy:'', shooterCap:'',
+  };
+  state.events.push(row);
+  ss('wp-events',state.events);
+  renderEventLog(); updateScores();
+  pushToSheet({action:'events', rows:eventToRows({...row, gameId:g.gameId||'', date:g.date||''})});
+}
+
+function selectActiveGoalie(team, cap){
+  const g=state.game;
+  const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
+  const teamName=team==='dark'?dN:wN;
+  const roster=team==='dark'?(g.darkRoster||[]):(g.whiteRoster||[]);
+  const player=roster.find(p=>p.cap===cap);
+  state.flowCtx.goalieTeam=team;
+  const d=state.pendingData;
+  d.goalieTeamLabel=teamName;
+  d.goalieCap=cap;
+  d.goalieCapName=player?player.name:'#'+cap;
+  d.goaliePlayerId=player?player.playerId:null;
+  // Skip past goalie-cap in the flow (it's already resolved)
+  const gcIdx=state.flow.indexOf('goalie-cap', state.flowIdx);
+  state.flowIdx=(gcIdx>=0?gcIdx:state.flowIdx)+1;
+  if(state.flowIdx<state.flow.length) showModalStep(state.flow[state.flowIdx]);
+  else finalizeEvent();
+}
+
+function eventToRows(ev){
+  const g=state.game;
+  const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
+  const oppTeam=ev.team===dN?wN:dN;
+  const base={gameId:ev.gameId||'', groupId:ev.id, q:ev.q, time:ev.time, date:ev.date||''};
+  const rows=[];
+
+  // Primary action
+  rows.push({...base, event:ev.type, team:ev.team, cap:ev.cap||'', playerId:ev.playerId||'', zone:ev.zone||'', gm:ev.gm||''});
+
+  // Assist
+  if(ev.assist){
+    rows.push({...base, event:'Assist', team:ev.team, cap:ev.assist.replace('#',''), playerId:ev.assistPlayerId||'', zone:'', gm:''});
+  }
+
+  // Ejection drawn / 5m drawn
+  if(ev.drawnBy){
+    const drawnType=ev.type.includes('Ejection')?'Ejection Drawn':'5m Drawn';
+    rows.push({...base, event:drawnType, team:oppTeam, cap:ev.drawnBy.replace('#',''), playerId:ev.drawnPlayerId||'', zone:'', gm:''});
+  }
+
+  // Turnover (counterpart to a steal)
+  if(ev.turnoverBy){
+    rows.push({...base, event:'Turnover', team:oppTeam, cap:ev.turnoverBy.replace('#',''), playerId:ev.turnoverPlayerId||'', zone:'', gm:''});
+  }
+
+  // Steal (counterpart to a turnover)
+  if(ev.stolenBy){
+    rows.push({...base, event:'Steal', team:oppTeam, cap:ev.stolenBy.replace('#',''), playerId:ev.stolenPlayerId||'', zone:'', gm:''});
+  }
+
+  // Shooter (counterpart to a save)
+  if(ev.shooterCap){
+    rows.push({...base, event:'Shot On Goal', team:oppTeam, cap:ev.shooterCap.replace('#',''), playerId:ev.shooterPlayerId||'', zone:'', gm:''});
+  }
+
+  return rows;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  MODAL RENDERING
+// ═══════════════════════════════════════════════════════════
+function showModalStep(step){
+  document.getElementById('modal-title').textContent=state.flowCtx.eventLabel;
+  const body=document.getElementById('modal-body');
+  const g=state.game;
+  const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
+  const isDk=state.flowCtx.team==='dark';
+  const roster=isDk?(g.darkRoster||[]):(g.whiteRoster||[]);
+  const oppRoster=isDk?(g.whiteRoster||[]):(g.darkRoster||[]);
+
+  if(step==='team-pick'){
+    body.innerHTML=`<p style="color:#7a9bb8;font-size:13px;margin-bottom:12px;">Which team?</p>
+    <div class="team-pick">
+      <button class="team-dk" onclick="nextStep('team','dark','${dN}')">${dN}<br><span style="font-weight:400;font-size:11px;opacity:.7">Dark caps</span></button>
+      <button class="team-wh" onclick="nextStep('team','white','${wN}')">${wN}<br><span style="font-weight:400;font-size:11px;opacity:.6">White caps</span></button>
+    </div>`;
+  }
+  else if(step==='cap') renderCapPicker(roster,isDk,`${isDk?dN:wN} — who?`,'cap');
+  else if(step==='goalie-team'){
+    const ag=state.activeGoalie||{};
+    const dkCap=ag.dark, whCap=ag.white;
+    // If either team has an active goalie set, show one-tap buttons that auto-fill cap
+    if(dkCap||whCap){
+      const dkRoster=g.darkRoster||[], whRoster=g.whiteRoster||[];
+      const dkP=dkCap?dkRoster.find(p=>p.cap===dkCap):null;
+      const whP=whCap?whRoster.find(p=>p.cap===whCap):null;
+      let html=`<p style="color:#7a9bb8;font-size:13px;margin-bottom:12px;">Which goalie made the block?</p><div class="cap-grid" style="grid-template-columns:1fr 1fr;">`;
+      if(dkCap){
+        html+=`<button class="cap-btn dk" title="${dkP?dkP.name:'#'+dkCap}" onclick="selectActiveGoalie('dark','${dkCap}')">${capSVG(dkCap,true)}<div style="font-size:11px;color:#7a9bb8;margin-top:3px;">#${dkCap}</div></button>`;
+      } else {
+        html+=`<button class="team-dk" style="padding:14px 8px;" onclick="nextStep('goalieTeam','dark','${dN}')">${dN}<br><span style="font-weight:400;font-size:11px;opacity:.7">Pick cap</span></button>`;
+      }
+      if(whCap){
+        html+=`<button class="cap-btn wh" title="${whP?whP.name:'#'+whCap}" onclick="selectActiveGoalie('white','${whCap}')">${capSVG(whCap,false)}<div style="font-size:11px;color:#5a7a9a;margin-top:3px;">#${whCap}</div></button>`;
+      } else {
+        html+=`<button class="team-wh" style="padding:14px 8px;" onclick="nextStep('goalieTeam','white','${wN}')">${wN}<br><span style="font-weight:400;font-size:11px;opacity:.6">Pick cap</span></button>`;
+      }
+      html+=`</div>`;
+      body.innerHTML=html;
+    } else {
+      body.innerHTML=`<p style="color:#7a9bb8;font-size:13px;margin-bottom:12px;">Goalie's team?</p>
+      <div class="team-pick">
+        <button class="team-dk" onclick="nextStep('goalieTeam','dark','${dN}')">${dN}</button>
+        <button class="team-wh" onclick="nextStep('goalieTeam','white','${wN}')">${wN}</button>
+      </div>`;
+    }
+  }
+  else if(step==='goalie-cap'){
+    const gtIsDk=state.flowCtx.goalieTeam==='dark';
+    renderCapPicker(gtIsDk?g.darkRoster:g.whiteRoster,gtIsDk,'Goalie cap #','goalieCap');
+  }
+  else if(step==='drawn'){
+    renderCapPicker(oppRoster,!isDk,`Drawn by — ${isDk?wN:dN}`,'drawn');
+  }
+  else if(step==='5m-shooter'){
+    const title = `Shooter — ${isDk?wN:dN}`;
+    renderCapPicker(oppRoster,!isDk,title,'fiveMShooter');
+  }
+  else if(step==='5m-result'){
+    body.innerHTML=`<p style="color:#7a9bb8;font-size:13px;margin-bottom:14px;">Result of the 5M shot?</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <button onclick="handle5mResult('make')"
+          style="padding:22px 8px;border-radius:10px;background:#0d3a2a;color:#6ee7b7;border:1px solid #1a5a3a;font-size:16px;font-weight:700;">
+          ✓ Goal
+        </button>
+        <button onclick="handle5mResult('miss')"
+          style="padding:22px 8px;border-radius:10px;background:#3a0d0d;color:#f08080;border:1px solid #5a1a1a;font-size:16px;font-weight:700;">
+          ✗ Saved / Miss
+        </button>
+      </div>`;
+  }
+  else if(step==='turnover') renderCapPicker(oppRoster,!isDk,`Turnover by — ${isDk?wN:dN}`,'turnover');
+  else if(step==='stolen-by') renderCapPicker(oppRoster,!isDk,`Stolen by — ${isDk?wN:dN}`,'stolenBy',true);
+  else if(step==='assist') renderCapPicker(roster,isDk,'Assist (optional)','assist',true);
+  else if(step==='zone') renderPoolPicker();
+  else if(step==='gm') renderGMPicker();
+
+  document.getElementById('modal-overlay').style.display='flex';
+}
+
+function capSVG(num, isDark) {
+  const fill   = isDark ? '#0e1d56' : '#f2f6fa';
+  const stroke = isDark ? '#4060b0' : '#7a9ab8';
+  const text   = isDark ? '#ffffff' : '#0e1d56';
+  const hole   = 'rgba(0,0,0,0.52)';
+  const fs     = String(num).length > 1 ? '22' : '28';
+
+  // Side-profile view: cap faces left, ear guard disc visible on left side.
+  // Dome path curves from forehead (lower-left) up over crown and down the back (right).
+  // Ear guard: 17-unit disc at (28,53) with a 7-hole pattern (1 centre + 6 at radius 9).
+  return `<svg viewBox="0 0 120 80" xmlns="http://www.w3.org/2000/svg">
+    <path d="M18,62 C14,42 20,14 48,8 C76,2 106,14 110,36 C115,58 104,72 88,74 L26,74 C20,74 18,68 18,62Z"
+          fill="${fill}" stroke="${stroke}" stroke-width="2.2" stroke-linejoin="round"/>
+    <circle cx="28" cy="53" r="17" fill="${fill}" stroke="${stroke}" stroke-width="2.2"/>
+    <circle cx="28" cy="53" r="4"   fill="${hole}"/>
+    <circle cx="28" cy="44" r="3.2" fill="${hole}"/>
+    <circle cx="35.8" cy="48.5" r="3.2" fill="${hole}"/>
+    <circle cx="35.8" cy="57.5" r="3.2" fill="${hole}"/>
+    <circle cx="28"   cy="62"   r="3.2" fill="${hole}"/>
+    <circle cx="20.2" cy="57.5" r="3.2" fill="${hole}"/>
+    <circle cx="20.2" cy="48.5" r="3.2" fill="${hole}"/>
+    <text x="74" y="40" text-anchor="middle" dominant-baseline="middle"
+          fill="${text}" font-size="${fs}" font-weight="900" font-family="system-ui,sans-serif">${num}</text>
+  </svg>`;
+}
+
+function renderCapPicker(roster,isDk,title,field,optional){
+  const caps=roster&&roster.length?roster:Array.from({length:13},(_,i)=>({cap:String(i+1),name:'',playerId:null}));
+  let html=`<p style="color:#7a9bb8;font-size:13px;margin-bottom:10px;">${title}</p><div class="cap-grid">`;
+  caps.forEach(p=>{
+    const pid=p.playerId?`'${p.playerId}'`:'null';
+    const safeName=(p.name||'#'+p.cap).replace(/'/g,"\\'");
+    html+=`<button class="cap-btn ${isDk?'dk':'wh'}" title="${p.name||'#'+p.cap}" onclick="nextStep('${field}','${p.cap}','${safeName}',${pid})">${capSVG(p.cap,isDk)}</button>`;
+  });
+  html+='</div>';
+  if(optional){
+    html+=`<button class="btn-s" style="width:100%;margin-top:4px;" onclick="nextStep('${field}',null,null,null)">Skip / Unknown</button>`;
+  } else {
+    html+=`<button class="btn-s" style="width:100%;margin-top:4px;" onclick="nextStep('${field}','?','Unknown',null)">Skip / Unknown</button>`;
+  }
+  document.getElementById('modal-body').innerHTML=html;
+}
+
+let _poolCoords = null;
+
+function renderPoolPicker(){
+  const {VBW,VBH,X,Y,W,H} = POOL;
+  const L = POOL_LINES;
+  const gCx = X + W/2, gW = W*0.15, gLeft = gCx - gW/2, gRight = gCx + gW/2;
+
+  const html = `
+  <p style="color:#7a9bb8;font-size:12px;margin-bottom:6px;">Tap the shot origin on the pool diagram</p>
+  <svg id="pool-svg" viewBox="0 0 ${VBW} ${VBH}"
+       style="width:100%;max-height:52vh;display:block;cursor:crosshair;touch-action:none;"
+       onclick="poolClicked(event)" ontouchend="poolTouched(event)">
+    <defs>
+      <linearGradient id="wg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#0a5a8a"/>
+        <stop offset="100%" stop-color="#083040"/>
+      </linearGradient>
+    </defs>
+
+    <!-- Pool water -->
+    <rect x="${X}" y="${Y}" width="${W}" height="${H}" fill="url(#wg)" stroke="#2a8aca" stroke-width="2" rx="3"/>
+
+    <!-- Center line (subtle) -->
+    <line x1="${gCx}" y1="${Y}" x2="${gCx}" y2="${Y+H}" stroke="#1a6a9a" stroke-width="0.5" stroke-dasharray="3,6" opacity="0.5"/>
+
+    <!-- Goal -->
+    <rect x="${gLeft}" y="${Y-14}" width="${gW}" height="16" fill="rgba(255,255,255,0.08)" stroke="#ffffff" stroke-width="2" rx="1"/>
+    <line x1="${gLeft}" y1="${Y}" x2="${X}" y2="${Y}" stroke="#2a8aca" stroke-width="0.5" opacity="0.4"/>
+    <line x1="${gRight}" y1="${Y}" x2="${X+W}" y2="${Y}" stroke="#2a8aca" stroke-width="0.5" opacity="0.4"/>
+    <text x="${gCx}" y="${Y-18}" text-anchor="middle" fill="#90c8e8" font-size="9" font-weight="600" letter-spacing="1">GOAL</text>
+
+    <!-- 2m line -->
+    <line x1="${X}" y1="${L['2m']}" x2="${X+W}" y2="${L['2m']}" stroke="#ffd700" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="${X-4}" y="${L['2m']+4}" text-anchor="end" fill="#ffd700" font-size="9" font-weight="600">2m</text>
+
+    <!-- 5m line -->
+    <line x1="${X}" y1="${L['5m']}" x2="${X+W}" y2="${L['5m']}" stroke="#ff9500" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="${X-4}" y="${L['5m']+4}" text-anchor="end" fill="#ff9500" font-size="9" font-weight="600">5m</text>
+
+    <!-- 6m line -->
+    <line x1="${X}" y1="${L['6m']}" x2="${X+W}" y2="${L['6m']}" stroke="#ff4444" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="${X-4}" y="${L['6m']+4}" text-anchor="end" fill="#ff4444" font-size="9" font-weight="600">6m</text>
+
+    <!-- Half tank -->
+    <line x1="${X}" y1="${Y+H}" x2="${X+W}" y2="${Y+H}" stroke="#4a8aaa" stroke-width="1.5"/>
+    <text x="${X-4}" y="${Y+H+4}" text-anchor="end" fill="#4a8aaa" font-size="9">half</text>
+
+    <!-- Shot marker (starts offscreen) -->
+    <circle id="pool-ring" cx="-99" cy="-99" r="13" fill="none" stroke="#ff5555" stroke-width="1.5" opacity="0.5"/>
+    <circle id="pool-dot"  cx="-99" cy="-99" r="7"  fill="#ff5555" stroke="#ffffff" stroke-width="2"/>
+  </svg>
+  <div id="pool-label" style="text-align:center;font-size:12px;color:#5a7a9a;margin:6px 0;min-height:18px;"></div>
+  <div class="row" style="gap:8px;">
+    <button class="btn-s" style="flex:1;" onclick="nextStep('zone',null,null)">Skip</button>
+    <button class="btn-p" style="flex:2;" id="pool-confirm" disabled onclick="confirmPool()">Confirm location</button>
+  </div>`;
+
+  _poolCoords = null;
+  document.getElementById('modal-body').innerHTML = html;
+}
+
+function poolClicked(e){
+  _handlePoolInput(e.clientX, e.clientY);
+}
+
+function poolTouched(e){
+  e.preventDefault();
+  const t = e.changedTouches[0];
+  _handlePoolInput(t.clientX, t.clientY);
+}
+
+function _handlePoolInput(clientX, clientY){
+  const svg = document.getElementById('pool-svg');
+  if(!svg) return;
+  const rect = svg.getBoundingClientRect();
+  const {VBW,VBH,X,Y,W,H} = POOL;
+
+  // Convert screen coords to viewBox coords
+  const vx = (clientX - rect.left) / rect.width  * VBW;
+  const vy = (clientY - rect.top)  / rect.height * VBH;
+
+  // Clamp to pool area
+  const px = Math.max(X, Math.min(X+W, vx));
+  const py = Math.max(Y, Math.min(Y+H, vy));
+
+  // Store as 0-100 percentages (x: left=0/right=100, y: goal=0/halftank=100)
+  const pctX = Math.round((px - X) / W * 100);
+  const pctY = Math.round((py - Y) / H * 100);
+  _poolCoords = {x: pctX, y: pctY};
+
+  // Move dot
+  ['pool-dot','pool-ring'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el){ el.setAttribute('cx', px); el.setAttribute('cy', py); }
+  });
+
+  // Human-readable label
+  const side = pctX < 35 ? 'Left' : pctX > 65 ? 'Right' : 'Center';
+  const L = POOL_LINES;
+  const absY = py;
+  const zone = absY < L['2m'] ? 'Inside 2m'
+              : absY < L['5m'] ? '2m – 5m'
+              : absY < L['6m'] ? '5m – 6m'
+              : absY < (POOL.Y + POOL.H*0.6) ? '6m zone'
+              : 'Deep';
+  document.getElementById('pool-label').textContent = `${side} · ${zone}  (${pctX}, ${pctY})`;
+
+  const btn = document.getElementById('pool-confirm');
+  if(btn) btn.disabled = false;
+}
+
+function confirmPool(){
+  if(!_poolCoords) return;
+  const coord = `${_poolCoords.x},${_poolCoords.y}`;
+  nextStep('zone', coord, coord);
+}
+
+function renderGMPicker(){
+  let html='<p style="color:#7a9bb8;font-size:12px;margin-bottom:6px;">Goal mouth location</p><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:8px;">';
+  GM_ZONES.forEach(z=>{ html+=`<button class="zone-btn" style="padding:10px 4px;" onclick="nextStep('gm','${z}','${z}')">${z}</button>`; });
+  html+=`</div><button class="btn-s" style="width:100%;" onclick="nextStep('gm',null,null)">Skip</button>`;
+  document.getElementById('modal-body').innerHTML=html;
+}
+
+function closeModal(){
+  document.getElementById('modal-overlay').style.display='none';
+  state.flow=null;state.flowIdx=0;state.flowCtx={};state.pendingData={};
+}
+
+// ═══════════════════════════════════════════════════════════
+//  GAME UI
+// ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+//  PREFS TAB
+// ═══════════════════════════════════════════════════════════
+const PREF_CATS = [
+  {key:'goals',    label:'Goals',        emoji:'⚽'},
+  {key:'miss',     label:'Missed Shots', emoji:'🚫'},
+  {key:'assist',   label:'Assists',      emoji:'🤝'},
+  {key:'ejection', label:'Ejections',    emoji:'🟡'},
+  {key:'fiveM',    label:'5M Penalties', emoji:'⚡'},
+  {key:'steal',    label:'Steals',       emoji:'✊'},
+  {key:'turnover', label:'Turnovers',    emoji:'🔄'},
+];
+const SHARED_PREF_CATS = [
+  {key:'goalieBlock', label:'Goalie Blocks', emoji:'🧤'},
+  {key:'fieldBlock',  label:'Field Blocks',  emoji:'🛡️'},
+  {key:'sprintWon',   label:'Sprint Won',    emoji:'🏃'},
+];
+
+function renderPrefsTab(){
+  const g=state.game;
+  const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
+  const p=state.prefs;
+
+  function teamSection(side, teamName, isDark){
+    const prefs = side==='dark' ? p.dark : p.white;
+    const capColor = isDark ? '#6080d0' : '#4a7a9a';
+    const headerStyle = isDark
+      ? 'background:#0e1d56;color:#fff;border:1px solid #4060b0;'
+      : 'background:#dde8f0;color:#1a2a3a;border:1px solid #aac0d0;';
+    const btns = PREF_CATS.map(c => {
+      const on = prefs[c.key] !== false;
+      return `<button class="pref-toggle ${on?'on':'off'}" onclick="togglePref('${side}','${c.key}')">
+        ${c.emoji} <span class="pref-label">${c.label}</span>
+      </button>`;
+    }).join('');
+    return `<div class="card" style="margin-bottom:10px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <span style="padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;${headerStyle}">${isDark?'Dark':'White'}</span>
+        <span style="font-weight:600;font-size:13px;color:#c0d8f0;">${teamName}</span>
+      </div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;">${btns}</div>
+    </div>`;
+  }
+
+  const sharedBtns = SHARED_PREF_CATS.map(c => {
+    const on = p.shared[c.key] !== false;
+    return `<button class="pref-toggle ${on?'on':'off'}" onclick="togglePref('shared','${c.key}')">
+      ${c.emoji} <span class="pref-label">${c.label}</span>
+    </button>`;
+  }).join('');
+  const sharedSection = `<div class="card" style="margin-bottom:10px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <span style="padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;background:#0d3a2a;color:#6ee7b7;border:1px solid #1a5a3a;">Shared</span>
+      <span style="font-weight:600;font-size:13px;color:#c0d8f0;">Both Teams</span>
+    </div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;">${sharedBtns}</div>
+  </div>`;
+
+  document.getElementById('prefs-content').innerHTML =
+    teamSection('dark', dN, true) + teamSection('white', wN, false) + sharedSection;
+}
+
+function togglePref(side, key){
+  // Toggle: enabled (true/undefined) → disabled (false), disabled → enabled (true)
+  state.prefs[side][key] = state.prefs[side][key] !== false ? false : true;
+  ss('wp-prefs', state.prefs);
+  renderPrefsTab();
+  renderGameUI(); // keep game buttons in sync immediately
+}
+
+function renderGameUI(){
+  const g=state.game;
+  const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
+  document.getElementById('dark-name-score').textContent=dN;
+  document.getElementById('white-name-score').textContent=wN;
+  document.getElementById('dark-btn-title').textContent=dN+' — Dark';
+  document.getElementById('white-btn-title').textContent=wN+' — White';
+  document.getElementById('game-label').textContent=dN+' vs '+wN;
+  document.getElementById('q-display').textContent='Q'+state.q+(state.q>4?' (OT)':'');
+  document.getElementById('no-sheet-warn').style.display=g.sheetUrl?'none':'block';
+  updateTimerDisplay(); updateScores();
+
+  const p=state.prefs||{}, dp=p.dark||{}, wp=p.white||{}, sp=p.shared||{};
+  function prefEnabled(prefs, type){
+    if(type==='goal-reg'||type==='goal-65') return prefs.goals   !== false;
+    if(type==='miss')                        return prefs.miss     !== false;
+    if(type==='ejection')                    return prefs.ejection !== false;
+    if(type==='5m-penalty')                  return prefs.fiveM    !== false;
+    if(type==='steal')                       return prefs.steal    !== false;
+    if(type==='turnover')                    return prefs.turnover !== false;
+    return true;
+  }
+  const allTeamBtns=['goal-reg','goal-65','miss','ejection','5m-penalty','steal','turnover'];
+  let dHtml='',wHtml='',sHtml='';
+  allTeamBtns.forEach(t=>{
+    if(prefEnabled(dp,t)) dHtml+=`<button class="evt-dk" onclick="startFlow('${t}','dark')">${EVENT_DEFS[t].label}</button>`;
+    if(prefEnabled(wp,t)) wHtml+=`<button class="evt-wh" onclick="startFlow('${t}','white')">${EVENT_DEFS[t].label}</button>`;
+  });
+
+  // Goalie Block: if active GKs are set, render one-tap cap buttons per team
+  if(sp.goalieBlock !== false){
+    const ag=state.activeGoalie||{};
+    const dkCap=ag.dark, whCap=ag.white;
+    if(dkCap||whCap){
+      if(dkCap){
+        sHtml+=`<button class="evt-nt" style="padding:4px 2px;" title="GK Block — ${dN} #${dkCap}" onclick="quickGoalieBlock('dark','${dkCap}')">
+          <span style="pointer-events:none;display:block;">${capSVG(dkCap,true)}</span>
+          <div style="font-size:10px;margin-top:2px;pointer-events:none;">GK Block</div>
+        </button>`;
+      } else {
+        sHtml+=`<button class="evt-nt" onclick="startFlow('goalie-block',null)">Goalie Block</button>`;
+      }
+      if(whCap){
+        sHtml+=`<button class="evt-nt" style="padding:4px 2px;" title="GK Block — ${wN} #${whCap}" onclick="quickGoalieBlock('white','${whCap}')">
+          <span style="pointer-events:none;display:block;">${capSVG(whCap,false)}</span>
+          <div style="font-size:10px;margin-top:2px;pointer-events:none;">GK Block</div>
+        </button>`;
+      } else {
+        sHtml+=`<button class="evt-nt" onclick="startFlow('goalie-block',null)">Goalie Block</button>`;
+      }
+    } else {
+      sHtml+=`<button class="evt-nt" onclick="startFlow('goalie-block',null)">Goalie Block</button>`;
+    }
+  }
+
+  if(sp.fieldBlock  !== false) sHtml+=`<button class="evt-nt" onclick="startFlow('field-block',null)">Field Block</button>`;
+  if(sp.sprintWon   !== false) sHtml+=`<button class="evt-nt" onclick="startFlow('sprint-won',null)">Sprint Won</button>`;
+
+  document.getElementById('dark-btns').innerHTML=dHtml;
+  document.getElementById('white-btns').innerHTML=wHtml;
+  document.getElementById('shared-btns').innerHTML=sHtml;
+  renderEventLog();
+}
+
+function updateScores(){
+  const g=state.game;
+  const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
+  document.getElementById('dark-score').textContent=state.events.filter(e=>e.type.match(/Goal/)&&e.team===dN).length;
+  document.getElementById('white-score').textContent=state.events.filter(e=>e.type.match(/Goal/)&&e.team===wN).length;
+}
+
+function renderEventLog(){
+  const g=state.game;
+  const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
+
+  // Look up a player name from roster by playerId (preferred) or cap number
+  function lookupName(team, cap, playerId){
+    const roster=team===dN?(g.darkRoster||[]):(g.whiteRoster||[]);
+    const p=playerId?roster.find(x=>x.playerId===playerId):roster.find(x=>x.cap===String(cap));
+    return p?p.name:'';
+  }
+
+  document.getElementById('event-count').textContent=`(${state.events.length})`;
+  document.getElementById('no-events-msg').style.display=state.events.length?'none':'block';
+
+  // Expand each stored event into all its related rows (same set sent to Sheets)
+  let html='';
+  [...state.events].reverse().forEach(ev=>{
+    const expanded=eventToRows({...ev, gameId:g.gameId||'', date:g.date||''});
+    expanded.forEach((r,idx)=>{
+      const isPrimary=idx===0;
+      // Primary row: use stored capName; counterpart rows: look up from roster
+      const capName=isPrimary
+        ?(ev.capName&&!ev.capName.includes('Placeholder')?ev.capName:lookupName(r.team,r.cap,r.playerId))
+        :lookupName(r.team,r.cap,r.playerId);
+      const cls=r.team===dN?'bdg-dk':r.team===wN?'bdg-wh':'bdg-nt';
+      const nameSpan=capName&&capName!=='#'+r.cap
+        ?`<span style="font-weight:400;font-size:10px;color:#5a7a9a;margin-left:3px;">${capName}</span>`:'';
+      const rowStyle=isPrimary?'':'opacity:0.65;';
+      html+=`<tr style="${rowStyle}">
+        <td>${r.q}</td><td style="font-variant-numeric:tabular-nums;">${r.time}</td>
+        <td><span class="bdg ${cls}">${r.event}</span></td>
+        <td style="font-size:11px;color:#7a9bb8;">${r.team}</td>
+        <td style="font-weight:600;">#${r.cap}${nameSpan}</td>
+        <td style="font-size:11px;">${r.zone||''}</td><td style="font-size:11px;">${r.gm||''}</td>
+        <td style="font-size:11px;color:#7a9bb8;"></td>
+      </tr>`;
+    });
+  });
+  document.getElementById('event-tbody').innerHTML=html;
+  updateCritStatsBtn();
+  updateStatChips();
+}
+
+function clearEvents(){
+  if(!confirm('Clear all events?')) return;
+  state.events=[]; ss('wp-events',[]); renderEventLog(); updateScores();
+}
+
+function exportCSV(){
+  const g=state.game;
+  const hdr=['GameID','GroupID','Q','Time','Date','Event','Team','Cap','PlayerID','Zone','GM'];
+  const rows=[];
+  state.events.forEach(ev=>{
+    eventToRows({...ev, gameId:g.gameId||'', date:g.date||''}).forEach(r=>{
+      rows.push([r.gameId,r.groupId,r.q,r.time,r.date,r.event,r.team,r.cap,r.playerId||'',r.zone||'',r.gm||'']);
+    });
+  });
+  const csv=[hdr,...rows].map(r=>r.map(v=>`"${(v||'').toString().replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download=`wp-${g.darkTeam||'dark'}-vs-${g.whiteTeam||'white'}-${g.date||'game'}.csv`;
+  a.click();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SETUP UI
+// ═══════════════════════════════════════════════════════════
+function renderSetupUI(){
+  const g=state.game;
+  if(state.rosterSheetUrl) document.getElementById('roster-url-input').value=state.rosterSheetUrl;
+  updateLastSyncLabel(ls('wp-roster-synced',''));
+  const savedSheetUrl=ls('wp-sheet-url','')||g.sheetUrl||'';
+  if(savedSheetUrl) document.getElementById('sheet-url-input').value=savedSheetUrl;
+  if(g.date) document.getElementById('game-date').value=g.date;
+  if(g.darkTeam) document.getElementById('dark-team-name').value=g.darkTeam;
+  if(g.whiteTeam) document.getElementById('white-team-name').value=g.whiteTeam;
+  populateTeamDropdowns();
+  if(g.darkTeamId){ document.getElementById('dark-team-roster').value=g.darkTeamId; buildRosterUI('dark'); }
+  if(g.whiteTeamId){ document.getElementById('white-team-roster').value=g.whiteTeamId; buildRosterUI('white'); }
+  renderPrimaryTeamUI();
+}
+
+function populateTeamDropdowns(){
+  ['dark','white'].forEach(side=>{
+    const sel=document.getElementById(side+'-team-roster');
+    const cur=state.game[side+'TeamId']||'';
+    sel.innerHTML='<option value="">Select team to load roster…</option>';
+    state.teams.forEach(t=>{ sel.innerHTML+=`<option value="${t.id}"${String(t.id)===String(cur)?' selected':''}>${t.name}</option>`; });
+  });
+}
+
+function buildRosterUI(side){
+  const teamId=document.getElementById(side+'-team-roster').value;
+  const builder=document.getElementById(side+'-roster-builder');
+  const rowsEl=document.getElementById(side+'-rb-rows');
+  const emptyEl=document.getElementById(side+'-rb-empty');
+  if(!teamId){ builder.style.display='none'; return; }
+  builder.style.display='block';
+
+  const team=state.teams.find(t=>String(t.id)===String(teamId));
+  const nameInput=document.getElementById(side+'-team-name');
+  if(team&&!nameInput.value) nameInput.value=team.name;
+
+  const teamPlayers=state.players.filter(p=>(p.teamIds||[]).map(String).includes(String(teamId)));
+  if(!teamPlayers.length){ rowsEl.innerHTML=''; emptyEl.style.display='block'; return; }
+  emptyEl.style.display='none';
+
+  const savedRoster=(String(state.game[side+'TeamId'])===String(teamId))?(state.game[side+'Roster']||[]):[];
+  let html='';
+  teamPlayers.sort((a,b)=>(a.last||'').localeCompare(b.last||'')).forEach(p=>{
+    const saved=savedRoster.find(r=>r.playerId===p.id);
+    const fullName=(p.first||'')+' '+(p.last||'');
+    const placeholderNum=fullName.includes('Placeholder')?(fullName.match(/-\s*(\d+)\s*\)/)||[])[1]||'':'';
+    const capVal=saved?saved.cap:placeholderNum;
+    const savedGk=(state.activeGoalie||{})[side];
+    // Default to cap #1 if no GK has been explicitly saved yet
+    const isGk=savedGk ? (saved?saved.cap===savedGk:capVal===savedGk) : capVal==='1';
+    html+=`<div class="rb-row" id="rbrow-${side}-${p.id}">
+      <input type="checkbox" class="rb-check" id="rb-active-${side}-${p.id}" checked
+        onchange="toggleRbRow('${side}','${p.id}')">
+      <input type="text" class="rb-cap" id="rb-cap-${side}-${p.id}"
+        placeholder="Cap #" value="${capVal}" maxlength="3">
+      <span class="rb-name">${p.last?p.last+', '+p.first:p.first}</span>
+      <label style="display:flex;align-items:center;gap:3px;font-size:11px;color:#5a7a9a;cursor:pointer;flex:0 0 auto;white-space:nowrap;" title="Active Goalkeeper">
+        <input type="radio" name="gk-${side}" id="rb-gk-${side}-${p.id}"
+          value="${capVal||p.id}" ${isGk?'checked':''}
+          style="accent-color:#0a84c8;width:14px;height:14px;margin:0;cursor:pointer;">
+        GK
+      </label>
+    </div>`;
+  });
+  rowsEl.innerHTML=html;
+}
+
+function toggleRbRow(side,pid){
+  const row=document.getElementById(`rbrow-${side}-${pid}`);
+  const checked=document.getElementById(`rb-active-${side}-${pid}`).checked;
+  row.classList.toggle('absent',!checked);
+}
+
+function saveGame(){
+  const sheetUrl=document.getElementById('sheet-url-input').value.trim();
+  const date=document.getElementById('game-date').value;
+  const darkTeam=document.getElementById('dark-team-name').value.trim()||'Dark';
+  const whiteTeam=document.getElementById('white-team-name').value.trim()||'White';
+  const darkTeamId=document.getElementById('dark-team-roster').value;
+  const whiteTeamId=document.getElementById('white-team-roster').value;
+
+  const readRoster=(side,teamId)=>{
+    if(!teamId) return [];
+    return state.players
+      .filter(p=>(p.teamIds||[]).map(String).includes(String(teamId)))
+      .filter(p=>{ const cb=document.getElementById(`rb-active-${side}-${p.id}`); return cb&&cb.checked; })
+      .map(p=>{ const capEl=document.getElementById(`rb-cap-${side}-${p.id}`); return {playerId:p.id,cap:capEl?capEl.value.trim():'',name:p.first+' '+p.last}; })
+      .filter(r=>r.cap)
+      .sort((a,b)=>Number(a.cap)-Number(b.cap));
+  };
+
+  // Read active GK — use the cap # input value for whichever row has the GK radio checked
+  const readGK=(side,teamId)=>{
+    if(!teamId) return null;
+    const sel=document.querySelector(`input[name="gk-${side}"]:checked`);
+    if(!sel) return null;
+    const pid=sel.id.replace(`rb-gk-${side}-`,'');
+    const capEl=document.getElementById(`rb-cap-${side}-${pid}`);
+    return capEl?capEl.value.trim()||null:null;
+  };
+  state.activeGoalie={dark:readGK('dark',darkTeamId), white:readGK('white',whiteTeamId)};
+  ss('wp-active-goalie', state.activeGoalie);
+
+  state.game={darkTeam,whiteTeam,darkTeamId,whiteTeamId,sheetUrl,date,
+    gameId:'game-'+genId(),
+    darkRoster:readRoster('dark',darkTeamId),
+    whiteRoster:readRoster('white',whiteTeamId)};
+  ss('wp-game',state.game);
+
+  if(sheetUrl) pushToSheet({action:'init',darkTeam,whiteTeam,date,gameId:state.game.gameId});
+
+  const dk=state.game.darkRoster.length, wh=state.game.whiteRoster.length;
+  alert(`Game saved!\nDark: ${dk} player${dk!==1?'s':''} · White: ${wh} player${wh!==1?'s':''}\n\nHead to the Game tab.`);
+  renderGameUI();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  ROSTER UI
+// ═══════════════════════════════════════════════════════════
+function rosterView(v){
+  document.getElementById('roster-players').style.display=v==='players'?'block':'none';
+  document.getElementById('roster-teams').style.display=v==='teams'?'block':'none';
+  document.getElementById('rview-players-btn').className=v==='players'?'btn-p':'btn-s';
+  document.getElementById('rview-teams-btn').className=v==='teams'?'btn-p':'btn-s';
+  renderRosterUI();
+}
+
+function renderRosterUI(){ renderPlayersList(); renderTeamsList(); }
+
+function addPlayer(){
+  const first=document.getElementById('p-first').value.trim();
+  const last=document.getElementById('p-last').value.trim();
+  const dob=document.getElementById('p-dob').value;
+  if(!first) return;
+  const player={id:genId(),first,last,dob,teamIds:[]};
+  state.players.push(player);
+  ss('wp-players',state.players);
+  syncPlayerToSheet(player);
+  document.getElementById('p-first').value='';
+  document.getElementById('p-last').value='';
+  document.getElementById('p-dob').value='';
+  renderPlayersList();
+}
+
+function renderPlayersList(){
+  const el=document.getElementById('players-list');
+  const mergeSection=document.getElementById('merge-section');
+
+  if(!state.players.length){
+    el.innerHTML='<p style="text-align:center;color:#5a7a9a;padding:20px;">No players yet</p>';
+    mergeSection.style.display='none';
+    return;
+  }
+
+  mergeSection.style.display=state.players.length>=2?'block':'none';
+  populateMergeDropdowns();
+
+  const sorted=[...state.players].sort((a,b)=>(a.last||'').localeCompare(b.last||''));
+  let html='';
+  sorted.forEach(p=>{
+    const teamIds=p.teamIds||[];
+    html+=`<div class="card" style="padding:12px 14px;">
+      <div class="row" style="justify-content:space-between;margin-bottom:8px;">
+        <div>
+          <span style="font-weight:600;">${p.last?p.last+', '+p.first:p.first}</span>
+          ${p.dob?`<span style="font-size:11px;color:#5a7a9a;margin-left:8px;">${p.dob}</span>`:''}
+        </div>
+        <button class="btn-d" style="padding:3px 8px;font-size:11px;" onclick="deletePlayer('${p.id}')">Remove</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:2px;">`;
+    state.teams.forEach(t=>{
+      const checked=teamIds.map(String).includes(String(t.id));
+      html+=`<label class="team-pill${checked?' checked':''}">
+        <input type="checkbox" ${checked?'checked':''} onchange="togglePlayerTeam('${p.id}','${t.id}',this)">
+        ${t.name}
+      </label>`;
+    });
+    if(!state.teams.length) html+=`<span style="font-size:12px;color:#5a7a9a;">Create teams first</span>`;
+    html+=`</div>
+      <div class="pill-id">ID: ${p.id}</div>
+    </div>`;
+  });
+  el.innerHTML=html;
+}
+
+function populateMergeDropdowns(){
+  const sorted=[...state.players].sort((a,b)=>(a.last||'').localeCompare(b.last||''));
+  ['merge-from','merge-to'].forEach(id=>{
+    const sel=document.getElementById(id);
+    if(!sel) return;
+    const cur=sel.value;
+    sel.innerHTML='<option value="">Select player…</option>';
+    sorted.forEach(p=>{ sel.innerHTML+=`<option value="${p.id}"${p.id===cur?' selected':''}>${p.last?p.last+', '+p.first:p.first}</option>`; });
+  });
+}
+
+function togglePlayerTeam(playerId,teamId,checkbox){
+  const p=state.players.find(p=>String(p.id)===String(playerId));
+  if(!p) return;
+  if(!p.teamIds) p.teamIds=[];
+  const tid=isNaN(teamId)?teamId:Number(teamId);
+  if(checkbox.checked){ if(!p.teamIds.map(String).includes(String(tid))) p.teamIds.push(tid); }
+  else { p.teamIds=p.teamIds.filter(id=>String(id)!==String(tid)); }
+  ss('wp-players',state.players);
+  syncPlayerToSheet(p);
+  const pill=checkbox.closest('.team-pill');
+  if(pill) pill.classList.toggle('checked',checkbox.checked);
+}
+
+function deletePlayer(id){
+  if(!confirm('Remove this player? Their event history will be preserved.')) return;
+  state.players=state.players.filter(p=>String(p.id)!==String(id));
+  ss('wp-players',state.players);
+  deletePlayerFromSheet(id);
+  renderPlayersList();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  MERGE PLAYERS
+// ═══════════════════════════════════════════════════════════
+function mergePlayers(){
+  const fromId=document.getElementById('merge-from').value;
+  const toId=document.getElementById('merge-to').value;
+  if(!fromId||!toId||fromId===toId){ alert('Select two different players.'); return; }
+
+  const fromP=state.players.find(p=>p.id===fromId);
+  const toP=state.players.find(p=>p.id===toId);
+  if(!fromP||!toP) return;
+
+  const fromName=`${fromP.last?fromP.last+', '+fromP.first:fromP.first}`;
+  const toName=`${toP.last?toP.last+', '+toP.first:toP.first}`;
+
+  if(!confirm(`Merge "${fromName}" → "${toName}"?\n\nAll events for the removed player will be reassigned to the kept player. Team associations will be combined. This cannot be undone.`)) return;
+
+  // Remap player IDs in all events
+  const idFields=['playerId','assistPlayerId','drawnPlayerId','turnoverPlayerId','shooterPlayerId','goaliePlayerId'];
+  let reassigned=0;
+  state.events=state.events.map(e=>{
+    let changed=false;
+    idFields.forEach(f=>{ if(e[f]===fromId){ e[f]=toId; changed=true; } });
+    if(changed) reassigned++;
+    return e;
+  });
+  ss('wp-events',state.events);
+
+  // Merge team associations into canonical player
+  const mergedTeamIds=[...new Set([...(toP.teamIds||[]).map(String),...(fromP.teamIds||[]).map(String)])].map(id=>isNaN(id)?id:Number(id));
+  toP.teamIds=mergedTeamIds;
+
+  // Remove the duplicate from sheet and state
+  deletePlayerFromSheet(fromId);
+  state.players=state.players.filter(p=>p.id!==fromId);
+
+  // Sync the updated canonical player
+  syncPlayerToSheet(toP);
+  ss('wp-players',state.players);
+
+  alert(`Done. ${reassigned} event${reassigned!==1?'s':''} reassigned to ${toName}.`);
+  renderPlayersList();
+}
+
+function addTeam(){
+  const name=document.getElementById('t-name').value.trim();
+  if(!name) return;
+  const team={id:genId(),name};
+  state.teams.push(team);
+  ss('wp-teams',state.teams);
+  syncTeamToSheet(team);
+  document.getElementById('t-name').value='';
+  renderTeamsList();
+  renderPlayersList();
+}
+
+function renderTeamsList(){
+  const el=document.getElementById('teams-list');
+  if(!state.teams.length){ el.innerHTML='<p style="text-align:center;color:#5a7a9a;padding:20px;">No teams yet</p>'; return; }
+  let html='';
+  state.teams.forEach(t=>{
+    const count=state.players.filter(p=>(p.teamIds||[]).map(String).includes(String(t.id))).length;
+    html+=`<div class="card" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;">
+      <div>
+        <span style="font-weight:600;">${t.name}</span>
+        <div class="pill-id">ID: ${t.id}</div>
+      </div>
+      <div class="row" style="gap:10px;">
+        <span style="font-size:12px;color:#5a7a9a;">${count} player${count!==1?'s':''}</span>
+        <button class="btn-d" style="padding:3px 8px;font-size:11px;" onclick="deleteTeam('${t.id}')">Remove</button>
+      </div>
+    </div>`;
+  });
+  el.innerHTML=html;
+}
+
+function deleteTeam(id){
+  if(!confirm('Remove this team? Player associations for this team will also be removed.')) return;
+  state.teams=state.teams.filter(t=>String(t.id)!==String(id));
+  state.players=state.players.map(p=>({...p,teamIds:(p.teamIds||[]).filter(tid=>String(tid)!==String(id))}));
+  ss('wp-teams',state.teams);
+  ss('wp-players',state.players);
+  deleteTeamFromSheet(id);
+  renderTeamsList();
+  renderPlayersList();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  PRIMARY TEAM (voice stats taker affiliation)
+// ═══════════════════════════════════════════════════════════
+function setPrimaryTeam(side) {
+  state.primaryTeam = side;
+  ss('wp-primary-team', side);
+  renderPrimaryTeamUI();
+}
+
+function renderPrimaryTeamUI() {
+  const card = document.getElementById('primary-team-card');
+  if (!card) return;
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRec) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+
+  const g = state.game;
+  const dN = g.darkTeam || 'Dark', wN = g.whiteTeam || 'White';
+  const isDark = state.primaryTeam === 'dark';
+  const db = document.getElementById('primary-dark-btn');
+  const wb = document.getElementById('primary-white-btn');
+  if (db) { db.textContent = (isDark ? '✓ ' : '') + dN + ' (Dark)'; db.className = isDark ? 'btn-p' : 'btn-s'; }
+  if (wb) { wb.textContent = (!isDark ? '✓ ' : '') + wN + ' (White)'; wb.className = isDark ? 'btn-s' : 'btn-p'; }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  VOICE CAPTURE
+// ═══════════════════════════════════════════════════════════
+const _SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+let _voiceRec = null;
+let _voiceActive = false;
+let _voiceFinal = '';
+
+function initVoice() {
+  const card = document.getElementById('voice-card');
+  if (!card) return;
+  card.style.display = 'block'; // always show — critical stats button works without voice
+  if (_SpeechRec) {
+    const btn = document.getElementById('voice-btn');
+    if (btn) btn.style.display = 'flex';
+    const hint = document.getElementById('voice-hint');
+    if (hint) hint.style.display = 'block';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  STAT CHIPS (Goals, Assists, Steals, TOs)
+// ═══════════════════════════════════════════════════════════
+function updateStatChips() {
+  const g = state.game;
+  let goals = 0, assists = 0, steals = 0, tos = 0;
+  state.events.forEach(ev => {
+    const expanded = eventToRows({...ev, gameId:'', date:''});
+    expanded.forEach(r => {
+      if (['Goal (Reg)','Goal (6-5)','5M Goal'].includes(r.event)) goals++;
+      if (r.event === 'Assist') assists++;
+      if (r.event === 'Steal') steals++;
+      if (r.event === 'Turnover') tos++;
+    });
+  });
+  const set = (id, n) => { const el = document.getElementById(id); if (el) el.textContent = n; };
+  set('stat-goals', goals);
+  set('stat-assists', assists);
+  set('stat-steals', steals);
+  set('stat-tos', tos);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CRITICAL STATS (Ejections & 5M Fouls)
+// ═══════════════════════════════════════════════════════════
+function updateCritStatsBtn() {
+  const badge = document.getElementById('crit-badge');
+  const btn   = document.getElementById('crit-stats-btn');
+  if (!badge || !btn) return;
+
+  const critical = state.events.filter(e => e.type === 'Ejection' || e.type === '5M Foul');
+  const total = critical.length;
+
+  // Check if any player has 2+ combined (ejections + 5M fouls) — approaching foul-out
+  const combinedMap = {};
+  critical.forEach(e => {
+    const key = (e.team || '') + '|' + (e.cap || '');
+    combinedMap[key] = (combinedMap[key] || 0) + 1;
+  });
+  const atRisk = Object.values(combinedMap).some(n => n >= 2);
+
+  if (total === 0) {
+    badge.style.display = 'none';
+    btn.style.background = '';
+    btn.style.borderColor = '';
+    btn.style.color = '';
+  } else {
+    badge.style.display = 'inline-block';
+    badge.textContent = total;
+    if (atRisk) {
+      badge.style.background = '#c85a00';
+      btn.style.background = '#3a1e00';
+      btn.style.borderColor = '#c85a00';
+      btn.style.color = '#ffaa55';
+    } else {
+      badge.style.background = '#0a84c8';
+      btn.style.background = '';
+      btn.style.borderColor = '';
+      btn.style.color = '';
+    }
+  }
+}
+
+function showShotChartPicker() {
+  const g = state.game;
+  const dN = g.darkTeam || 'Dark', wN = g.whiteTeam || 'White';
+  document.getElementById('modal-title').textContent = '📊 Shot Chart';
+  document.getElementById('modal-body').innerHTML = `
+    <p style="color:#7a9bb8;font-size:13px;margin-bottom:12px;">Which team?</p>
+    <div class="team-pick">
+      <button class="team-dk" onclick="closeModal();showShotChart('dark')">${dN}<br><span style="font-weight:400;font-size:11px;opacity:.7">Dark caps</span></button>
+      <button class="team-wh" onclick="closeModal();showShotChart('white')">${wN}<br><span style="font-weight:400;font-size:11px;opacity:.6">White caps</span></button>
+    </div>`;
+  document.getElementById('modal-overlay').style.display = 'flex';
+}
+
+let _scData = null; // { teamName, withZone, goalCount, missCount }
+
+function showShotChart(side) {
+  const g = state.game;
+  const dN = g.darkTeam || 'Dark', wN = g.whiteTeam || 'White';
+  const teamName = side === 'dark' ? dN : wN;
+  const {VBW, VBH, X, Y, W, H} = POOL;
+  const L = POOL_LINES;
+  const gCx = X + W/2, gW = W*0.15, gLeft = gCx - gW/2, gRight = gCx + gW/2;
+  const GOAL_TYPES = ['Goal (Reg)','Goal (6-5)','5M Goal'];
+
+  const shots    = state.events.filter(e => e.team === teamName &&
+    (GOAL_TYPES.includes(e.type) || e.type === 'Missed Shot'));
+  const withZone = shots.filter(e => e.zone && e.zone.includes(','));
+  const noZone   = shots.filter(e => !e.zone || !e.zone.includes(','));
+  const goalCount = shots.filter(e => GOAL_TYPES.includes(e.type)).length;
+  const missCount = shots.filter(e => e.type === 'Missed Shot').length;
+  const pct = (goalCount + missCount) > 0 ? Math.round(goalCount/(goalCount+missCount)*100) : 0;
+
+  _scData = { teamName, withZone, goalCount, missCount };
+
+  // Build static pool SVG (background only — markers injected separately)
+  const svgHTML = `<svg id="sc-svg" viewBox="0 0 ${VBW} ${VBH}" style="width:100%;display:block;">
+    <defs>
+      <linearGradient id="sc-wg" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#0a5a8a"/><stop offset="100%" stop-color="#083040"/>
+      </linearGradient>
+    </defs>
+    <rect x="${X}" y="${Y}" width="${W}" height="${H}" fill="url(#sc-wg)" stroke="#2a8aca" stroke-width="2" rx="3"/>
+    <line x1="${gCx}" y1="${Y}" x2="${gCx}" y2="${Y+H}" stroke="#1a6a9a" stroke-width="0.5" stroke-dasharray="3,6" opacity="0.5"/>
+    <rect x="${gLeft}" y="${Y-14}" width="${gW}" height="16" fill="rgba(255,255,255,0.08)" stroke="#ffffff" stroke-width="2" rx="1"/>
+    <line x1="${gLeft}" y1="${Y}" x2="${X}" y2="${Y}" stroke="#2a8aca" stroke-width="0.5" opacity="0.4"/>
+    <line x1="${gRight}" y1="${Y}" x2="${X+W}" y2="${Y}" stroke="#2a8aca" stroke-width="0.5" opacity="0.4"/>
+    <text x="${gCx}" y="${Y-18}" text-anchor="middle" fill="#90c8e8" font-size="9" font-weight="600" letter-spacing="1">GOAL</text>
+    <line x1="${X}" y1="${L['2m']}" x2="${X+W}" y2="${L['2m']}" stroke="#ffd700" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="${X-4}" y="${L['2m']+4}" text-anchor="end" fill="#ffd700" font-size="9" font-weight="600">2m</text>
+    <line x1="${X}" y1="${L['5m']}" x2="${X+W}" y2="${L['5m']}" stroke="#ff9500" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="${X-4}" y="${L['5m']+4}" text-anchor="end" fill="#ff9500" font-size="9" font-weight="600">5m</text>
+    <line x1="${X}" y1="${L['6m']}" x2="${X+W}" y2="${L['6m']}" stroke="#ff4444" stroke-width="1.5" stroke-dasharray="6,3"/>
+    <text x="${X-4}" y="${L['6m']+4}" text-anchor="end" fill="#ff4444" font-size="9" font-weight="600">6m</text>
+    <line x1="${X}" y1="${Y+H}" x2="${X+W}" y2="${Y+H}" stroke="#4a8aaa" stroke-width="1.5"/>
+    <text x="${X-4}" y="${Y+H+4}" text-anchor="end" fill="#4a8aaa" font-size="9">half</text>
+    <g id="sc-markers"></g>
+  </svg>`;
+
+  // Legend
+  const legendHTML = `<div style="display:flex;gap:18px;flex-wrap:wrap;font-size:13px;">
+    <span style="display:flex;align-items:center;gap:5px;">
+      <span style="width:10px;height:10px;border-radius:50%;background:#16a34a;border:1.5px solid #fff;display:inline-block;flex:0 0 auto;"></span>
+      <span style="color:#e0f0ff;">Goals <strong>${goalCount}</strong></span>
+    </span>
+    <span style="display:flex;align-items:center;gap:5px;">
+      <span style="width:10px;height:10px;border-radius:50%;background:#3a0d0d;border:1.5px solid #ef4444;display:inline-block;flex:0 0 auto;"></span>
+      <span style="color:#e0f0ff;">Misses <strong>${missCount}</strong></span>
+    </span>
+    <span style="color:#7abcdc;">Shooting% <strong>${pct}%</strong></span>
+  </div>`;
+
+  // Filter chips — one per unique cap with shots
+  const caps = [...new Set(withZone.map(e => e.cap||'?'))].sort((a,b)=>Number(a)-Number(b));
+  let filtersHTML = `<button id="sc-f-all" onclick="filterShotChart(null)"
+    style="padding:5px 12px;border-radius:14px;font-size:12px;font-weight:600;border:1.5px solid #2a8aca;background:#0a3a5a;color:#7abcdc;cursor:pointer;">All</button>`;
+  caps.forEach(cap => {
+    const capShots  = withZone.filter(e => (e.cap||'?') === cap);
+    const capGoals  = capShots.filter(e => GOAL_TYPES.includes(e.type)).length;
+    const capMisses = capShots.filter(e => e.type === 'Missed Shot').length;
+    const capName   = (capShots[0]?.capName && !capShots[0].capName.includes('Placeholder')) ? capShots[0].capName.split(' ')[0] : '';
+    const label     = capName ? `#${cap} ${capName}` : `#${cap}`;
+    filtersHTML += `<button id="sc-f-${cap}" onclick="filterShotChart('${cap}')"
+      style="padding:5px 12px;border-radius:14px;font-size:12px;border:1.5px solid #1e3a5a;background:#0d1e2e;color:#5a7a9a;cursor:pointer;">
+      ${label} <span style="font-size:10px;color:#4a8a6a;">${capGoals}G</span><span style="font-size:10px;color:#8a4a4a;margin-left:2px;">${capMisses}M</span>
+    </button>`;
+  });
+
+  document.getElementById('sc-title').textContent = `${teamName} — Shot Chart`;
+  document.getElementById('sc-summary').textContent = `${goalCount} goals · ${missCount} misses · ${pct}% shooting`;
+  document.getElementById('sc-svg-container').innerHTML = svgHTML;
+  document.getElementById('sc-legend').innerHTML = legendHTML;
+  document.getElementById('sc-filters').innerHTML = filtersHTML;
+  document.getElementById('sc-nozone').textContent = noZone.length > 0
+    ? `* ${noZone.length} shot(s) without location data not plotted` : '';
+  document.getElementById('shot-chart-overlay').style.display = 'block';
+  renderShotChartMarkers(null); // show all
+}
+
+function renderShotChartMarkers(filterCap) {
+  const {X, Y, W, H} = POOL;
+  const GOAL_TYPES = ['Goal (Reg)','Goal (6-5)','5M Goal'];
+  if (!_scData) return;
+  const posCount = {};
+  let html = '';
+  _scData.withZone.forEach(e => {
+    const [pctX, pctY] = (e.zone||'').split(',').map(Number);
+    if (isNaN(pctX) || isNaN(pctY)) return;
+    const cap = e.cap || '?';
+    const active = filterCap === null || filterCap === cap;
+    const svgX = X + (pctX/100)*W;
+    const svgY = Y + (pctY/100)*H;
+    const key = `${Math.round(pctX/5)*5},${Math.round(pctY/5)*5}`;
+    const idx = posCount[key] || 0;
+    posCount[key] = idx + 1;
+    const jX = (idx % 3 - 1) * 6;
+    const jY = Math.floor(idx/3) * 6;
+    const cx = Math.max(X+4, Math.min(X+W-4, svgX+jX));
+    const cy = Math.max(Y+4, Math.min(Y+H-4, svgY+jY));
+    const isGoal = GOAL_TYPES.includes(e.type);
+    const op = active ? '0.95' : '0.18';
+    if (isGoal) {
+      html += `<circle cx="${cx}" cy="${cy}" r="4" fill="#16a34a" stroke="#ffffff" stroke-width="1" opacity="${op}"/>`;
+    } else {
+      html += `<circle cx="${cx}" cy="${cy}" r="4" fill="#3a0d0d" stroke="#ef4444" stroke-width="1" opacity="${op}"/>`;
+    }
+  });
+  const g = document.getElementById('sc-markers');
+  if (g) g.innerHTML = html;
+}
+
+function filterShotChart(cap) {
+  renderShotChartMarkers(cap);
+  // Update chip active states
+  document.querySelectorAll('[id^="sc-f-"]').forEach(btn => {
+    const isActive = (cap === null && btn.id === 'sc-f-all') ||
+                     (cap !== null && btn.id === `sc-f-${cap}`);
+    btn.style.background  = isActive ? '#0a3a5a' : '#0d1e2e';
+    btn.style.color       = isActive ? '#7abcdc' : '#5a7a9a';
+    btn.style.borderColor = isActive ? '#2a8aca' : '#1e3a5a';
+  });
+}
+
+function showStatPopup(statTypes, title) {
+  const g = state.game;
+  const dN = g.darkTeam || 'Dark', wN = g.whiteTeam || 'White';
+
+  // Collect expanded rows matching the stat types, group by team → cap
+  const groups = {};
+  state.events.forEach(ev => {
+    eventToRows({...ev, gameId:'', date:''}).forEach(r => {
+      if (!statTypes.includes(r.event)) return;
+      const team = r.team || 'Unknown';
+      if (!groups[team]) groups[team] = {};
+      const cap = r.cap || '?';
+      if (!groups[team][cap]) {
+        const roster = team === dN ? (g.darkRoster||[]) : (g.whiteRoster||[]);
+        const player = r.playerId
+          ? roster.find(p => p.playerId === r.playerId)
+          : roster.find(p => p.cap === String(cap));
+        groups[team][cap] = { name: player ? player.name : null, count: 0, types: {} };
+      }
+      groups[team][cap].count++;
+      groups[team][cap].types[r.event] = (groups[team][cap].types[r.event] || 0) + 1;
+    });
+  });
+
+  const teamOrder = [dN, wN, ...Object.keys(groups).filter(t => t !== dN && t !== wN)];
+  const grandTotal = Object.values(groups).reduce((s, caps) =>
+    s + Object.values(caps).reduce((s2, p) => s2 + p.count, 0), 0);
+
+  let html = '';
+  if (grandTotal === 0) {
+    html = `<div style="color:#5a7a9a;font-size:13px;text-align:center;padding:20px 0;">No ${title.replace(/^.+ /,'')} recorded yet.</div>`;
+  } else {
+    // Multiple goal types? Show type breakdown column
+    const multiType = statTypes.length > 1;
+    teamOrder.forEach(team => {
+      if (!groups[team]) return;
+      const isDark = team === dN, isWhite = team === wN;
+      const badgeCls = isDark ? 'bdg-dk' : isWhite ? 'bdg-wh' : 'bdg-nt';
+      const caps = Object.keys(groups[team]).sort((a,b) => groups[team][b].count - groups[team][a].count);
+      const teamTotal = caps.reduce((s, c) => s + groups[team][c].count, 0);
+
+      html += `<div style="margin-bottom:16px;">
+        <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
+          <span class="bdg ${badgeCls}" style="font-size:12px;padding:3px 12px;">${team}</span>
+          <span style="font-size:12px;color:#5a7a9a;">${teamTotal} total</span>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead><tr>
+            <th style="text-align:left;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">Player</th>
+            ${multiType ? statTypes.map(t => `<th style="text-align:center;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">${t.replace('Goal ','').replace('(','').replace(')','')}</th>`).join('') : ''}
+            <th style="text-align:center;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">Total</th>
+          </tr></thead>
+          <tbody>`;
+
+      caps.forEach(cap => {
+        const p = groups[team][cap];
+        const playerLabel = p.name
+          ? `#${cap} <span style="color:#5a7a9a;font-size:11px;">${p.name}</span>`
+          : `#${cap}`;
+        const typeCells = multiType
+          ? statTypes.map(t => `<td style="text-align:center;padding:6px 6px;color:#7a9bb8;">${p.types[t] || '—'}</td>`).join('')
+          : '';
+        html += `<tr>
+          <td style="padding:6px 6px;font-weight:600;">${playerLabel}</td>
+          ${typeCells}
+          <td style="text-align:center;padding:6px 6px;font-weight:700;color:#7abcdc;">${p.count}</td>
+        </tr>`;
+      });
+      html += `</tbody></table></div>`;
+    });
+  }
+
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = html;
+  document.getElementById('modal-overlay').style.display = 'flex';
+}
+
+function showCriticalStats() {
+  const g = state.game;
+  const dN = g.darkTeam || 'Dark';
+  const wN = g.whiteTeam || 'White';
+
+  const critical = state.events.filter(e => e.type === 'Ejection' || e.type === '5M Foul');
+
+  // Group by team → cap → { name, ejections, fouls }
+  const groups = {};
+  critical.forEach(e => {
+    const team = e.team || 'Unknown';
+    if (!groups[team]) groups[team] = {};
+    const key = e.cap || '?';
+    if (!groups[team][key]) {
+      const displayName = (e.capName && !e.capName.includes('Placeholder')) ? e.capName : null;
+      groups[team][key] = { name: displayName, ejections: 0, fouls: 0 };
+    }
+    if (e.type === 'Ejection') groups[team][key].ejections++;
+    else                        groups[team][key].fouls++;
+  });
+
+  const teamOrder = [dN, wN, ...Object.keys(groups).filter(t => t !== dN && t !== wN)];
+
+  let html = '';
+
+  if (critical.length === 0) {
+    html += `<div style="color:#5a7a9a;font-size:13px;text-align:center;padding:20px 0;">No ejections or 5M fouls recorded yet.</div>`;
+  } else {
+    teamOrder.forEach(team => {
+      if (!groups[team]) return;
+      const isDark = team === dN;
+      const isWhite = team === wN;
+      const badgeCls = isDark ? 'bdg-dk' : isWhite ? 'bdg-wh' : 'bdg-nt';
+
+      html += `<div style="margin-bottom:16px;">
+        <div style="margin-bottom:8px;"><span class="bdg ${badgeCls}" style="font-size:12px;padding:3px 12px;">${team}</span></div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead><tr>
+            <th style="text-align:left;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">Player</th>
+            <th style="text-align:center;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">Ej</th>
+            <th style="text-align:center;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">5M</th>
+            <th style="text-align:center;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">Total</th>
+            <th style="text-align:left;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">Status</th>
+          </tr></thead>
+          <tbody>`;
+
+      // Sort: highest combined total first, then ejections as tiebreak
+      const caps = Object.keys(groups[team]).sort((a, b) => {
+        const pa = groups[team][a], pb = groups[team][b];
+        const combA = pa.ejections + pa.fouls, combB = pb.ejections + pb.fouls;
+        return (combB - combA) || (pb.ejections - pa.ejections);
+      });
+
+      caps.forEach(cap => {
+        const p = groups[team][cap];
+        const totalEj = p.ejections;
+        const totalF  = p.fouls;
+        const combined = totalEj + totalF; // 3 combined = permanent ejection
+
+        // Dot indicators — filled dots represent combined count (max 3)
+        const dots = [0,1,2].map(i => {
+          const filled = i < combined;
+          const color  = combined >= 3 ? '#ff4444' : combined >= 2 ? '#ffaa22' : '#22c55e';
+          return `<span style="font-size:15px;color:${filled ? color : '#2a4a6a'};">●</span>`;
+        }).join('');
+
+        // Warning badge based on combined total
+        let warnBadge = '';
+        if (combined >= 3)      warnBadge = `<span title="Permanently ejected!" style="margin-left:6px;font-size:14px;">🚨</span>`;
+        else if (combined >= 2) warnBadge = `<span title="1 call away from permanent ejection" style="margin-left:6px;font-size:14px;">⚠️</span>`;
+
+        const playerLabel = p.name ? `#${cap} <span style="color:#5a7a9a;font-size:11px;">${p.name}</span>` : `#${cap}`;
+        const ejStr = totalEj > 0
+          ? `<span style="color:#ff8888;font-weight:600;">${totalEj}</span>`
+          : `<span style="color:#2a4a6a;">—</span>`;
+        const foulStr = totalF > 0
+          ? `<span style="color:#7a9bb8;font-weight:600;">${totalF}</span>`
+          : `<span style="color:#2a4a6a;">—</span>`;
+
+        html += `<tr>
+          <td style="padding:6px 6px;font-weight:600;">${playerLabel}</td>
+          <td style="text-align:center;padding:6px 6px;">${ejStr}</td>
+          <td style="text-align:center;padding:6px 6px;">${foulStr}</td>
+          <td style="text-align:center;padding:6px 6px;">${dots}${warnBadge}</td>
+          <td style="padding:6px 6px;font-size:12px;color:#7a9bb8;">
+            ${combined >= 3 ? '<span style="color:#ff4444;font-weight:700;">OUT</span>' :
+              combined === 2 ? '<span style="color:#ffaa22;font-weight:700;">DANGER</span>' :
+              combined === 1 ? '<span style="color:#22c55e;">Watch</span>' : ''}
+          </td>
+        </tr>`;
+      });
+
+      html += `</tbody></table></div>`;
+    });
+  }
+
+  // Legend
+  html += `<div style="border-top:1px solid #1e3a5a;margin-top:8px;padding-top:10px;font-size:11px;color:#3a5a7a;display:flex;gap:14px;flex-wrap:wrap;">
+    <span>● dots = ejections + 5M fouls combined</span>
+    <span>⚠️ = 2 combined — 1 away from permanent ejection</span>
+    <span>🚨 = 3 combined — permanently ejected</span>
+  </div>`;
+
+  document.getElementById('modal-title').textContent = '⚑ Critical Stats';
+  document.getElementById('modal-body').innerHTML = html;
+  document.getElementById('modal-overlay').style.display = 'flex';
+}
+
+function startVoice(e) {
+  if (e) e.preventDefault();
+  if (!_SpeechRec || _voiceActive) return;
+  _voiceActive = true;
+  _voiceFinal = '';
+
+  const btn = document.getElementById('voice-btn');
+  const tr = document.getElementById('voice-transcript');
+  const hint = document.getElementById('voice-hint');
+  const result = document.getElementById('voice-result');
+  btn.classList.add('listening');
+  btn.textContent = '🔴';
+  if (hint) hint.textContent = 'Listening — release when done';
+  if (tr) tr.textContent = '';
+  if (result) result.innerHTML = '';
+
+  _voiceRec = new _SpeechRec();
+  _voiceRec.continuous = true;
+  _voiceRec.interimResults = true;
+  _voiceRec.lang = 'en-US';
+
+  _voiceRec.onresult = (ev) => {
+    let interim = '';
+    for (let i = ev.resultIndex; i < ev.results.length; i++) {
+      if (ev.results[i].isFinal) _voiceFinal += ev.results[i][0].transcript + ' ';
+      else interim += ev.results[i][0].transcript;
+    }
+    if (tr) tr.textContent = (_voiceFinal + interim).trim();
+  };
+
+  _voiceRec.onerror = (ev) => {
+    if (tr) tr.textContent = ev.error === 'no-speech' ? 'No speech detected' : '✕ ' + ev.error;
+    _voiceActive = false;
+    btn.classList.remove('listening');
+    btn.textContent = '🎙';
+    if (hint) hint.textContent = 'Hold to record a play';
+  };
+
+  try { _voiceRec.start(); } catch(e) {}
+}
+
+function stopVoice(e) {
+  if (e) e.preventDefault();
+  if (!_voiceActive) return;
+  _voiceActive = false;
+
+  const btn = document.getElementById('voice-btn');
+  const hint = document.getElementById('voice-hint');
+  btn.classList.remove('listening');
+  btn.classList.add('processing');
+  btn.textContent = '⟳';
+  if (hint) hint.textContent = 'Processing…';
+
+  if (_voiceRec) {
+    _voiceRec.onend = () => {
+      btn.classList.remove('processing');
+      btn.textContent = '🎙';
+      if (hint) hint.textContent = 'Hold to record a play';
+      const text = _voiceFinal.trim();
+      if (text) processVoiceTranscript(text);
+      else {
+        const tr = document.getElementById('voice-transcript');
+        if (tr) tr.textContent = 'Nothing captured — try again';
+      }
+    };
+    _voiceRec.stop();
+  }
+}
+
+// ─── Parser helpers ──────────────────────────────────────────
+function wordToNum(token) {
+  const map = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,
+               ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15};
+  const t = (token || '').trim().toLowerCase();
+  if (map[t] !== undefined) return map[t];
+  const n = parseInt(t);
+  return (!isNaN(n) && n >= 1 && n <= 99) ? n : null;
+}
+
+// Returns {match:'exact'|'multiple'|'none', player?:{cap,name,playerId}, candidates?:[...]}
+function resolveToken(token, rosterSide) {
+  if (!token || !token.trim()) return { match: 'none' };
+  const roster = rosterSide === 'dark' ? (state.game.darkRoster || []) : (state.game.whiteRoster || []);
+
+  // Try as number first
+  const num = wordToNum(token);
+  if (num !== null) {
+    const found = roster.find(r => String(r.cap) === String(num));
+    // Even if not in roster, accept the number (fallback to what was heard)
+    return { match: 'exact', player: found
+      ? { cap: found.cap, name: found.name, playerId: found.playerId }
+      : { cap: String(num), name: '#' + num, playerId: null } };
+  }
+
+  // Try name match
+  const tLow = token.toLowerCase().trim();
+  const matches = roster.filter(r => {
+    if (!r.name) return false;
+    const parts = r.name.toLowerCase().split(/\s+/);
+    return parts.some(p => p.startsWith(tLow) || tLow === p);
+  });
+
+  if (matches.length === 1) return { match: 'exact', player: { cap: matches[0].cap, name: matches[0].name, playerId: matches[0].playerId } };
+  if (matches.length > 1) return { match: 'multiple', candidates: matches };
+  return { match: 'none' };
+}
+
+function parseVoiceTranscript(text) {
+  // ── Normalise common mis-transcriptions ─────────────────
+  // "call" is never a valid stat; speech recognition often hears "goal" as "call"
+  let t = text.toLowerCase().trim()
+    .replace(/\bcall\b/g, 'goal');
+
+  // ── Event type ──────────────────────────────────────────
+  let eventType = null;
+  if (/\bgoal\b/.test(t)) {
+    if (/\b(six.?on.?five|6.?on.?5|power.?play)\b/.test(t)) eventType = 'goal-65';
+    else eventType = 'goal-reg';
+  } else if (/\b(kickout|kick.?out|ejection|kicked.?out)\b/.test(t)) {
+    eventType = 'ejection';
+  } else if (/\b(five.?m(eter)?|5.?m\b|foul|penalty)\b/.test(t)) {
+    eventType = '5m-penalty';  // voice triggers the full 5M flow
+  } else if (/\b(steal|steel|steele)\b/.test(t)) {
+    eventType = 'steal';
+  } else if (/\bturnover\b/.test(t)) {
+    eventType = 'turnover';
+  } else if (/\b(miss(ed)?(\s+shot)?)\b/.test(t)) {
+    eventType = 'miss';
+  } else if (/\b(save|goalie.?block)\b/.test(t)) {
+    eventType = 'goalie-block';
+  } else if (/\b(field.?block|block)\b/.test(t)) {
+    eventType = 'field-block';
+  } else if (/\bsprint\b/.test(t)) {
+    eventType = 'sprint-won';
+  }
+
+  if (!eventType) return null;
+
+  // ── Split out secondary clauses ───────────────────────────
+  const splitRe = /\b(assist(ed)?\s+by|drawn\s+by|stolen\s+from|from)\b/;
+  const primaryPart = t.split(splitRe)[0];
+
+  // ── Team from primary clause ──────────────────────────────
+  let mainTeamSide = state.primaryTeam || 'dark';
+  if (/\bdark\b/.test(primaryPart)) mainTeamSide = 'dark';
+  else if (/\b(white|light)\b/.test(primaryPart)) mainTeamSide = 'white';
+  const oppSide = mainTeamSide === 'dark' ? 'white' : 'dark';
+
+  // ── Main player token ────────────────────────────────────
+  // Strategy: literal digits first (unambiguous), then number words, then name text.
+  // Number words like "six"/"five" must NOT be in the noise list — they are valid cap numbers.
+  let mainToken = null;
+  const digitM = primaryPart.match(/\b(\d+)\b/);
+  if (digitM) {
+    // "dark 6 steal" → "6"
+    mainToken = digitM[1];
+  } else {
+    // Strip event/team phrases, then look for a number word ("six", "five", etc.)
+    const numWords = 'one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen';
+    const strippedForNum = primaryPart
+      .replace(/\b(six\s*on\s*five|6\s*on\s*5|power\s*play|five\s*met\w*|five\s*meter|kickout|kick\s*out|ejection|steal|steel|steele|goal|turnover|miss\w*|save|block|field\s*block|goalie\s*block|sprint|won|foul|penalty|dark|white|light|by|the|a|cap|number|pound|hashtag)\b/gi, ' ')
+      .replace(/\s+/g, ' ').trim();
+    const numWordM = strippedForNum.match(new RegExp('\\b(' + numWords + ')\\b', 'i'));
+    if (numWordM) {
+      // "dark six steal" → "six"
+      mainToken = numWordM[1];
+    } else {
+      // Fall back to name: strip all event/team noise, remainder is a player name
+      const nameNoise = /\b(goal|kickout|kick|out|ejection|foul|penalty|steal|steel|steele|turnover|miss(ed)?|shot|save|block|field|goalie|sprint|won|six\s*on\s*five|power\s*play|five\s*met\w*|dark|white|light|a|the|by|cap|number|pound|hashtag|assist(ed)?|drawn|from|stolen)\b/g;
+      mainToken = primaryPart.replace(nameNoise, ' ').replace(/\s+/g, ' ').trim() || null;
+    }
+  }
+
+  // ── Secondary tokens (allow digits AND letters) ───────────
+  const assistM = t.match(/\bassist(ed)?\s+by\s+([\w]+(?:\s+[\w]+)?)/);
+  const drawnM  = t.match(/\bdrawn\s+by\s+([\w]+(?:\s+[\w]+)?)/);
+  const fromM      = t.match(/\b(?:stolen\s+from|from)\s+([\w]+(?:\s+[\w]+)?)/);
+  const stolenByM  = t.match(/\bstolen\s+by\s+([\w]+(?:\s+[\w]+)?)/);
+
+  return {
+    eventType,
+    mainTeamSide,
+    oppSide,
+    mainToken: mainToken || null,
+    assistToken:   assistM   ? assistM[2].trim()   : null,
+    drawnToken:    drawnM    ? drawnM[1].trim()    : null,
+    fromToken:     fromM     ? fromM[1].trim()     : null,
+    stolenByToken: stolenByM ? stolenByM[1].trim() : null,
+  };
+}
+
+// ─── Disambiguation (Promise-based modal) ───────────────────
+function showDisambiguation(candidates, title) {
+  return new Promise(resolve => {
+    window._vDisambigResolve = resolve;
+    const body = document.getElementById('modal-body');
+    document.getElementById('modal-title').textContent = title;
+    let html = '<p style="color:#7a9bb8;font-size:12px;margin-bottom:10px;">Multiple players match — select one:</p>';
+    candidates.forEach(c => {
+      const safe = (c.name||'').replace(/'/g, "\\'");
+      const pid = c.playerId ? `'${c.playerId}'` : 'null';
+      html += `<button class="disambig-btn" onclick="vDisambigPick({cap:'${c.cap}',name:'${safe}',playerId:${pid}})">
+        <span style="font-weight:700;font-size:17px;margin-right:10px;">#${c.cap}</span>${c.name||''}
+      </button>`;
+    });
+    html += `<button class="btn-s" style="width:100%;margin-top:4px;" onclick="vDisambigPick(null)">Skip / unknown</button>`;
+    body.innerHTML = html;
+    document.getElementById('modal-overlay').style.display = 'flex';
+  });
+}
+
+function vDisambigPick(player) {
+  document.getElementById('modal-overlay').style.display = 'none';
+  document.getElementById('modal-body').innerHTML = '';
+  if (window._vDisambigResolve) { window._vDisambigResolve(player); window._vDisambigResolve = null; }
+}
+
+// ─── Main voice processor (async for disambiguation) ─────────
+async function processVoiceTranscript(text) {
+  const tr = document.getElementById('voice-transcript');
+  const result = document.getElementById('voice-result');
+
+  const parsed = parseVoiceTranscript(text);
+  if (!parsed) {
+    if (tr) tr.innerHTML = `<span style="color:#ffaaaa;">Could not parse: "${text}"</span>`;
+    if (result) result.innerHTML = `<div style="font-size:12px;color:#5a7a9a;margin-top:6px;">Tap a button above to record manually.</div>`;
+    return;
+  }
+
+  const prefill = { teamSide: parsed.mainTeamSide };
+  const isGoalie = parsed.eventType === 'goalie-block';
+
+  // ── Resolve main player ─────────────────────────────────
+  if (parsed.mainToken) {
+    const res = resolveToken(parsed.mainToken, parsed.mainTeamSide);
+    if (res.match === 'exact') {
+      if (isGoalie) {
+        prefill.goalieTeam = parsed.mainTeamSide;
+        prefill.goalieCap = res.player.cap;
+        prefill.goalieCapName = res.player.name;
+        prefill.goaliePlayerId = res.player.playerId;
+      } else {
+        prefill.cap = res.player.cap;
+        prefill.capName = res.player.name;
+        prefill.playerId = res.player.playerId;
+      }
+    } else if (res.match === 'multiple') {
+      const chosen = await showDisambiguation(res.candidates, `Who is "${parsed.mainToken}"?`);
+      if (chosen) {
+        if (isGoalie) {
+          prefill.goalieTeam = parsed.mainTeamSide;
+          prefill.goalieCap = chosen.cap;
+          prefill.goalieCapName = chosen.name;
+          prefill.goaliePlayerId = chosen.playerId;
+        } else {
+          prefill.cap = chosen.cap;
+          prefill.capName = chosen.name;
+          prefill.playerId = chosen.playerId;
+        }
+      }
+    }
+    // match='none' → leave cap unset → flow will show cap picker
+  }
+
+  // ── Resolve assist (same team) ──────────────────────────
+  if (parsed.assistToken !== null) {
+    const res = resolveToken(parsed.assistToken, parsed.mainTeamSide);
+    if (res.match === 'exact') {
+      prefill.assist = res.player.cap;
+      prefill.assistName = res.player.name;
+      prefill.assistPlayerId = res.player.playerId;
+    } else if (res.match === 'multiple') {
+      const chosen = await showDisambiguation(res.candidates, `Assist — who is "${parsed.assistToken}"?`);
+      if (chosen) { prefill.assist = chosen.cap; prefill.assistName = chosen.name; prefill.assistPlayerId = chosen.playerId; }
+    } else {
+      // try as number anyway
+      const n = wordToNum(parsed.assistToken);
+      if (n !== null) { prefill.assist = String(n); prefill.assistName = '#' + n; }
+    }
+  } else {
+    // Voice said nothing about an assist → skip that step
+    prefill.assist = null;
+  }
+
+  // ── Resolve drawn by (opponent) ─────────────────────────
+  if (parsed.drawnToken !== null) {
+    const res = resolveToken(parsed.drawnToken, parsed.oppSide);
+    if (res.match === 'exact') {
+      prefill.drawnBy = res.player.cap;
+      prefill.drawnByName = res.player.name;
+      prefill.drawnPlayerId = res.player.playerId;
+    } else if (res.match === 'multiple') {
+      const chosen = await showDisambiguation(res.candidates, `Drawn by — who is "${parsed.drawnToken}"?`);
+      if (chosen) { prefill.drawnBy = chosen.cap; prefill.drawnByName = chosen.name; prefill.drawnPlayerId = chosen.playerId; }
+    } else {
+      const n = wordToNum(parsed.drawnToken);
+      if (n !== null) { prefill.drawnBy = String(n); prefill.drawnByName = '#' + n; }
+    }
+  }
+
+  // ── Resolve from / stolen from (opponent) ───────────────
+  if (parsed.fromToken !== null) {
+    if (isGoalie) {
+      // "from" = shooter on opponent side
+      const res = resolveToken(parsed.fromToken, parsed.oppSide);
+      if (res.match === 'exact') {
+        prefill.shooterCap = res.player.cap;
+        prefill.shooterCapName = res.player.name;
+        prefill.shooterPlayerId = res.player.playerId;
+      } else if (res.match === 'multiple') {
+        const chosen = await showDisambiguation(res.candidates, `Shooter — who is "${parsed.fromToken}"?`);
+        if (chosen) { prefill.shooterCap = chosen.cap; prefill.shooterCapName = chosen.name; prefill.shooterPlayerId = chosen.playerId; }
+      } else {
+        const n = wordToNum(parsed.fromToken);
+        if (n !== null) { prefill.shooterCap = String(n); prefill.shooterCapName = '#' + n; }
+      }
+    } else {
+      // steal "from" = turnover opponent
+      const res = resolveToken(parsed.fromToken, parsed.oppSide);
+      if (res.match === 'exact') {
+        prefill.turnoverBy = res.player.cap;
+        prefill.turnoverByName = res.player.name;
+        prefill.turnoverPlayerId = res.player.playerId;
+      } else if (res.match === 'multiple') {
+        const chosen = await showDisambiguation(res.candidates, `Stolen from — who is "${parsed.fromToken}"?`);
+        if (chosen) { prefill.turnoverBy = chosen.cap; prefill.turnoverByName = chosen.name; prefill.turnoverPlayerId = chosen.playerId; }
+      } else {
+        const n = wordToNum(parsed.fromToken);
+        if (n !== null) { prefill.turnoverBy = String(n); prefill.turnoverByName = '#' + n; }
+      }
+    }
+  }
+
+  // ── Resolve stolen by (for turnover events — opponent who stole the ball)
+  if (parsed.stolenByToken !== null) {
+    const res = resolveToken(parsed.stolenByToken, parsed.oppSide);
+    if (res.match === 'exact') {
+      prefill.stolenBy = res.player.cap;
+      prefill.stolenByName = res.player.name;
+      prefill.stolenPlayerId = res.player.playerId;
+    } else if (res.match === 'multiple') {
+      const chosen = await showDisambiguation(res.candidates, `Stolen by — who is "${parsed.stolenByToken}"?`);
+      if (chosen) { prefill.stolenBy = chosen.cap; prefill.stolenByName = chosen.name; prefill.stolenPlayerId = chosen.playerId; }
+    } else {
+      const n = wordToNum(parsed.stolenByToken);
+      if (n !== null) { prefill.stolenBy = String(n); prefill.stolenByName = '#' + n; }
+    }
+  }
+
+  showVoiceConfirmation(text, parsed, prefill);
+}
+
+// ─── Confirmation card ────────────────────────────────────────
+function showVoiceConfirmation(rawText, parsed, prefill) {
+  const result = document.getElementById('voice-result');
+  if (!result) return;
+
+  const g = state.game;
+  const dN = g.darkTeam || 'Dark', wN = g.whiteTeam || 'White';
+  const teamName = prefill.teamSide === 'dark' ? dN : wN;
+  const def = EVENT_DEFS[parsed.eventType];
+  const isGoalie = parsed.eventType === 'goalie-block';
+
+  let tokens = [];
+  tokens.push(`<span class="vtok">${def.label}</span>`);
+  tokens.push(`<span class="vtok">${teamName}</span>`);
+
+  if (isGoalie) {
+    if (prefill.goalieCap) tokens.push(`<span class="vtok">Goalie #${prefill.goalieCap}${prefill.goalieCapName && prefill.goalieCapName !== '#'+prefill.goalieCap ? ' '+prefill.goalieCapName : ''}</span>`);
+    if (prefill.shooterCap) tokens.push(`<span class="vtok">Shooter #${prefill.shooterCap}${prefill.shooterCapName && prefill.shooterCapName !== '#'+prefill.shooterCap ? ' '+prefill.shooterCapName : ''}</span>`);
+  } else {
+    if (prefill.cap !== undefined) {
+      const label = prefill.cap ? `#${prefill.cap}${prefill.capName && prefill.capName !== '#'+prefill.cap ? ' '+prefill.capName : ''}` : '?';
+      tokens.push(`<span class="vtok${prefill.cap ? '' : ' unresolved'}">${label}</span>`);
+    } else {
+      tokens.push(`<span class="vtok unresolved">player?</span>`);
+    }
+    if (prefill.assist) tokens.push(`<span class="vtok">Assist #${prefill.assist}${prefill.assistName && prefill.assistName !== '#'+prefill.assist ? ' '+prefill.assistName : ''}</span>`);
+    if (prefill.drawnBy) tokens.push(`<span class="vtok">Drawn #${prefill.drawnBy}${prefill.drawnByName && prefill.drawnByName !== '#'+prefill.drawnBy ? ' '+prefill.drawnByName : ''}</span>`);
+    if (prefill.turnoverBy) tokens.push(`<span class="vtok">From #${prefill.turnoverBy}${prefill.turnoverByName && prefill.turnoverByName !== '#'+prefill.turnoverBy ? ' '+prefill.turnoverByName : ''}</span>`);
+    if (prefill.stolenBy) tokens.push(`<span class="vtok">Stl by #${prefill.stolenBy}${prefill.stolenByName && prefill.stolenByName !== '#'+prefill.stolenBy ? ' '+prefill.stolenByName : ''}</span>`);
+  }
+
+  window._voicePending = { eventType: parsed.eventType, prefill };
+
+  result.innerHTML = `<div class="voice-parsed">
+    <div style="font-size:11px;color:#3a6a3a;margin-bottom:6px;">"${rawText}"</div>
+    <div style="margin-bottom:10px;line-height:1.8;">${tokens.join(' ')}</div>
+    <div class="row" style="gap:6px;">
+      <button class="btn-d" style="flex:1;padding:7px;" onclick="clearVoiceResult()">✕ Cancel</button>
+      <button class="btn-p" style="flex:2;padding:7px;" onclick="confirmVoiceResult()">✓ Continue →</button>
+    </div>
+  </div>`;
+}
+
+function clearVoiceResult() {
+  const result = document.getElementById('voice-result');
+  if (result) result.innerHTML = '';
+  const tr = document.getElementById('voice-transcript');
+  if (tr) tr.textContent = '';
+  window._voicePending = null;
+}
+
+function confirmVoiceResult() {
+  const r = window._voicePending;
+  if (!r) return;
+  clearVoiceResult();
+  voiceStartFlow(r.eventType, r.prefill);
+}
+
+// ─── Voice-initiated event flow ───────────────────────────────
+function voiceStartFlow(eventType, prefill) {
+  const def = EVENT_DEFS[eventType];
+  const g = state.game;
+  const dN = g.darkTeam || 'Dark', wN = g.whiteTeam || 'White';
+  const isGoalie = eventType === 'goalie-block';
+  const forceTeam = prefill.teamSide; // pre-selected team
+
+  // Build the same full flow startFlow would build
+  let fullFlow = [...def.flow];
+  if (!isGoalie && forceTeam) {
+    // team-pick is suppressed (like forceTeam in startFlow), so no team-pick step
+  } else if (!isGoalie && !forceTeam) {
+    fullFlow = ['team-pick', ...fullFlow];
+  }
+
+  // Init context
+  state.flowCtx = { eventType, eventLabel: def.label, team: forceTeam || null };
+  state.pendingData = forceTeam ? { teamLabel: forceTeam === 'dark' ? dN : wN } : {};
+  state.flow = fullFlow;
+  state.flowIdx = 0;
+
+  // Apply prefills and track which steps to skip
+  const skip = new Set();
+
+  if (forceTeam) skip.add('team-pick');
+
+  if (prefill.cap !== undefined) {
+    state.pendingData.cap = prefill.cap ? String(prefill.cap) : null;
+    state.pendingData.capName = prefill.capName || (prefill.cap ? '#' + prefill.cap : null);
+    state.pendingData.playerId = prefill.playerId || null;
+    skip.add('cap');
+  }
+  if ('assist' in prefill) {
+    state.pendingData.assist = prefill.assist ? String(prefill.assist) : null;
+    state.pendingData.assistName = prefill.assistName || null;
+    state.pendingData.assistPlayerId = prefill.assistPlayerId || null;
+    skip.add('assist');
+  }
+  if ('drawnBy' in prefill) {
+    state.pendingData.drawnBy = prefill.drawnBy ? String(prefill.drawnBy) : null;
+    state.pendingData.drawnByName = prefill.drawnByName || null;
+    state.pendingData.drawnPlayerId = prefill.drawnPlayerId || null;
+    skip.add('drawn');
+  }
+  if ('turnoverBy' in prefill) {
+    state.pendingData.turnoverBy = prefill.turnoverBy ? String(prefill.turnoverBy) : null;
+    state.pendingData.turnoverByName = prefill.turnoverByName || null;
+    state.pendingData.turnoverPlayerId = prefill.turnoverPlayerId || null;
+    skip.add('turnover');
+  }
+  if ('stolenBy' in prefill) {
+    state.pendingData.stolenBy = prefill.stolenBy ? String(prefill.stolenBy) : null;
+    state.pendingData.stolenByName = prefill.stolenByName || null;
+    state.pendingData.stolenPlayerId = prefill.stolenPlayerId || null;
+    skip.add('stolen-by');
+  }
+  if ('goalieTeam' in prefill) {
+    state.flowCtx.goalieTeam = prefill.goalieTeam;
+    state.pendingData.goalieTeamLabel = prefill.goalieTeam === 'dark' ? dN : wN;
+    skip.add('goalie-team');
+  }
+  if ('goalieCap' in prefill) {
+    state.pendingData.goalieCap = prefill.goalieCap ? String(prefill.goalieCap) : null;
+    state.pendingData.goalieCapName = prefill.goalieCapName || null;
+    state.pendingData.goaliePlayerId = prefill.goaliePlayerId || null;
+    skip.add('goalie-cap');
+  }
+  if ('shooterCap' in prefill) {
+    state.pendingData.shooterCap = prefill.shooterCap ? String(prefill.shooterCap) : null;
+    state.pendingData.shooterCapName = prefill.shooterCapName || null;
+    state.pendingData.shooterPlayerId = prefill.shooterPlayerId || null;
+    skip.add('shooter-cap');
+  }
+  if ('fiveMShooterCap' in prefill) {
+    state.pendingData.fiveMShooterCap = prefill.fiveMShooterCap ? String(prefill.fiveMShooterCap) : null;
+    state.pendingData.fiveMShooterName = prefill.fiveMShooterName || null;
+    state.pendingData.fiveMShooterPlayerId = prefill.fiveMShooterPlayerId || null;
+    skip.add('5m-shooter');
+  }
+
+  // Filter to only unresolved steps
+  const filtered = fullFlow.filter(s => !skip.has(s));
+  state.flow = filtered;
+  state.flowIdx = 0;
+
+  if (filtered.length === 0) {
+    finalizeEvent();
+  } else {
+    showModalStep(filtered[0]);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════
+updateTimerDisplay();
+renderGameUI();
+// Silently refresh roster from sheet on every page load
+if(state.rosterSheetUrl) loadRosterFromSheet(false);
+initVoice();
+updateCritStatsBtn();
+</script>
+</body>
+</html>
