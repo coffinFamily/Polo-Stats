@@ -1259,7 +1259,7 @@ function evtIcon(type){
   if(type==='5m-penalty')                                    return redFrown;
   if(type==='ejection-drawn'||type==='5m-drawn')             return greenSmile;
   if(type==='steal')                                         return '🏴‍☠️ ';
-  if(type==='sprint-won')                                    return '⚡ ';
+  if(type==='sprint-won')                                    return `<svg width="11" height="13" viewBox="0 0 11 14" style="vertical-align:middle;margin-right:3px;flex-shrink:0;display:inline-block;"><polygon points="7,0 2,7 5.5,7 4,14 9,7 5.5,7 7,0" fill="#22c55e" stroke="#16a34a" stroke-width="0.5" stroke-linejoin="round"/></svg>`;
   if(type==='field-block'||type==='goalie-block')            return '😄 ';
   return '';
 }
