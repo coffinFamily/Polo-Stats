@@ -172,9 +172,6 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
   <div class="grid4" id="dark-btns"></div>
   <div class="stitle" id="white-btn-title">White events</div>
   <div class="grid4" id="white-btns"></div>
-  <div class="stitle">Shared events</div>
-  <div class="grid4" id="shared-btns"></div>
-
   <!-- Critical stats + Voice capture -->
   <div class="card" id="voice-card" style="display:none;padding:8px 10px;margin-top:10px;">
     <!-- Single row: stat chips + mic pushed right -->
@@ -436,16 +433,14 @@ if(DEFAULT_SHEET_URL)  { state.game.sheetUrl=DEFAULT_SHEET_URL;   ss('wp-sheet-u
 
 // Ensure prefs exist with full defaults
 {
-  const defTeam = () => ({goals:true,miss:true,assist:true,ejection:true,fiveM:true,steal:true,turnover:true});
-  const defShared = () => ({goalieBlock:true,fieldBlock:true,sprintWon:true});
+  const defTeam = () => ({goals:true,miss:true,assist:true,ejection:true,fiveM:true,steal:true,turnover:true,goalieBlock:true,fieldBlock:true,sprintWon:true});
   if(!state.prefs) state.prefs = {};
-  if(!state.prefs.dark)   state.prefs.dark   = defTeam();
-  if(!state.prefs.white)  state.prefs.white  = defTeam();
-  if(!state.prefs.shared) state.prefs.shared = defShared();
+  if(!state.prefs.dark)  state.prefs.dark  = defTeam();
+  if(!state.prefs.white) state.prefs.white = defTeam();
+  if(!state.prefs.shared) state.prefs.shared = {}; // keep for legacy compat, no longer used in UI
   // Fill in any keys added later that may not exist in stored prefs
-  Object.assign(state.prefs.dark,   Object.fromEntries(Object.entries(defTeam()).filter(([k])=>!(k in state.prefs.dark))));
-  Object.assign(state.prefs.white,  Object.fromEntries(Object.entries(defTeam()).filter(([k])=>!(k in state.prefs.white))));
-  Object.assign(state.prefs.shared, Object.fromEntries(Object.entries(defShared()).filter(([k])=>!(k in state.prefs.shared))));
+  Object.assign(state.prefs.dark,  Object.fromEntries(Object.entries(defTeam()).filter(([k])=>!(k in state.prefs.dark))));
+  Object.assign(state.prefs.white, Object.fromEntries(Object.entries(defTeam()).filter(([k])=>!(k in state.prefs.white))));
 }
 
 // Migrate old aff-based players to teamIds format
@@ -698,11 +693,18 @@ function startFlow(type,forceTeam){
   let flow=[...def.flow];
   // Apply pref filters when team is known up-front
   if(forceTeam) flow = applyPrefFilters(flow, forceTeam);
-  // Goalie Block doesn't force a team — the goalie-team step handles it
+  // Goalie Block with forced team: skip the goalie-team picker step
+  if(type==='goalie-block' && forceTeam) flow = flow.filter(s=>s!=='goalie-team');
+  // All other non-forced flows get a team-pick step prepended
   if(!forceTeam && type!=='goalie-block') flow=['team-pick',...flow];
   state.flow=flow; state.flowIdx=0;
-  state.flowCtx={eventType:type,eventLabel:def.label,team:forceTeam||null};
-  state.pendingData=forceTeam?{teamLabel:forceTeam==='dark'?state.game.darkTeam:state.game.whiteTeam}:{};
+  const teamName=forceTeam?(forceTeam==='dark'?state.game.darkTeam||'Dark':state.game.whiteTeam||'White'):null;
+  state.flowCtx={eventType:type, eventLabel:def.label, team:forceTeam||null,
+    goalieTeam: (type==='goalie-block'&&forceTeam)?forceTeam:null};
+  state.pendingData=forceTeam?{
+    teamLabel:teamName,
+    ...(type==='goalie-block'?{goalieTeamLabel:teamName}:{})
+  }:{};
   showModalStep(flow[0]);
 }
 
@@ -1195,15 +1197,13 @@ function closeModal(){
 //  PREFS TAB
 // ═══════════════════════════════════════════════════════════
 const PREF_CATS = [
-  {key:'goals',    label:'Goals',        emoji:'⚽'},
-  {key:'miss',     label:'Missed Shots', emoji:'🚫'},
-  {key:'assist',   label:'Assists',      emoji:'🤝'},
-  {key:'ejection', label:'Ejections',    emoji:'🟡'},
-  {key:'fiveM',    label:'5M Penalties', emoji:'⚡'},
-  {key:'steal',    label:'Steals',       emoji:'✊'},
-  {key:'turnover', label:'Turnovers',    emoji:'🔄'},
-];
-const SHARED_PREF_CATS = [
+  {key:'goals',       label:'Goals',         emoji:'⚽'},
+  {key:'miss',        label:'Missed Shots',  emoji:'🚫'},
+  {key:'assist',      label:'Assists',       emoji:'🤝'},
+  {key:'ejection',    label:'Ejections',     emoji:'🟡'},
+  {key:'fiveM',       label:'5M Penalties',  emoji:'⚡'},
+  {key:'steal',       label:'Steals',        emoji:'✊'},
+  {key:'turnover',    label:'Turnovers',     emoji:'🔄'},
   {key:'goalieBlock', label:'Goalie Blocks', emoji:'🧤'},
   {key:'fieldBlock',  label:'Field Blocks',  emoji:'🛡️'},
   {key:'sprintWon',   label:'Sprint Won',    emoji:'🏃'},
@@ -1235,22 +1235,8 @@ function renderPrefsTab(){
     </div>`;
   }
 
-  const sharedBtns = SHARED_PREF_CATS.map(c => {
-    const on = p.shared[c.key] !== false;
-    return `<button class="pref-toggle ${on?'on':'off'}" onclick="togglePref('shared','${c.key}')">
-      ${c.emoji} <span class="pref-label">${c.label}</span>
-    </button>`;
-  }).join('');
-  const sharedSection = `<div class="card" style="margin-bottom:10px;">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-      <span style="padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;background:#0d3a2a;color:#6ee7b7;border:1px solid #1a5a3a;">Shared</span>
-      <span style="font-weight:600;font-size:13px;color:#c0d8f0;">Both Teams</span>
-    </div>
-    <div style="display:flex;gap:7px;flex-wrap:wrap;">${sharedBtns}</div>
-  </div>`;
-
   document.getElementById('prefs-content').innerHTML =
-    teamSection('dark', dN, true) + teamSection('white', wN, false) + sharedSection;
+    teamSection('dark', dN, true) + teamSection('white', wN, false);
 }
 
 function togglePref(side, key){
@@ -1273,55 +1259,55 @@ function renderGameUI(){
   document.getElementById('no-sheet-warn').style.display=g.sheetUrl?'none':'block';
   updateTimerDisplay(); updateScores();
 
-  const p=state.prefs||{}, dp=p.dark||{}, wp=p.white||{}, sp=p.shared||{};
+  const p=state.prefs||{}, dp=p.dark||{}, wp=p.white||{};
+  const ag=state.activeGoalie||{};
+  const dkCap=ag.dark, whCap=ag.white;
+
   function prefEnabled(prefs, type){
-    if(type==='goal-reg'||type==='goal-65') return prefs.goals   !== false;
-    if(type==='miss')                        return prefs.miss     !== false;
-    if(type==='ejection')                    return prefs.ejection !== false;
-    if(type==='5m-penalty')                  return prefs.fiveM    !== false;
-    if(type==='steal')                       return prefs.steal    !== false;
-    if(type==='turnover')                    return prefs.turnover !== false;
+    if(type==='goal-reg'||type==='goal-65') return prefs.goals       !== false;
+    if(type==='miss')                        return prefs.miss        !== false;
+    if(type==='ejection')                    return prefs.ejection    !== false;
+    if(type==='5m-penalty')                  return prefs.fiveM       !== false;
+    if(type==='steal')                       return prefs.steal       !== false;
+    if(type==='turnover')                    return prefs.turnover    !== false;
+    if(type==='goalie-block')                return prefs.goalieBlock !== false;
+    if(type==='field-block')                 return prefs.fieldBlock  !== false;
+    if(type==='sprint-won')                  return prefs.sprintWon   !== false;
     return true;
   }
-  const allTeamBtns=['goal-reg','goal-65','miss','ejection','5m-penalty','steal','turnover'];
-  let dHtml='',wHtml='',sHtml='';
-  allTeamBtns.forEach(t=>{
+
+  const stdBtns=['goal-reg','goal-65','miss','ejection','5m-penalty','steal','turnover','field-block','sprint-won'];
+  let dHtml='', wHtml='';
+
+  stdBtns.forEach(t=>{
     if(prefEnabled(dp,t)) dHtml+=`<button class="evt-dk" onclick="startFlow('${t}','dark')">${EVENT_DEFS[t].label}</button>`;
     if(prefEnabled(wp,t)) wHtml+=`<button class="evt-wh" onclick="startFlow('${t}','white')">${EVENT_DEFS[t].label}</button>`;
   });
 
-  // Goalie Block: if active GKs are set, render one-tap cap buttons per team
-  if(sp.goalieBlock !== false){
-    const ag=state.activeGoalie||{};
-    const dkCap=ag.dark, whCap=ag.white;
-    if(dkCap||whCap){
-      if(dkCap){
-        sHtml+=`<button class="evt-nt" style="padding:4px 2px;" title="GK Block — ${dN} #${dkCap}" onclick="quickGoalieBlock('dark','${dkCap}')">
-          <span style="pointer-events:none;display:block;">${capSVG(dkCap,true)}</span>
-          <div style="font-size:10px;margin-top:2px;pointer-events:none;">GK Block</div>
-        </button>`;
-      } else {
-        sHtml+=`<button class="evt-nt" onclick="startFlow('goalie-block',null)">Goalie Block</button>`;
-      }
-      if(whCap){
-        sHtml+=`<button class="evt-nt" style="padding:4px 2px;" title="GK Block — ${wN} #${whCap}" onclick="quickGoalieBlock('white','${whCap}')">
-          <span style="pointer-events:none;display:block;">${capSVG(whCap,false)}</span>
-          <div style="font-size:10px;margin-top:2px;pointer-events:none;">GK Block</div>
-        </button>`;
-      } else {
-        sHtml+=`<button class="evt-nt" onclick="startFlow('goalie-block',null)">Goalie Block</button>`;
-      }
+  // Goalie Block per team — quick-tap if active GK is set, otherwise cap picker
+  if(prefEnabled(dp,'goalie-block')){
+    if(dkCap){
+      dHtml+=`<button class="evt-dk" style="padding:4px 2px;" title="GK Block — ${dN} #${dkCap}" onclick="quickGoalieBlock('dark','${dkCap}')">
+        <span style="pointer-events:none;display:block;">${capSVG(dkCap,true)}</span>
+        <div style="font-size:10px;margin-top:2px;pointer-events:none;">GK Block</div>
+      </button>`;
     } else {
-      sHtml+=`<button class="evt-nt" onclick="startFlow('goalie-block',null)">Goalie Block</button>`;
+      dHtml+=`<button class="evt-dk" onclick="startFlow('goalie-block','dark')">Goalie Block</button>`;
+    }
+  }
+  if(prefEnabled(wp,'goalie-block')){
+    if(whCap){
+      wHtml+=`<button class="evt-wh" style="padding:4px 2px;" title="GK Block — ${wN} #${whCap}" onclick="quickGoalieBlock('white','${whCap}')">
+        <span style="pointer-events:none;display:block;">${capSVG(whCap,false)}</span>
+        <div style="font-size:10px;margin-top:2px;pointer-events:none;">GK Block</div>
+      </button>`;
+    } else {
+      wHtml+=`<button class="evt-wh" onclick="startFlow('goalie-block','white')">Goalie Block</button>`;
     }
   }
 
-  if(sp.fieldBlock  !== false) sHtml+=`<button class="evt-nt" onclick="startFlow('field-block',null)">Field Block</button>`;
-  if(sp.sprintWon   !== false) sHtml+=`<button class="evt-nt" onclick="startFlow('sprint-won',null)">Sprint Won</button>`;
-
   document.getElementById('dark-btns').innerHTML=dHtml;
   document.getElementById('white-btns').innerHTML=wHtml;
-  document.getElementById('shared-btns').innerHTML=sHtml;
   renderEventLog();
 }
 
