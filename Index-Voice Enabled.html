@@ -169,9 +169,9 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
   </div>
 
   <div class="stitle" id="dark-btn-title">Dark events</div>
-  <div class="grid4" id="dark-btns"></div>
+  <div id="dark-btns"></div>
   <div class="stitle" id="white-btn-title">White events</div>
-  <div class="grid4" id="white-btns"></div>
+  <div id="white-btns"></div>
   <!-- Critical stats + Voice capture -->
   <div class="card" id="voice-card" style="display:none;padding:8px 10px;margin-top:10px;">
     <!-- Single row: stat chips + mic pushed right -->
@@ -1296,33 +1296,41 @@ function renderGameUI(){
     return true;
   }
 
-  const stdBtns=['goal-reg','goal-65','goal-5m','miss','ejection','ejection-drawn','5m-penalty','5m-drawn','steal','turnover','assist','field-block','sprint-won'];
-  let dHtml='', wHtml='';
-
-  stdBtns.forEach(t=>{
-    const ico = evtIcon(t);
-    if(prefEnabled(dp,t)) dHtml+=`<button class="evt-dk" onclick="startFlow('${t}','dark')">${ico}${EVENT_DEFS[t].label}</button>`;
-    if(prefEnabled(wp,t)) wHtml+=`<button class="evt-wh" onclick="startFlow('${t}','white')">${ico}${EVENT_DEFS[t].label}</button>`;
-  });
-
-  // Goalie Block per team — quick-tap if active GK is set, otherwise cap picker
-  if(prefEnabled(dp,'goalie-block')){
-    if(dkCap){
-      dHtml+=`<button class="evt-dk" title="GK Block — ${dN} #${dkCap}" onclick="quickGoalieBlock('dark','${dkCap}')">${evtIcon('goalie-block')}GK Block</button>`;
-    } else {
-      dHtml+=`<button class="evt-dk" onclick="startFlow('goalie-block','dark')">Goalie Block</button>`;
-    }
+  // Build a button row. types = ordered list of event keys for this row.
+  // center=true → justify-content:center (for rows with fewer buttons)
+  function buildRow(types, side, prefs, center){
+    const isDk = side==='dark';
+    const cls  = isDk ? 'evt-dk' : 'evt-wh';
+    const teamCap = isDk ? dkCap : whCap;
+    const teamName = isDk ? dN : wN;
+    let btns='';
+    types.forEach(t=>{
+      if(!prefEnabled(prefs,t)) return;
+      const ico = evtIcon(t);
+      if(t==='goalie-block'){
+        if(teamCap){
+          btns+=`<button class="${cls}" style="flex:1;" title="GK Block — ${teamName} #${teamCap}" onclick="quickGoalieBlock('${side}','${teamCap}')">${ico}GK Block</button>`;
+        } else {
+          btns+=`<button class="${cls}" style="flex:1;" onclick="startFlow('goalie-block','${side}')">${ico}Goalie Block</button>`;
+        }
+      } else {
+        btns+=`<button class="${cls}" style="flex:1;" onclick="startFlow('${t}','${side}')">${ico}${EVENT_DEFS[t].label}</button>`;
+      }
+    });
+    if(!btns) return '';
+    return `<div style="display:flex;gap:6px;margin-bottom:5px;justify-content:${center?'center':'stretch'};">${btns}</div>`;
   }
-  if(prefEnabled(wp,'goalie-block')){
-    if(whCap){
-      wHtml+=`<button class="evt-wh" title="GK Block — ${wN} #${whCap}" onclick="quickGoalieBlock('white','${whCap}')">${evtIcon('goalie-block')}GK Block</button>`;
-    } else {
-      wHtml+=`<button class="evt-wh" onclick="startFlow('goalie-block','white')">Goalie Block</button>`;
-    }
-  }
 
-  document.getElementById('dark-btns').innerHTML=dHtml;
-  document.getElementById('white-btns').innerHTML=wHtml;
+  // Row layout per team
+  const ROWS = [
+    {types:['goal-reg','goal-65','goal-5m','assist'],                       center:false},
+    {types:['miss','steal','turnover'],                                      center:true},
+    {types:['ejection','ejection-drawn','5m-penalty','5m-drawn'],           center:false},
+    {types:['field-block','goalie-block','sprint-won'],                     center:true},
+  ];
+
+  document.getElementById('dark-btns').innerHTML  = ROWS.map(r=>buildRow(r.types,'dark', dp,r.center)).join('');
+  document.getElementById('white-btns').innerHTML = ROWS.map(r=>buildRow(r.types,'white',wp,r.center)).join('');
   renderEventLog();
 }
 
