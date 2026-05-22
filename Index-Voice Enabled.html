@@ -1243,6 +1243,23 @@ function togglePref(side, key){
   renderGameUI(); // keep game buttons in sync immediately
 }
 
+function evtIcon(type){
+  // Inline SVG water polo ball — pass fill/stroke colors
+  function wpBall(fill, stroke){
+    return `<svg width="13" height="13" viewBox="0 0 14 14" style="vertical-align:middle;margin-right:3px;flex-shrink:0;display:inline-block;"><circle cx="7" cy="7" r="6.5" fill="${fill}" stroke="${stroke}" stroke-width="0.6"/><path d="M1.5 5Q7 1.5 12.5 5" fill="none" stroke="${stroke}" stroke-width="0.8"/><path d="M1.5 9Q7 12.5 12.5 9" fill="none" stroke="${stroke}" stroke-width="0.8"/><path d="M4.5 1Q2 7 4.5 13" fill="none" stroke="${stroke}" stroke-width="0.8"/><path d="M9.5 1Q12 7 9.5 13" fill="none" stroke="${stroke}" stroke-width="0.8"/></svg>`;
+  }
+  if(type==='goal-reg'||type==='goal-65'||type==='goal-5m') return wpBall('#f5c518','#c8960e');
+  if(type==='miss')                                          return wpBall('#ef4444','#b03030');
+  if(type==='assist')                                        return '👍 ';
+  if(type==='ejection'||type==='ejection-drawn')             return '😟 ';
+  if(type==='5m-penalty'||type==='5m-drawn')                 return '😟 ';
+  if(type==='turnover')                                      return '😟 ';
+  if(type==='steal')                                         return '🏴‍☠️ ';
+  if(type==='sprint-won')                                    return '⚡ ';
+  if(type==='field-block'||type==='goalie-block')            return '😄 ';
+  return '';
+}
+
 function renderGameUI(){
   const g=state.game;
   const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
@@ -1279,21 +1296,22 @@ function renderGameUI(){
   let dHtml='', wHtml='';
 
   stdBtns.forEach(t=>{
-    if(prefEnabled(dp,t)) dHtml+=`<button class="evt-dk" onclick="startFlow('${t}','dark')">${EVENT_DEFS[t].label}</button>`;
-    if(prefEnabled(wp,t)) wHtml+=`<button class="evt-wh" onclick="startFlow('${t}','white')">${EVENT_DEFS[t].label}</button>`;
+    const ico = evtIcon(t);
+    if(prefEnabled(dp,t)) dHtml+=`<button class="evt-dk" onclick="startFlow('${t}','dark')">${ico}${EVENT_DEFS[t].label}</button>`;
+    if(prefEnabled(wp,t)) wHtml+=`<button class="evt-wh" onclick="startFlow('${t}','white')">${ico}${EVENT_DEFS[t].label}</button>`;
   });
 
   // Goalie Block per team — quick-tap if active GK is set, otherwise cap picker
   if(prefEnabled(dp,'goalie-block')){
     if(dkCap){
-      dHtml+=`<button class="evt-dk" title="GK Block — ${dN} #${dkCap}" onclick="quickGoalieBlock('dark','${dkCap}')">GK Block</button>`;
+      dHtml+=`<button class="evt-dk" title="GK Block — ${dN} #${dkCap}" onclick="quickGoalieBlock('dark','${dkCap}')">${evtIcon('goalie-block')}GK Block</button>`;
     } else {
       dHtml+=`<button class="evt-dk" onclick="startFlow('goalie-block','dark')">Goalie Block</button>`;
     }
   }
   if(prefEnabled(wp,'goalie-block')){
     if(whCap){
-      wHtml+=`<button class="evt-wh" title="GK Block — ${wN} #${whCap}" onclick="quickGoalieBlock('white','${whCap}')">GK Block</button>`;
+      wHtml+=`<button class="evt-wh" title="GK Block — ${wN} #${whCap}" onclick="quickGoalieBlock('white','${whCap}')">${evtIcon('goalie-block')}GK Block</button>`;
     } else {
       wHtml+=`<button class="evt-wh" onclick="startFlow('goalie-block','white')">Goalie Block</button>`;
     }
