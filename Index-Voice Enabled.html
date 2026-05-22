@@ -436,7 +436,7 @@ if(DEFAULT_SHEET_URL)  { state.game.sheetUrl=DEFAULT_SHEET_URL;   ss('wp-sheet-u
 
 // Ensure prefs exist with full defaults
 {
-  const defTeam = () => ({goals:true,miss:true,assist:true,ejection:true,ejectionDrawn:true,fiveM:true,fiveMDrawn:true,steal:true,turnover:true,goalieBlock:true,fieldBlock:true,sprintWon:true});
+  const defTeam = () => ({goals:true,miss:true,assist:true,ejection:true,ejectionDrawn:true,fiveM:true,fiveMDrawn:true,steal:true,turnover:true,goalieBlock:true,fieldBlock:true,sprintWon:true,goalZone:true,goalGM:true,missZone:true});
   if(!state.prefs) state.prefs = {};
   if(!state.prefs.dark)  state.prefs.dark  = defTeam();
   if(!state.prefs.white) state.prefs.white = defTeam();
@@ -685,17 +685,24 @@ function deletePlayerFromSheet(id){ rosterPost({action:'delete-player',id}); }
 // ═══════════════════════════════════════════════════════════
 //  EVENT FLOW
 // ═══════════════════════════════════════════════════════════
-function applyPrefFilters(flow, side){
-  // All related-event steps (assist, drawn, etc.) are now standalone buttons,
-  // not inline flow steps — so no per-step filtering needed here.
-  return flow;
+function applyPrefFilters(flow, side, eventType){
+  if(!side) return flow;
+  const tp=(state.prefs||{})[side]||{};
+  const isGoal = eventType==='goal-reg'||eventType==='goal-65'||eventType==='goal-5m';
+  const isMiss = eventType==='miss';
+  return flow.filter(s=>{
+    if(s==='zone' && isGoal) return tp.goalZone !== false;
+    if(s==='gm'   && isGoal) return tp.goalGM   !== false;
+    if(s==='zone' && isMiss) return tp.missZone  !== false;
+    return true;
+  });
 }
 
 function startFlow(type,forceTeam){
   const def=EVENT_DEFS[type];
   let flow=[...def.flow];
   // Apply pref filters when team is known up-front
-  if(forceTeam) flow = applyPrefFilters(flow, forceTeam);
+  if(forceTeam) flow = applyPrefFilters(flow, forceTeam, type);
   // Goalie Block with forced team: skip the goalie-team picker step
   if(type==='goalie-block' && forceTeam) flow = flow.filter(s=>s!=='goalie-team');
   // All other non-forced flows get a team-pick step prepended
@@ -1194,18 +1201,21 @@ function closeModal(){
 //  PREFS TAB
 // ═══════════════════════════════════════════════════════════
 const PREF_CATS = [
-  {key:'goals',          label:'Goals',          emoji:'⚽'},
-  {key:'miss',           label:'Missed Shots',   emoji:'🚫'},
-  {key:'assist',         label:'Assists',        emoji:'🤝'},
-  {key:'ejection',       label:'Ejections',      emoji:'🟡'},
-  {key:'ejectionDrawn',  label:'Ejection Drawn', emoji:'🟠'},
-  {key:'fiveM',          label:'5M Penalties',   emoji:'⚡'},
-  {key:'fiveMDrawn',     label:'5M Drawn',       emoji:'🎯'},
-  {key:'steal',          label:'Steals',         emoji:'✊'},
-  {key:'turnover',       label:'Turnovers',      emoji:'🔄'},
-  {key:'goalieBlock',    label:'Goalie Blocks',  emoji:'🧤'},
-  {key:'fieldBlock',     label:'Field Blocks',   emoji:'🛡️'},
-  {key:'sprintWon',      label:'Sprint Won',     emoji:'🏃'},
+  {key:'goals',          label:'Goals',              emoji:'⚽'},
+  {key:'goalZone',       label:'Goal Location',      emoji:'📍'},
+  {key:'goalGM',         label:'Goal Mouth',         emoji:'🥅'},
+  {key:'miss',           label:'Missed Shots',       emoji:'🚫'},
+  {key:'missZone',       label:'Miss Location',      emoji:'📍'},
+  {key:'assist',         label:'Assists',            emoji:'🤝'},
+  {key:'ejection',       label:'Ejections',          emoji:'🟡'},
+  {key:'ejectionDrawn',  label:'Ejection Drawn',     emoji:'🟠'},
+  {key:'fiveM',          label:'5M Penalties',       emoji:'⚡'},
+  {key:'fiveMDrawn',     label:'5M Drawn',           emoji:'🎯'},
+  {key:'steal',          label:'Steals',             emoji:'✊'},
+  {key:'turnover',       label:'Turnovers',          emoji:'🔄'},
+  {key:'goalieBlock',    label:'Goalie Blocks',      emoji:'🧤'},
+  {key:'fieldBlock',     label:'Field Blocks',       emoji:'🛡️'},
+  {key:'sprintWon',      label:'Sprint Won',         emoji:'🏃'},
 ];
 
 function renderPrefsTab(){
