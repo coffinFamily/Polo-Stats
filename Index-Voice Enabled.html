@@ -433,7 +433,7 @@ if(DEFAULT_SHEET_URL)  { state.game.sheetUrl=DEFAULT_SHEET_URL;   ss('wp-sheet-u
 
 // Ensure prefs exist with full defaults
 {
-  const defTeam = () => ({goals:true,miss:true,assist:true,ejection:true,fiveM:true,steal:true,turnover:true,goalieBlock:true,fieldBlock:true,sprintWon:true});
+  const defTeam = () => ({goals:true,miss:true,assist:true,ejection:true,ejectionDrawn:true,fiveM:true,fiveMDrawn:true,steal:true,turnover:true,goalieBlock:true,fieldBlock:true,sprintWon:true});
   if(!state.prefs) state.prefs = {};
   if(!state.prefs.dark)  state.prefs.dark  = defTeam();
   if(!state.prefs.white) state.prefs.white = defTeam();
@@ -456,16 +456,19 @@ state.players = state.players.map(p => {
 //  EVENT DEFINITIONS
 // ═══════════════════════════════════════════════════════════
 const EVENT_DEFS = {
-  'goal-reg':    {label:'Goal (Reg)',    flow:['cap','zone','gm','assist']},
-  'goal-65':     {label:'Goal (6-5)',    flow:['cap','zone','gm','assist']},
-  'miss':        {label:'Missed Shot',   flow:['cap','zone']},
-  'ejection':    {label:'Ejection',      flow:['cap','drawn']},
-  '5m-penalty':  {label:'5M Penalty',   flow:['cap','drawn','5m-shooter','5m-result']},
-  'steal':       {label:'Steal',         flow:['cap','turnover']},
-  'turnover':    {label:'Turnover',      flow:['cap','stolen-by']},
-  'goalie-block':{label:'Goalie Block',  flow:['goalie-team','goalie-cap']},
-  'field-block': {label:'Field Block',   flow:['cap']},
-  'sprint-won':  {label:'Sprint Won',    flow:['cap']},
+  'goal-reg':       {label:'Goal (Reg)',       flow:['cap','zone','gm']},
+  'goal-65':        {label:'Goal (6-5)',        flow:['cap','zone','gm']},
+  'miss':           {label:'Missed Shot',       flow:['cap','zone']},
+  'ejection':       {label:'Ejection',          flow:['cap']},
+  '5m-penalty':     {label:'5M Penalty',        flow:['cap','5m-result']},
+  'steal':          {label:'Steal',             flow:['cap']},
+  'turnover':       {label:'Turnover',          flow:['cap']},
+  'assist':         {label:'Assist',            flow:['cap']},
+  'ejection-drawn': {label:'Ejection Drawn',    flow:['cap']},
+  '5m-drawn':       {label:'5M Drawn',          flow:['cap']},
+  'goalie-block':   {label:'Goalie Block',      flow:['goalie-team','goalie-cap']},
+  'field-block':    {label:'Field Block',       flow:['cap']},
+  'sprint-won':     {label:'Sprint Won',        flow:['cap']},
 };
 
 // Pool SVG constants — 23 yards (~21m) wide × 25m long; showing attacking half (12.5m)
@@ -679,13 +682,9 @@ function deletePlayerFromSheet(id){ rosterPost({action:'delete-player',id}); }
 //  EVENT FLOW
 // ═══════════════════════════════════════════════════════════
 function applyPrefFilters(flow, side){
-  // Remove flow steps the user has turned off for this team side ('dark'|'white')
-  if(!side) return flow;
-  const tp = (state.prefs||{})[side] || {};
-  return flow.filter(s => {
-    if(s==='assist') return tp.assist !== false;
-    return true; // all other steps always kept (event button wouldn't exist if disabled)
-  });
+  // All related-event steps (assist, drawn, etc.) are now standalone buttons,
+  // not inline flow steps — so no per-step filtering needed here.
+  return flow;
 }
 
 function startFlow(type,forceTeam){
@@ -710,13 +709,7 @@ function startFlow(type,forceTeam){
 
 function nextStep(field,val,label,playerId){
   const d=state.pendingData;
-  if(field==='team'){
-    state.flowCtx.team=val; d.teamLabel=label;
-    // Apply pref filters for the chosen team to remaining flow steps
-    const remaining = state.flow.slice(state.flowIdx+1);
-    const filtered = applyPrefFilters(remaining, val);
-    state.flow = [...state.flow.slice(0, state.flowIdx+1), ...filtered];
-  }
+  if(field==='team'){state.flowCtx.team=val;d.teamLabel=label;}
   else if(field==='goalieTeam'){state.flowCtx.goalieTeam=val;d.goalieTeamLabel=label;}
   else if(field==='cap'){d.cap=val;d.capName=label;d.playerId=playerId||null;}
   else if(field==='goalieCap'){d.goalieCap=val;d.goalieCapName=label;d.goaliePlayerId=playerId||null;}
@@ -1197,16 +1190,18 @@ function closeModal(){
 //  PREFS TAB
 // ═══════════════════════════════════════════════════════════
 const PREF_CATS = [
-  {key:'goals',       label:'Goals',         emoji:'⚽'},
-  {key:'miss',        label:'Missed Shots',  emoji:'🚫'},
-  {key:'assist',      label:'Assists',       emoji:'🤝'},
-  {key:'ejection',    label:'Ejections',     emoji:'🟡'},
-  {key:'fiveM',       label:'5M Penalties',  emoji:'⚡'},
-  {key:'steal',       label:'Steals',        emoji:'✊'},
-  {key:'turnover',    label:'Turnovers',     emoji:'🔄'},
-  {key:'goalieBlock', label:'Goalie Blocks', emoji:'🧤'},
-  {key:'fieldBlock',  label:'Field Blocks',  emoji:'🛡️'},
-  {key:'sprintWon',   label:'Sprint Won',    emoji:'🏃'},
+  {key:'goals',          label:'Goals',          emoji:'⚽'},
+  {key:'miss',           label:'Missed Shots',   emoji:'🚫'},
+  {key:'assist',         label:'Assists',        emoji:'🤝'},
+  {key:'ejection',       label:'Ejections',      emoji:'🟡'},
+  {key:'ejectionDrawn',  label:'Ejection Drawn', emoji:'🟠'},
+  {key:'fiveM',          label:'5M Penalties',   emoji:'⚡'},
+  {key:'fiveMDrawn',     label:'5M Drawn',       emoji:'🎯'},
+  {key:'steal',          label:'Steals',         emoji:'✊'},
+  {key:'turnover',       label:'Turnovers',      emoji:'🔄'},
+  {key:'goalieBlock',    label:'Goalie Blocks',  emoji:'🧤'},
+  {key:'fieldBlock',     label:'Field Blocks',   emoji:'🛡️'},
+  {key:'sprintWon',      label:'Sprint Won',     emoji:'🏃'},
 ];
 
 function renderPrefsTab(){
@@ -1264,19 +1259,22 @@ function renderGameUI(){
   const dkCap=ag.dark, whCap=ag.white;
 
   function prefEnabled(prefs, type){
-    if(type==='goal-reg'||type==='goal-65') return prefs.goals       !== false;
-    if(type==='miss')                        return prefs.miss        !== false;
-    if(type==='ejection')                    return prefs.ejection    !== false;
-    if(type==='5m-penalty')                  return prefs.fiveM       !== false;
-    if(type==='steal')                       return prefs.steal       !== false;
-    if(type==='turnover')                    return prefs.turnover    !== false;
-    if(type==='goalie-block')                return prefs.goalieBlock !== false;
-    if(type==='field-block')                 return prefs.fieldBlock  !== false;
-    if(type==='sprint-won')                  return prefs.sprintWon   !== false;
+    if(type==='goal-reg'||type==='goal-65') return prefs.goals          !== false;
+    if(type==='miss')                        return prefs.miss           !== false;
+    if(type==='ejection')                    return prefs.ejection       !== false;
+    if(type==='ejection-drawn')              return prefs.ejectionDrawn  !== false;
+    if(type==='5m-penalty')                  return prefs.fiveM          !== false;
+    if(type==='5m-drawn')                    return prefs.fiveMDrawn     !== false;
+    if(type==='steal')                       return prefs.steal          !== false;
+    if(type==='turnover')                    return prefs.turnover       !== false;
+    if(type==='assist')                      return prefs.assist         !== false;
+    if(type==='goalie-block')                return prefs.goalieBlock    !== false;
+    if(type==='field-block')                 return prefs.fieldBlock     !== false;
+    if(type==='sprint-won')                  return prefs.sprintWon      !== false;
     return true;
   }
 
-  const stdBtns=['goal-reg','goal-65','miss','ejection','5m-penalty','steal','turnover','field-block','sprint-won'];
+  const stdBtns=['goal-reg','goal-65','miss','ejection','ejection-drawn','5m-penalty','5m-drawn','steal','turnover','assist','field-block','sprint-won'];
   let dHtml='', wHtml='';
 
   stdBtns.forEach(t=>{
