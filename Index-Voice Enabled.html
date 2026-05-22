@@ -311,6 +311,7 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
     </div>
   </div>
 
+  <p id="save-game-error" style="display:none;background:#2a0a0a;border:1px solid #ef4444;color:#fca5a5;border-radius:8px;padding:10px 14px;font-size:12px;margin-bottom:8px;line-height:1.6;"></p>
   <button class="btn-p" style="width:100%;padding:12px;font-size:15px;" onclick="saveGame()">Save game setup →</button>
 </div>
 
@@ -1459,7 +1460,7 @@ function buildRosterUI(side){
     const saved=savedRoster.find(r=>r.playerId===p.id);
     const fullName=(p.first||'')+' '+(p.last||'');
     const placeholderNum=fullName.includes('Placeholder')?(fullName.match(/-\s*(\d+)\s*\)/)||[])[1]||'':'';
-    const capVal=saved?saved.cap:placeholderNum;
+    const capVal=saved?saved.cap:(p.defaultCap||placeholderNum);
     const savedGk=(state.activeGoalie||{})[side];
     // Default to cap #1 if no GK has been explicitly saved yet
     const isGk=savedGk ? (saved?saved.cap===savedGk:capVal===savedGk) : capVal==='1';
@@ -1513,13 +1514,44 @@ function saveGame(){
     const capEl=document.getElementById(`rb-cap-${side}-${pid}`);
     return capEl?capEl.value.trim()||null:null;
   };
+  // --- Duplicate cap check ---
+  const darkRoster=readRoster('dark',darkTeamId);
+  const whiteRoster=readRoster('white',whiteTeamId);
+  const errEl=document.getElementById('save-game-error');
+
+  function findDupes(roster){ const seen={},dupes=new Set(); roster.forEach(r=>{ if(r.cap){seen[r.cap]=(seen[r.cap]||0)+1; if(seen[r.cap]>1)dupes.add(r.cap);} }); return dupes; }
+  function applyCapHighlights(side,roster,dupes){
+    roster.forEach(r=>{
+      const el=document.getElementById(`rb-cap-${side}-${r.playerId}`);
+      if(!el) return;
+      if(dupes.has(r.cap)){ el.style.borderColor='#ef4444'; el.style.background='#2a0a0a'; }
+      else { el.style.borderColor=''; el.style.background=''; }
+    });
+  }
+
+  const darkDupes=findDupes(darkRoster);
+  const whiteDupes=findDupes(whiteRoster);
+  applyCapHighlights('dark',darkRoster,darkDupes);
+  applyCapHighlights('white',whiteRoster,whiteDupes);
+
+  if(darkDupes.size||whiteDupes.size){
+    const msgs=[];
+    if(darkDupes.size) msgs.push(`<strong>${darkTeam} (Dark)</strong> — duplicate cap${darkDupes.size>1?'s':''}: #${[...darkDupes].join(', #')}`);
+    if(whiteDupes.size) msgs.push(`<strong>${whiteTeam} (White)</strong> — duplicate cap${whiteDupes.size>1?'s':''}: #${[...whiteDupes].join(', #')}`);
+    errEl.innerHTML='⚠️ Fix duplicate cap numbers before saving:<br>'+msgs.join('<br>');
+    errEl.style.display='block';
+    errEl.scrollIntoView({behavior:'smooth',block:'nearest'});
+    return;
+  }
+  errEl.style.display='none';
+  // --- End duplicate check ---
+
   state.activeGoalie={dark:readGK('dark',darkTeamId), white:readGK('white',whiteTeamId)};
   ss('wp-active-goalie', state.activeGoalie);
 
   state.game={darkTeam,whiteTeam,darkTeamId,whiteTeamId,sheetUrl,date,
     gameId:'game-'+genId(),
-    darkRoster:readRoster('dark',darkTeamId),
-    whiteRoster:readRoster('white',whiteTeamId)};
+    darkRoster, whiteRoster};
   ss('wp-game',state.game);
 
   if(sheetUrl) pushToSheet({action:'init',darkTeam,whiteTeam,date,gameId:state.game.gameId});
@@ -1557,6 +1589,14 @@ function addPlayer(){
   renderPlayersList();
 }
 
+function setDefaultCap(playerId, cap){
+  const p=state.players.find(p=>String(p.id)===String(playerId));
+  if(!p) return;
+  p.defaultCap=cap.trim();
+  ss('wp-players',state.players);
+  syncPlayerToSheet(p);
+}
+
 function renderPlayersList(query){
   // Preserve search text across re-renders (e.g. after add/delete)
   if(query===undefined){
@@ -1592,12 +1632,20 @@ function renderPlayersList(query){
   filtered.forEach(p=>{
     const teamIds=p.teamIds||[];
     html+=`<div class="card" style="padding:12px 14px;">
-      <div class="row" style="justify-content:space-between;margin-bottom:8px;">
-        <div>
+      <div class="row" style="justify-content:space-between;margin-bottom:8px;align-items:flex-start;">
+        <div style="flex:1;min-width:0;">
           <span style="font-weight:600;">${p.last?p.last+', '+p.first:p.first}</span>
           ${p.dob?`<span style="font-size:11px;color:#5a7a9a;margin-left:8px;">${p.dob}</span>`:''}
         </div>
-        <button class="btn-d" style="padding:3px 8px;font-size:11px;" onclick="deletePlayer('${p.id}')">Remove</button>
+        <div class="row" style="gap:8px;align-items:center;flex:0 0 auto;">
+          <div style="display:flex;align-items:center;gap:4px;">
+            <span style="font-size:10px;color:#5a7a9a;white-space:nowrap;">Default #</span>
+            <input type="text" maxlength="3" value="${p.defaultCap||''}" placeholder="—"
+              style="width:38px;text-align:center;padding:3px 4px;font-size:12px;font-weight:600;"
+              onchange="setDefaultCap('${p.id}',this.value)">
+          </div>
+          <button class="btn-d" style="padding:3px 8px;font-size:11px;" onclick="deletePlayer('${p.id}')">Remove</button>
+        </div>
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:2px;">`;
     state.teams.forEach(t=>{
