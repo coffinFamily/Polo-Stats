@@ -331,6 +331,7 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
         <button class="btn-p" style="flex:0 0 auto;" onclick="addPlayer()">Add</button>
       </div>
     </div>
+    <input id="player-search" type="search" placeholder="🔍 Search by name or team…" oninput="renderPlayersList(this.value)" style="margin-bottom:8px;" />
     <div id="players-list"></div>
 
     <!-- Merge duplicates -->
@@ -362,6 +363,7 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
         <button class="btn-p" style="flex:0 0 auto;" onclick="addTeam()">Add</button>
       </div>
     </div>
+    <input id="team-search" type="search" placeholder="🔍 Search teams…" oninput="renderTeamsList(this.value)" style="margin-bottom:8px;" />
     <div id="teams-list"></div>
   </div>
 </div>
@@ -1555,7 +1557,12 @@ function addPlayer(){
   renderPlayersList();
 }
 
-function renderPlayersList(){
+function renderPlayersList(query){
+  // Preserve search text across re-renders (e.g. after add/delete)
+  if(query===undefined){
+    const box=document.getElementById('player-search');
+    query=box?box.value:'';
+  }
   const el=document.getElementById('players-list');
   const mergeSection=document.getElementById('merge-section');
 
@@ -1568,9 +1575,21 @@ function renderPlayersList(){
   mergeSection.style.display=state.players.length>=2?'block':'none';
   populateMergeDropdowns();
 
+  const q=(query||'').toLowerCase().trim();
   const sorted=[...state.players].sort((a,b)=>(a.last||'').localeCompare(b.last||''));
+  const filtered=q?sorted.filter(p=>{
+    const name=`${p.first||''} ${p.last||''} ${p.last||''} ${p.first||''}`.toLowerCase();
+    const teams=(p.teamIds||[]).map(tid=>state.teams.find(t=>String(t.id)===String(tid))?.name||'').join(' ').toLowerCase();
+    return name.includes(q)||teams.includes(q);
+  }):sorted;
+
+  if(!filtered.length){
+    el.innerHTML=`<p style="text-align:center;color:#5a7a9a;padding:20px;">No players match "${query}"</p>`;
+    return;
+  }
+
   let html='';
-  sorted.forEach(p=>{
+  filtered.forEach(p=>{
     const teamIds=p.teamIds||[];
     html+=`<div class="card" style="padding:12px 14px;">
       <div class="row" style="justify-content:space-between;margin-bottom:8px;">
@@ -1684,11 +1703,21 @@ function addTeam(){
   renderPlayersList();
 }
 
-function renderTeamsList(){
+function renderTeamsList(query){
+  if(query===undefined){
+    const box=document.getElementById('team-search');
+    query=box?box.value:'';
+  }
   const el=document.getElementById('teams-list');
   if(!state.teams.length){ el.innerHTML='<p style="text-align:center;color:#5a7a9a;padding:20px;">No teams yet</p>'; return; }
+  const q=(query||'').toLowerCase().trim();
+  const filtered=q?state.teams.filter(t=>t.name.toLowerCase().includes(q)):state.teams;
+  if(!filtered.length){
+    el.innerHTML=`<p style="text-align:center;color:#5a7a9a;padding:20px;">No teams match "${query}"</p>`;
+    return;
+  }
   let html='';
-  state.teams.forEach(t=>{
+  filtered.forEach(t=>{
     const count=state.players.filter(p=>(p.teamIds||[]).map(String).includes(String(t.id))).length;
     html+=`<div class="card" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;">
       <div>
