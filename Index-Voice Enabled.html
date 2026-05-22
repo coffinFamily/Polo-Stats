@@ -2747,6 +2747,16 @@ function voiceStartFlow(eventType, prefill) {
     state.flowCtx.goalieTeam = prefill.goalieTeam;
     state.pendingData.goalieTeamLabel = prefill.goalieTeam === 'dark' ? dN : wN;
     skip.add('goalie-team');
+  } else if (isGoalie && forceTeam) {
+    // teamSide IS the goalie's team — no need for a team picker
+    state.flowCtx.goalieTeam = forceTeam;
+    state.pendingData.goalieTeamLabel = forceTeam === 'dark' ? dN : wN;
+    skip.add('goalie-team');
+  }
+  // Apply blockZone pref — skip zone step if pref is off
+  if (isGoalie && state.flowCtx.goalieTeam) {
+    const tp = (state.prefs||{})[state.flowCtx.goalieTeam]||{};
+    if (tp.blockZone === false) skip.add('zone');
   }
   if ('goalieCap' in prefill) {
     state.pendingData.goalieCap = prefill.goalieCap ? String(prefill.goalieCap) : null;
