@@ -1048,6 +1048,14 @@ function showModalStep(step){
   else if(step==='zone') renderPoolPicker();
   else if(step==='gm') renderGMPicker();
 
+  // Voice context banner — bold summary of captured data with a Cancel button
+  if (state.voiceCtxLabel) {
+    body.innerHTML = `<div style="background:#0a1e30;border:1px solid #0a4a6a;border-radius:8px;padding:9px 12px;margin-bottom:13px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <span style="font-size:14px;font-weight:700;color:#5bc8f0;line-height:1.3;">${state.voiceCtxLabel}</span>
+      <button class="btn-d" style="padding:4px 10px;font-size:12px;flex:0 0 auto;" onclick="closeModal()">✕ Cancel</button>
+    </div>` + body.innerHTML;
+  }
+
   document.getElementById('modal-overlay').style.display='flex';
 }
 
@@ -1221,6 +1229,7 @@ function renderGMPicker(){
 function closeModal(){
   document.getElementById('modal-overlay').style.display='none';
   state.flow=null;state.flowIdx=0;state.flowCtx={};state.pendingData={};
+  state.voiceCtxLabel=null;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2625,7 +2634,12 @@ async function processVoiceTranscript(text) {
     }
   }
 
-  showVoiceConfirmation(text, parsed, prefill);
+  // Clear voice UI then fire the flow directly — no confirmation step
+  const tr2 = document.getElementById('voice-transcript');
+  if (tr2) tr2.textContent = '';
+  const res2 = document.getElementById('voice-result');
+  if (res2) res2.innerHTML = '';
+  voiceStartFlow(parsed.eventType, prefill);
 }
 
 // ─── Confirmation card ────────────────────────────────────────
@@ -2684,6 +2698,31 @@ function confirmVoiceResult() {
   if (!r) return;
   clearVoiceResult();
   voiceStartFlow(r.eventType, r.prefill);
+}
+
+// ─── Voice context label (shown in modal header when extra steps remain) ──
+function buildVoiceLabel(eventType, prefill) {
+  const g = state.game;
+  const dN = g.darkTeam || 'Dark', wN = g.whiteTeam || 'White';
+  const def = EVENT_DEFS[eventType];
+  let parts = [def.label];
+  const teamSide = prefill.goalieTeam || prefill.teamSide;
+  if (teamSide) parts.push(teamSide === 'dark' ? dN : wN);
+  if (prefill.goalieCap) {
+    const name = prefill.goalieCapName && prefill.goalieCapName !== '#'+prefill.goalieCap ? prefill.goalieCapName : null;
+    parts.push(name ? `#${prefill.goalieCap} ${name}` : `#${prefill.goalieCap}`);
+  } else if (prefill.cap) {
+    const name = prefill.capName && prefill.capName !== '#'+prefill.cap ? prefill.capName : null;
+    parts.push(name ? `#${prefill.cap} ${name}` : `#${prefill.cap}`);
+  }
+  return parts.join(' ');
+}
+
+function showVoiceFlash(label) {
+  const result = document.getElementById('voice-result');
+  if (!result) return;
+  result.innerHTML = `<div style="background:#0a2a14;border:1px solid #1a5a2a;border-radius:8px;padding:10px 14px;color:#6ee7b7;font-size:13px;font-weight:600;">✓ ${label}</div>`;
+  setTimeout(() => { if (result) result.innerHTML = ''; }, 2500);
 }
 
 // ─── Voice-initiated event flow ───────────────────────────────
@@ -2782,9 +2821,15 @@ function voiceStartFlow(eventType, prefill) {
   state.flow = filtered;
   state.flowIdx = 0;
 
+  const ctxLabel = buildVoiceLabel(eventType, prefill);
   if (filtered.length === 0) {
+    // Everything known — auto-save without any modal
+    state.voiceCtxLabel = null;
     finalizeEvent();
+    showVoiceFlash(ctxLabel);
   } else {
+    // Steps remain — show modal with captured context in header
+    state.voiceCtxLabel = ctxLabel;
     showModalStep(filtered[0]);
   }
 }
