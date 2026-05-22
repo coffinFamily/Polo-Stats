@@ -1296,41 +1296,44 @@ function renderGameUI(){
     return true;
   }
 
-  // Build a button row. types = ordered list of event keys for this row.
-  // center=true → justify-content:center (for rows with fewer buttons)
-  function buildRow(types, side, prefs, center){
+  // All buttons use the same fixed width (sized for 4-per-row with 6px gaps).
+  // Every row is centred so rows with fewer visible buttons stay tidy.
+  const BTN_W = 'calc(25% - 5px)';
+
+  function buildRow(types, side, prefs){
     const isDk = side==='dark';
     const cls  = isDk ? 'evt-dk' : 'evt-wh';
     const teamCap = isDk ? dkCap : whCap;
     const teamName = isDk ? dN : wN;
+    const btnStyle = `flex:0 0 ${BTN_W};min-width:0;`;
     let btns='';
     types.forEach(t=>{
       if(!prefEnabled(prefs,t)) return;
       const ico = evtIcon(t);
       if(t==='goalie-block'){
         if(teamCap){
-          btns+=`<button class="${cls}" style="flex:1;" title="GK Block — ${teamName} #${teamCap}" onclick="quickGoalieBlock('${side}','${teamCap}')">${ico}GK Block</button>`;
+          btns+=`<button class="${cls}" style="${btnStyle}" title="GK Block — ${teamName} #${teamCap}" onclick="quickGoalieBlock('${side}','${teamCap}')">${ico}GK Block</button>`;
         } else {
-          btns+=`<button class="${cls}" style="flex:1;" onclick="startFlow('goalie-block','${side}')">${ico}Goalie Block</button>`;
+          btns+=`<button class="${cls}" style="${btnStyle}" onclick="startFlow('goalie-block','${side}')">${ico}Goalie Block</button>`;
         }
       } else {
-        btns+=`<button class="${cls}" style="flex:1;" onclick="startFlow('${t}','${side}')">${ico}${EVENT_DEFS[t].label}</button>`;
+        btns+=`<button class="${cls}" style="${btnStyle}" onclick="startFlow('${t}','${side}')">${ico}${EVENT_DEFS[t].label}</button>`;
       }
     });
     if(!btns) return '';
-    return `<div style="display:flex;gap:6px;margin-bottom:5px;justify-content:${center?'center':'stretch'};">${btns}</div>`;
+    return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:5px;justify-content:center;">${btns}</div>`;
   }
 
   // Row layout per team
   const ROWS = [
-    {types:['goal-reg','goal-65','goal-5m','assist'],                       center:false},
-    {types:['miss','steal','turnover'],                                      center:true},
-    {types:['ejection','ejection-drawn','5m-penalty','5m-drawn'],           center:false},
-    {types:['field-block','goalie-block','sprint-won'],                     center:true},
+    ['goal-reg','goal-65','goal-5m','assist'],
+    ['miss','steal','turnover'],
+    ['ejection','ejection-drawn','5m-penalty','5m-drawn'],
+    ['field-block','goalie-block','sprint-won'],
   ];
 
-  document.getElementById('dark-btns').innerHTML  = ROWS.map(r=>buildRow(r.types,'dark', dp,r.center)).join('');
-  document.getElementById('white-btns').innerHTML = ROWS.map(r=>buildRow(r.types,'white',wp,r.center)).join('');
+  document.getElementById('dark-btns').innerHTML  = ROWS.map(r=>buildRow(r,'dark', dp)).join('');
+  document.getElementById('white-btns').innerHTML = ROWS.map(r=>buildRow(r,'white',wp)).join('');
   renderEventLog();
 }
 
