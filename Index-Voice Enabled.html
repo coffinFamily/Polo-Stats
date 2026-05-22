@@ -1286,20 +1286,14 @@ function renderGameUI(){
   // Goalie Block per team — quick-tap if active GK is set, otherwise cap picker
   if(prefEnabled(dp,'goalie-block')){
     if(dkCap){
-      dHtml+=`<button class="evt-dk" style="padding:4px 2px;" title="GK Block — ${dN} #${dkCap}" onclick="quickGoalieBlock('dark','${dkCap}')">
-        <span style="pointer-events:none;display:block;">${capSVG(dkCap,true)}</span>
-        <div style="font-size:10px;margin-top:2px;pointer-events:none;">GK Block</div>
-      </button>`;
+      dHtml+=`<button class="evt-dk" title="GK Block — ${dN} #${dkCap}" onclick="quickGoalieBlock('dark','${dkCap}')">GK Block</button>`;
     } else {
       dHtml+=`<button class="evt-dk" onclick="startFlow('goalie-block','dark')">Goalie Block</button>`;
     }
   }
   if(prefEnabled(wp,'goalie-block')){
     if(whCap){
-      wHtml+=`<button class="evt-wh" style="padding:4px 2px;" title="GK Block — ${wN} #${whCap}" onclick="quickGoalieBlock('white','${whCap}')">
-        <span style="pointer-events:none;display:block;">${capSVG(whCap,false)}</span>
-        <div style="font-size:10px;margin-top:2px;pointer-events:none;">GK Block</div>
-      </button>`;
+      wHtml+=`<button class="evt-wh" title="GK Block — ${wN} #${whCap}" onclick="quickGoalieBlock('white','${whCap}')">GK Block</button>`;
     } else {
       wHtml+=`<button class="evt-wh" onclick="startFlow('goalie-block','white')">Goalie Block</button>`;
     }
