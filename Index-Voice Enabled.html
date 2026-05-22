@@ -436,7 +436,7 @@ if(DEFAULT_SHEET_URL)  { state.game.sheetUrl=DEFAULT_SHEET_URL;   ss('wp-sheet-u
 
 // Ensure prefs exist with full defaults
 {
-  const defTeam = () => ({goals:true,miss:true,assist:true,ejection:true,ejectionDrawn:true,fiveM:true,fiveMDrawn:true,steal:true,turnover:true,goalieBlock:true,fieldBlock:true,sprintWon:true,goalZone:true,goalGM:true,missZone:true});
+  const defTeam = () => ({goals:true,miss:true,assist:true,ejection:true,ejectionDrawn:true,fiveM:true,fiveMDrawn:true,steal:true,turnover:true,goalieBlock:true,fieldBlock:true,sprintWon:true,goalZone:true,goalGM:true,missZone:true,blockZone:true});
   if(!state.prefs) state.prefs = {};
   if(!state.prefs.dark)  state.prefs.dark  = defTeam();
   if(!state.prefs.white) state.prefs.white = defTeam();
@@ -470,7 +470,7 @@ const EVENT_DEFS = {
   'assist':         {label:'Assist',            flow:['cap']},
   'ejection-drawn': {label:'Ejection Drawn',    flow:['cap']},
   '5m-drawn':       {label:'5M Drawn',          flow:['cap']},
-  'goalie-block':   {label:'Goalie Block',      flow:['goalie-team','goalie-cap']},
+  'goalie-block':   {label:'Goalie Block',      flow:['goalie-team','goalie-cap','zone']},
   'field-block':    {label:'Field Block',       flow:['cap']},
   'sprint-won':     {label:'Sprint Won',        flow:['cap']},
 };
@@ -688,12 +688,14 @@ function deletePlayerFromSheet(id){ rosterPost({action:'delete-player',id}); }
 function applyPrefFilters(flow, side, eventType){
   if(!side) return flow;
   const tp=(state.prefs||{})[side]||{};
-  const isGoal = eventType==='goal-reg'||eventType==='goal-65'||eventType==='goal-5m';
-  const isMiss = eventType==='miss';
+  const isGoal  = eventType==='goal-reg'||eventType==='goal-65'||eventType==='goal-5m';
+  const isMiss  = eventType==='miss';
+  const isBlock = eventType==='goalie-block';
   return flow.filter(s=>{
-    if(s==='zone' && isGoal) return tp.goalZone !== false;
-    if(s==='gm'   && isGoal) return tp.goalGM   !== false;
-    if(s==='zone' && isMiss) return tp.missZone  !== false;
+    if(s==='zone' && isGoal)  return tp.goalZone  !== false;
+    if(s==='gm'   && isGoal)  return tp.goalGM    !== false;
+    if(s==='zone' && isMiss)  return tp.missZone  !== false;
+    if(s==='zone' && isBlock) return tp.blockZone !== false;
     return true;
   });
 }
@@ -721,7 +723,15 @@ function startFlow(type,forceTeam){
 function nextStep(field,val,label,playerId){
   const d=state.pendingData;
   if(field==='team'){state.flowCtx.team=val;d.teamLabel=label;}
-  else if(field==='goalieTeam'){state.flowCtx.goalieTeam=val;d.goalieTeamLabel=label;}
+  else if(field==='goalieTeam'){
+    state.flowCtx.goalieTeam=val;d.goalieTeamLabel=label;
+    // Re-filter remaining steps now that team is known (applies blockZone pref)
+    if(state.flowCtx.eventType==='goalie-block'){
+      const rem=state.flow.slice(state.flowIdx+1);
+      const filt=applyPrefFilters(rem,val,'goalie-block');
+      state.flow=[...state.flow.slice(0,state.flowIdx+1),...filt];
+    }
+  }
   else if(field==='cap'){d.cap=val;d.capName=label;d.playerId=playerId||null;}
   else if(field==='goalieCap'){d.goalieCap=val;d.goalieCapName=label;d.goaliePlayerId=playerId||null;}
   else if(field==='shooterCap'){d.shooterCap=val;d.shooterCapName=label;d.shooterPlayerId=playerId||null;}
@@ -861,6 +871,25 @@ function finalize5mPenalty(){
 }
 
 function quickGoalieBlock(team, cap){
+  const prefs=(state.prefs||{})[team]||{};
+  if(prefs.blockZone!==false){
+    // Block Zone capture is ON — show zone picker then save
+    const g=state.game;
+    const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
+    const teamName=team==='dark'?dN:wN;
+    const roster=team==='dark'?(g.darkRoster||[]):(g.whiteRoster||[]);
+    const player=roster.find(p=>p.cap===cap);
+    state.flow=['zone']; state.flowIdx=0;
+    state.flowCtx={eventType:'goalie-block',eventLabel:'Goalie Block',team,goalieTeam:team};
+    state.pendingData={
+      teamLabel:teamName, goalieTeamLabel:teamName,
+      goalieCap:cap, goalieCapName:player?player.name:'#'+cap,
+      goaliePlayerId:player?player.playerId:null
+    };
+    showModalStep('zone');
+    return;
+  }
+  // Block Zone OFF — save immediately without zone
   const g=state.game;
   const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
   const teamName=team==='dark'?dN:wN;
@@ -1214,6 +1243,7 @@ const PREF_CATS = [
   {key:'steal',          label:'Steals',             emoji:'✊'},
   {key:'turnover',       label:'Turnovers',          emoji:'🔄'},
   {key:'goalieBlock',    label:'Goalie Blocks',      emoji:'🧤'},
+  {key:'blockZone',      label:'Block Zone',         emoji:'🗺️'},
   {key:'fieldBlock',     label:'Field Blocks',       emoji:'🛡️'},
   {key:'sprintWon',      label:'Sprint Won',         emoji:'🏃'},
 ];
@@ -1935,14 +1965,15 @@ function showShotChart(side) {
   const GOAL_TYPES = ['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)'];
 
   const shots    = state.events.filter(e => e.team === teamName &&
-    (GOAL_TYPES.includes(e.type) || e.type === 'Missed Shot'));
-  const withZone = shots.filter(e => e.zone && e.zone.includes(','));
-  const noZone   = shots.filter(e => !e.zone || !e.zone.includes(','));
-  const goalCount = shots.filter(e => GOAL_TYPES.includes(e.type)).length;
-  const missCount = shots.filter(e => e.type === 'Missed Shot').length;
+    (GOAL_TYPES.includes(e.type) || e.type === 'Missed Shot' || e.type === 'Goalie Block'));
+  const withZone  = shots.filter(e => e.zone && e.zone.includes(','));
+  const noZone    = shots.filter(e => !e.zone || !e.zone.includes(','));
+  const goalCount  = shots.filter(e => GOAL_TYPES.includes(e.type)).length;
+  const missCount  = shots.filter(e => e.type === 'Missed Shot').length;
+  const blockCount = shots.filter(e => e.type === 'Goalie Block').length;
   const pct = (goalCount + missCount) > 0 ? Math.round(goalCount/(goalCount+missCount)*100) : 0;
 
-  _scData = { teamName, withZone, goalCount, missCount };
+  _scData = { teamName, withZone, goalCount, missCount, blockCount };
 
   // Build static pool SVG (background only — markers injected separately)
   const svgHTML = `<svg id="sc-svg" viewBox="0 0 ${VBW} ${VBH}" style="width:100%;display:block;">
@@ -1978,6 +2009,10 @@ function showShotChart(side) {
       <span style="width:10px;height:10px;border-radius:50%;background:#3a0d0d;border:1.5px solid #ef4444;display:inline-block;flex:0 0 auto;"></span>
       <span style="color:#e0f0ff;">Misses <strong>${missCount}</strong></span>
     </span>
+    <span style="display:flex;align-items:center;gap:5px;">
+      <span style="width:10px;height:10px;border-radius:50%;background:#f97316;border:1.5px solid #ea580c;display:inline-block;flex:0 0 auto;"></span>
+      <span style="color:#e0f0ff;">Blocks <strong>${blockCount}</strong></span>
+    </span>
     <span style="color:#7abcdc;">Shooting% <strong>${pct}%</strong></span>
   </div>`;
 
@@ -1989,21 +2024,22 @@ function showShotChart(side) {
     const capShots  = withZone.filter(e => (e.cap||'?') === cap);
     const capGoals  = capShots.filter(e => GOAL_TYPES.includes(e.type)).length;
     const capMisses = capShots.filter(e => e.type === 'Missed Shot').length;
+    const capBlocks = capShots.filter(e => e.type === 'Goalie Block').length;
     const capName   = (capShots[0]?.capName && !capShots[0].capName.includes('Placeholder')) ? capShots[0].capName.split(' ')[0] : '';
     const label     = capName ? `#${cap} ${capName}` : `#${cap}`;
     filtersHTML += `<button id="sc-f-${cap}" onclick="filterShotChart('${cap}')"
       style="padding:5px 12px;border-radius:14px;font-size:12px;border:1.5px solid #1e3a5a;background:#0d1e2e;color:#5a7a9a;cursor:pointer;">
-      ${label} <span style="font-size:10px;color:#4a8a6a;">${capGoals}G</span><span style="font-size:10px;color:#8a4a4a;margin-left:2px;">${capMisses}M</span>
+      ${label} <span style="font-size:10px;color:#4a8a6a;">${capGoals}G</span><span style="font-size:10px;color:#8a4a4a;margin-left:2px;">${capMisses}M</span>${capBlocks?`<span style="font-size:10px;color:#c2620a;margin-left:2px;">${capBlocks}B</span>`:''}
     </button>`;
   });
 
   document.getElementById('sc-title').textContent = `${teamName} — Shot Chart`;
-  document.getElementById('sc-summary').textContent = `${goalCount} goals · ${missCount} misses · ${pct}% shooting`;
+  document.getElementById('sc-summary').textContent = `${goalCount} goals · ${missCount} misses · ${blockCount} blocks · ${pct}% shooting`;
   document.getElementById('sc-svg-container').innerHTML = svgHTML;
   document.getElementById('sc-legend').innerHTML = legendHTML;
   document.getElementById('sc-filters').innerHTML = filtersHTML;
   document.getElementById('sc-nozone').textContent = noZone.length > 0
-    ? `* ${noZone.length} shot(s) without location data not plotted` : '';
+    ? `* ${noZone.length} event(s) without location data not plotted` : '';
   document.getElementById('shot-chart-overlay').style.display = 'block';
   renderShotChartMarkers(null); // show all
 }
@@ -2028,10 +2064,13 @@ function renderShotChartMarkers(filterCap) {
     const jY = Math.floor(idx/3) * 6;
     const cx = Math.max(X+4, Math.min(X+W-4, svgX+jX));
     const cy = Math.max(Y+4, Math.min(Y+H-4, svgY+jY));
-    const isGoal = GOAL_TYPES.includes(e.type);
+    const isGoal  = GOAL_TYPES.includes(e.type);
+    const isBlock = e.type === 'Goalie Block';
     const op = active ? '0.95' : '0.18';
     if (isGoal) {
       html += `<circle cx="${cx}" cy="${cy}" r="4" fill="#16a34a" stroke="#ffffff" stroke-width="1" opacity="${op}"/>`;
+    } else if (isBlock) {
+      html += `<circle cx="${cx}" cy="${cy}" r="4" fill="#f97316" stroke="#ea580c" stroke-width="1" opacity="${op}"/>`;
     } else {
       html += `<circle cx="${cx}" cy="${cy}" r="4" fill="#3a0d0d" stroke="#ef4444" stroke-width="1" opacity="${op}"/>`;
     }
