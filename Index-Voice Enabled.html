@@ -396,7 +396,7 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
 //  Any device that opens the app will get these automatically.
 // ═══════════════════════════════════════════════════════════
 const DEFAULT_ROSTER_URL = 'https://script.google.com/macros/s/AKfycbw-tUTt2rgO9Lqd_afyNRZWm5ywto6z0sLSr0sssFBmvyX6HJdupiSdch0TC9FKX0E/exec';  // paste your Master Roster script URL here
-const DEFAULT_SHEET_URL  = 'https://script.google.com/macros/s/AKfycbx3Cg-UlcQeE-pQTz9o1OMQzLTjFqXnAbFjOWxHni8MEOhIGvx8M37GeRHf31oj6kPjNw/exec';  // paste your Game Stats script URL here
+const DEFAULT_SHEET_URL  = 'https://script.google.com/macros/s/AKfycbykAOLhV7Jq_sICTwRjJBvSRWkQzXwwyeENmo17SkBCHMYk9DdJ0B4hYUhFvF7hIQhzBA/exec';  // paste your Game Stats script URL here
 
 // ═══════════════════════════════════════════════════════════
 //  UTILITIES
@@ -1602,8 +1602,7 @@ function saveEditedEvent(){
   ss('wp-events',state.events);
   closeModal(); renderEventLog(); updateScores();
   const gameId=g.gameId||'', date=g.date||'';
-  pushToSheet({action:'delete-event',groupId:id});
-  pushToSheet({action:'events',rows:eventToRows({...state.events[idx],gameId,date})});
+  pushToSheet({action:'update-event',groupId:id,rows:eventToRows({...state.events[idx],gameId,date})});
 }
 
 function clearEvents(){
