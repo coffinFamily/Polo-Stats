@@ -96,6 +96,7 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
 .pref-toggle.on{background:#0a1e30;color:#5bc8f0;border-color:#0a84c8;}
 .pref-toggle.off{background:#0d1520;color:#374a56;border-color:#1a2a38;}
 .pref-toggle.off .pref-label{text-decoration:line-through;opacity:0.6;}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-8px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
 </style>
 </head>
 <body>
@@ -112,10 +113,10 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
 <!-- ═══ GAME TAB ═══════════════════════════════════════════════════════ -->
 <div id="tab-game" class="tab-panel active page">
   <div class="card">
-    <div class="row" style="justify-content:space-between;flex-wrap:nowrap;">
-      <div style="text-align:center;min-width:60px;">
-        <div style="font-size:11px;color:#5a7a9a;margin-bottom:2px;" id="dark-name-score">Dark</div>
-        <div id="dark-score" style="font-size:36px;font-weight:300;color:#e8d5a3;">0</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">
+      <div style="text-align:center;min-width:72px;">
+        <div id="dark-name-score" style="font-size:12px;font-weight:600;color:#7abcdc;margin-bottom:3px;letter-spacing:0.03em;">Dark</div>
+        <div id="dark-score" style="font-size:58px;font-weight:700;color:#e8d5a3;line-height:1;">0</div>
       </div>
       <div style="text-align:center;flex:1;">
         <div style="display:flex;align-items:center;justify-content:center;gap:10px;">
@@ -130,15 +131,15 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
           <button class="btn-s" onclick="adjustTimer(-30)">−30s</button>
         </div>
       </div>
-      <div style="text-align:center;min-width:60px;">
-        <div style="font-size:11px;color:#5a7a9a;margin-bottom:2px;" id="white-name-score">White</div>
-        <div id="white-score" style="font-size:36px;font-weight:300;">0</div>
+      <div style="text-align:center;min-width:72px;">
+        <div id="white-name-score" style="font-size:12px;font-weight:600;color:#c0d8f0;margin-bottom:3px;letter-spacing:0.03em;">White</div>
+        <div id="white-score" style="font-size:58px;font-weight:700;color:#ffffff;line-height:1;">0</div>
       </div>
     </div>
-    <div class="row" style="justify-content:space-between;margin-top:10px;border-top:1px solid #1e3a5a;padding-top:10px;">
-      <div class="row" style="gap:8px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid #1e3a5a;padding-top:8px;">
+      <div style="display:flex;align-items:center;gap:6px;">
         <button class="btn-round" onclick="changeQ(-1)">‹</button>
-        <span id="q-display" style="font-weight:600;font-size:15px;">Q1</span>
+        <span id="q-display" style="font-weight:700;font-size:22px;color:#e0f0ff;min-width:36px;text-align:center;letter-spacing:0.02em;">Q1</span>
         <button class="btn-round" onclick="changeQ(1)">›</button>
       </div>
       <span id="sync-pill" class="sync sync-idle">Sheets: not connected</span>
@@ -213,6 +214,7 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
     <div class="row" style="justify-content:space-between;margin-bottom:10px;">
       <span style="font-weight:600;font-size:14px;">Event log <span id="event-count" style="color:#5a7a9a;font-weight:400;">(0)</span></span>
       <div class="row" style="gap:6px;">
+        <button class="btn-s" style="padding:4px 10px;font-size:11px;color:#e8c84a;border-color:#3a2a0a;" onclick="undoLastEvent()">↩ Undo</button>
         <button class="btn-s" style="padding:4px 10px;font-size:11px;" onclick="exportCSV()">⬇ CSV</button>
         <button class="btn-d" onclick="clearEvents()">Clear</button>
       </div>
@@ -781,6 +783,8 @@ function finalizeEvent(){
   ss('wp-events',state.events);
   autoPauseIfNeeded(row.type);
   closeModal(); renderEventLog(); updateScores();
+  const isGoal=row.type.match(/Goal/);
+  showEventToast('✓ '+row.type,(row.team||'')+(row.cap?' · #'+row.cap:''),isGoal?'#22c55e':'#0a84c8');
   // Push to sheet after UI update so sheet errors never block the UI
   pushToSheet({action:'events', rows:eventToRows({...row, gameId:state.game.gameId||'', date:state.game.date||''})});
 }
@@ -866,6 +870,8 @@ function finalize5mPenalty(){
   ss('wp-events', state.events);
   autoPauseIfNeeded(d.fiveMResult==='make'?'5M Goal':'5M Foul');
   closeModal(); renderEventLog(); updateScores();
+  const _r=d.fiveMResult==='make'?resultRow:foulRow;
+  showEventToast(d.fiveMResult==='make'?'✓ 5M Goal':'✓ 5M Saved',(_r.team||'')+(_r.cap?' · #'+_r.cap:''),d.fiveMResult==='make'?'#22c55e':'#0a84c8');
   // Push to sheet after UI update so sheet errors never block the UI
   pushToSheet({action:'events', rows:[...eventToRows({...foulRow,gameId,date}),...eventToRows({...resultRow,gameId,date})]});
 }
@@ -908,6 +914,7 @@ function quickGoalieBlock(team, cap){
   state.events.push(row);
   ss('wp-events',state.events);
   renderEventLog(); updateScores();
+  showEventToast('✓ Goalie Block', teamName+(cap?' · #'+cap:''), '#0a84c8');
   pushToSheet({action:'events', rows:eventToRows({...row, gameId:g.gameId||'', date:g.date||''})});
 }
 
@@ -1608,6 +1615,34 @@ function saveEditedEvent(){
 function clearEvents(){
   if(!confirm('Clear all events?')) return;
   state.events=[]; ss('wp-events',[]); renderEventLog(); updateScores();
+}
+
+// ─── Undo last event ──────────────────────────────────────────
+function undoLastEvent(){
+  if(!state.events.length){ showEventToast('Nothing to undo','','#ef4444'); return; }
+  const last=state.events[state.events.length-1];
+  state.events.pop();
+  ss('wp-events',state.events);
+  renderEventLog(); updateScores();
+  pushToSheet({action:'delete-event',groupId:last.id});
+  showEventToast('↩ Undone', last.type+(last.cap?' · #'+last.cap:''), '#e8c84a');
+}
+
+// ─── Event toast notification ─────────────────────────────────
+function showEventToast(label, sub, color){
+  const old=document.getElementById('event-toast');
+  if(old) old.remove();
+  const t=document.createElement('div');
+  t.id='event-toast';
+  t.style.cssText=`position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:9990;`
+    +`background:#0a1820;border:2px solid ${color||'#22c55e'};border-radius:10px;`
+    +`padding:9px 20px;text-align:center;pointer-events:none;animation:toastIn 0.15s ease;`
+    +`min-width:180px;max-width:88vw;box-shadow:0 4px 20px rgba(0,0,0,0.5);`;
+  t.innerHTML=`<div style="font-size:14px;font-weight:700;color:${color||'#6ee7b7'};">${label}</div>`
+    +(sub?`<div style="font-size:11px;color:#4a7a8a;margin-top:2px;">${sub}</div>`:'');
+  document.body.appendChild(t);
+  setTimeout(()=>{ if(t.parentNode){t.style.opacity='0';t.style.transition='opacity 0.3s';} },1700);
+  setTimeout(()=>{ if(t.parentNode) t.remove(); },2100);
 }
 
 function exportCSV(){
