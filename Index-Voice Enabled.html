@@ -2740,6 +2740,8 @@ function voiceStartFlow(eventType, prefill) {
   } else if (!isGoalie && !forceTeam) {
     fullFlow = ['team-pick', ...fullFlow];
   }
+  // Apply per-team pref filters (goalZone, goalGM, missZone, blockZone)
+  if (forceTeam) fullFlow = applyPrefFilters(fullFlow, forceTeam, eventType);
 
   // Init context
   state.flowCtx = { eventType, eventLabel: def.label, team: forceTeam || null };
