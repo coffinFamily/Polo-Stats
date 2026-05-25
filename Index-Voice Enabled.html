@@ -3906,33 +3906,96 @@ function renderFollowContent(){
   else renderFollowTimeline(ev, wN, dN);
 }
 
+const FOLLOW_CHIPS = [
+  {label:'Goals',  icon:'⚽', types:['Goal (Reg)','Goal (6-5)','Goal (5M)']},
+  {label:'Assists',icon:'👍', types:['Assist']},
+  {label:'Steals', icon:'🏴‍☠️',types:['Steal']},
+  {label:'Ej',     icon:'🟡', types:['Ejection']},
+  {label:'5M',     icon:'⚡', types:['5M Penalty']},
+  {label:'Blocks', icon:'😄', types:['Goalie Block','Field Block']},
+  {label:'TOs',    icon:'🔄', types:['Turnover']},
+];
+
 function renderFollowChips(ev, wN, dN){
-  const CHIPS = [
-    {label:'Goals',  icon:'⚽', fn:e=>/goal/i.test(e.event||'')},
-    {label:'Assists',icon:'👍', fn:e=>e.event==='Assist'},
-    {label:'Steals', icon:'🏴‍☠️',fn:e=>e.event==='Steal'},
-    {label:'Ej',     icon:'🟡', fn:e=>e.event==='Ejection'},
-    {label:'5M',     icon:'⚡', fn:e=>e.event==='5M Penalty'},
-    {label:'Blocks', icon:'😄', fn:e=>/block/i.test(e.event||'')},
-    {label:'TOs',    icon:'🔄', fn:e=>e.event==='Turnover'},
-  ];
   function teamRow(name, isDark){
     const hdr = isDark
       ? 'background:#0e1d56;border:1px solid #4060b0;color:#fff;'
       : 'background:#dde8f0;border:1px solid #aac0d0;color:#1a2a3a;';
-    const chip = isDark
-      ? 'background:#0a1440;border:1px solid #2a3a70;color:#a0c0e8;'
-      : 'background:#c0d0e0;border:1px solid #8ab0cc;color:#1a2a3a;';
+    const chipStyle = isDark
+      ? 'background:#0a1440;border:1px solid #2a3a70;color:#a0c0e8;cursor:pointer;'
+      : 'background:#c0d0e0;border:1px solid #8ab0cc;color:#1a2a3a;cursor:pointer;';
+    const safeName = name.replace(/'/g,"\\'");
     let chips = '';
-    CHIPS.forEach(c=>{
-      const n = ev.filter(e=>e.team===name&&c.fn(e)).length;
-      chips += '<span style="display:inline-flex;align-items:center;gap:3px;padding:3px 9px;border-radius:12px;font-size:12px;font-weight:600;'+chip+'">'+c.icon+' '+c.label+' <strong style="margin-left:2px;">'+n+'</strong></span> ';
+    FOLLOW_CHIPS.forEach((c,i)=>{
+      const n = ev.filter(e=>e.team===name&&c.types.includes(e.event)).length;
+      chips += '<button onclick="showFollowStatPopup('+i+',\''+safeName+'\')" '+
+        'style="display:inline-flex;align-items:center;gap:3px;padding:4px 9px;border-radius:12px;font-size:12px;font-weight:600;border:none;'+chipStyle+'">'+
+        c.icon+' '+c.label+' <strong style="margin-left:2px;">'+n+'</strong></button>';
     });
     return '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:5px;padding:8px 10px;border-radius:8px;margin-bottom:6px;'+hdr+'">'+
-      '<span style="font-size:11px;font-weight:700;white-space:nowrap;flex:0 0 auto;margin-right:2px;">'+name+'</span>'+chips+'</div>';
+      '<span style="font-size:11px;font-weight:700;white-space:nowrap;flex:0 0 auto;margin-right:4px;">'+name+'</span>'+chips+'</div>';
   }
   const el = document.getElementById('follow-chips-card');
   if(el) el.innerHTML = '<div class="card" style="padding:8px;margin-bottom:8px;">'+teamRow(wN,false)+teamRow(dN,true)+'</div>';
+}
+
+function showFollowStatPopup(chipIdx, teamName){
+  const chip = FOLLOW_CHIPS[chipIdx];
+  const ev = _follow.events.filter(e=>e.team===teamName&&chip.types.includes(e.event));
+  const game = _follow.games.find(g=>g.gameId===_follow.gameId);
+  const isDark = game && teamName===game.darkTeam;
+
+  // Group by cap number
+  const players = {};
+  ev.forEach(e=>{
+    const cap = e.cap||'?';
+    if(!players[cap]){
+      let name = '';
+      if(e.playerId){
+        const p = state.players.find(p=>String(p.id)===String(e.playerId));
+        if(p) name = ((p.first||'')+' '+(p.last||'')).trim();
+      }
+      players[cap] = {cap, name, count:0, byType:{}};
+    }
+    players[cap].count++;
+    players[cap].byType[e.event] = (players[cap].byType[e.event]||0)+1;
+  });
+
+  const sorted = Object.values(players).sort((a,b)=>b.count-a.count);
+  const total  = ev.length;
+  const multiType = chip.types.length > 1;
+  const badgeCls  = isDark ? 'bdg-dk' : 'bdg-wh';
+
+  let html = '';
+  if(!total){
+    html = '<div style="color:#5a7a9a;text-align:center;padding:20px 0;">None recorded yet.</div>';
+  } else {
+    html += '<div style="margin-bottom:10px;display:flex;align-items:center;gap:8px;">'+
+      '<span class="bdg '+badgeCls+'">'+teamName+'</span>'+
+      '<span style="font-size:12px;color:#5a7a9a;">'+total+' total</span></div>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr>';
+    html += '<th style="text-align:left;padding:5px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">Player</th>';
+    if(multiType) chip.types.forEach(t=>{
+      const short = t.replace('Goal ','').replace(/[()]/g,'').trim();
+      html += '<th style="text-align:center;padding:5px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">'+short+'</th>';
+    });
+    html += '<th style="text-align:center;padding:5px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">Total</th></tr></thead><tbody>';
+    sorted.forEach(p=>{
+      const label = p.name
+        ? '#'+p.cap+' <span style="color:#5a7a9a;font-size:11px;">'+p.name+'</span>'
+        : '#'+p.cap;
+      html += '<tr style="border-bottom:1px solid #162535;"><td style="padding:6px;">'+label+'</td>';
+      if(multiType) chip.types.forEach(t=>{
+        html += '<td style="text-align:center;padding:6px;">'+(p.byType[t]||'–')+'</td>';
+      });
+      html += '<td style="text-align:center;padding:6px;font-weight:700;">'+p.count+'</td></tr>';
+    });
+    html += '</tbody></table>';
+  }
+
+  document.getElementById('modal-title').textContent = chip.icon+' '+chip.label+' — '+teamName;
+  document.getElementById('modal-body').innerHTML = html;
+  document.getElementById('modal-overlay').style.display = 'flex';
 }
 
 function renderFollowPlayers(ev, wN, dN){
