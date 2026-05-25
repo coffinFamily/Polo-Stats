@@ -2998,29 +2998,55 @@ function filterShotChart(cap) {
   });
 }
 
-function showStatPopup(statTypes, title) {
-  const g = state.game;
+// opts (optional): { rows, game }
+//   rows — pre-expanded event rows (Follow tab); skips eventToRows when provided
+//   game — override game object (darkTeam / whiteTeam); defaults to state.game
+function showStatPopup(statTypes, title, opts) {
+  opts = opts || {};
+  const g = opts.game || state.game;
   const dN = g.darkTeam || 'Dark', wN = g.whiteTeam || 'White';
 
   // Collect expanded rows matching the stat types, group by team → cap
   const groups = {};
-  state.events.forEach(ev => {
-    eventToRows({...ev, gameId:'', date:''}).forEach(r => {
+
+  if (opts.rows) {
+    // Follow mode: rows already expanded from sheet — skip eventToRows
+    opts.rows.forEach(r => {
       if (!statTypes.includes(r.event)) return;
       const team = r.team || 'Unknown';
       if (!groups[team]) groups[team] = {};
       const cap = r.cap || '?';
       if (!groups[team][cap]) {
-        const roster = team === dN ? (g.darkRoster||[]) : (g.whiteRoster||[]);
-        const player = r.playerId
-          ? roster.find(p => p.playerId === r.playerId)
-          : roster.find(p => p.cap === String(cap));
-        groups[team][cap] = { name: player ? player.name : null, count: 0, types: {} };
+        let name = null;
+        if (r.playerId) {
+          const p = state.players.find(p => String(p.id) === String(r.playerId));
+          if (p) name = ((p.first||'')+' '+(p.last||'')).trim() || null;
+        }
+        groups[team][cap] = { name, count: 0, types: {} };
       }
       groups[team][cap].count++;
       groups[team][cap].types[r.event] = (groups[team][cap].types[r.event] || 0) + 1;
     });
-  });
+  } else {
+    // Game mode: expand local events via eventToRows
+    state.events.forEach(ev => {
+      eventToRows({...ev, gameId:'', date:''}).forEach(r => {
+        if (!statTypes.includes(r.event)) return;
+        const team = r.team || 'Unknown';
+        if (!groups[team]) groups[team] = {};
+        const cap = r.cap || '?';
+        if (!groups[team][cap]) {
+          const roster = team === dN ? (g.darkRoster||[]) : (g.whiteRoster||[]);
+          const player = r.playerId
+            ? roster.find(p => p.playerId === r.playerId)
+            : roster.find(p => p.cap === String(cap));
+          groups[team][cap] = { name: player ? player.name : null, count: 0, types: {} };
+        }
+        groups[team][cap].count++;
+        groups[team][cap].types[r.event] = (groups[team][cap].types[r.event] || 0) + 1;
+      });
+    });
+  }
 
   const teamOrder = [dN, wN, ...Object.keys(groups).filter(t => t !== dN && t !== wN)];
   const grandTotal = Object.values(groups).reduce((s, caps) =>
@@ -3939,63 +3965,12 @@ function renderFollowChips(ev, wN, dN){
   if(el) el.innerHTML = '<div class="card" style="padding:8px;margin-bottom:8px;">'+teamRow(wN,false)+teamRow(dN,true)+'</div>';
 }
 
+// Thin wrapper — reuses showStatPopup with pre-expanded Follow events
 function showFollowStatPopup(chipIdx, teamName){
   const chip = FOLLOW_CHIPS[chipIdx];
-  const ev = _follow.events.filter(e=>e.team===teamName&&chip.types.includes(e.event));
   const game = _follow.games.find(g=>g.gameId===_follow.gameId);
-  const isDark = game && teamName===game.darkTeam;
-
-  // Group by cap number
-  const players = {};
-  ev.forEach(e=>{
-    const cap = e.cap||'?';
-    if(!players[cap]){
-      let name = '';
-      if(e.playerId){
-        const p = state.players.find(p=>String(p.id)===String(e.playerId));
-        if(p) name = ((p.first||'')+' '+(p.last||'')).trim();
-      }
-      players[cap] = {cap, name, count:0, byType:{}};
-    }
-    players[cap].count++;
-    players[cap].byType[e.event] = (players[cap].byType[e.event]||0)+1;
-  });
-
-  const sorted = Object.values(players).sort((a,b)=>b.count-a.count);
-  const total  = ev.length;
-  const multiType = chip.types.length > 1;
-  const badgeCls  = isDark ? 'bdg-dk' : 'bdg-wh';
-
-  let html = '';
-  if(!total){
-    html = '<div style="color:#5a7a9a;text-align:center;padding:20px 0;">None recorded yet.</div>';
-  } else {
-    html += '<div style="margin-bottom:10px;display:flex;align-items:center;gap:8px;">'+
-      '<span class="bdg '+badgeCls+'">'+teamName+'</span>'+
-      '<span style="font-size:12px;color:#5a7a9a;">'+total+' total</span></div>';
-    html += '<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr>';
-    html += '<th style="text-align:left;padding:5px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">Player</th>';
-    if(multiType) chip.types.forEach(t=>{
-      const short = t.replace('Goal ','').replace(/[()]/g,'').trim();
-      html += '<th style="text-align:center;padding:5px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">'+short+'</th>';
-    });
-    html += '<th style="text-align:center;padding:5px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">Total</th></tr></thead><tbody>';
-    sorted.forEach(p=>{
-      const label = p.name
-        ? '#'+p.cap+' <span style="color:#5a7a9a;font-size:11px;">'+p.name+'</span>'
-        : '#'+p.cap;
-      html += '<tr style="border-bottom:1px solid #162535;"><td style="padding:6px;">'+label+'</td>';
-      if(multiType) chip.types.forEach(t=>{
-        html += '<td style="text-align:center;padding:6px;">'+(p.byType[t]||'–')+'</td>';
-      });
-      html += '<td style="text-align:center;padding:6px;font-weight:700;">'+p.count+'</td></tr>';
-    });
-    html += '</tbody></table>';
-  }
-
-  document.getElementById('modal-title').textContent = chip.icon+' '+chip.label+' — '+teamName;
-  document.getElementById('modal-body').innerHTML = html;
-  document.getElementById('modal-overlay').style.display = 'flex';
+  const rows = _follow.events.filter(e=>e.team===teamName&&chip.types.includes(e.event));
+  showStatPopup(chip.types, chip.icon+' '+chip.label+' — '+teamName, {rows, game});
 }
 
 function renderFollowPlayers(ev, wN, dN){
