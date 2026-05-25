@@ -2175,7 +2175,7 @@ function ngwStepBody(step,w){
     const prefs=w[side].prefs;
     const mkNgwBtn=cat=>{ const on=prefs[cat.key]!==false; return `<button onclick="ngwTogglePref('${side}','${cat.key}',this)"
         style="display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border-radius:20px;font-size:13px;cursor:pointer;transition:all 0.15s;margin:3px;
-          ${on?'background:#0a3a5a;border:1.5px solid #0a84c8;color:#7abcdc;':'background:#0a1420;border:1.5px solid #1e2e3e;color:#2a4a5a;}">
+          ${on?'background:#0a3a5a;border:1.5px solid #0a84c8;color:#7abcdc;':'background:#0a1420;border:1.5px solid #1e2e3e;color:#2a4a5a;'}">
         ${prefIcon(cat.key)}${cat.label}
       </button>`; };
     const basicBtns  = PREF_CATS.filter(c=>c.section==='basic').map(mkNgwBtn).join('');
