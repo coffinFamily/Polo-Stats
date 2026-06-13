@@ -307,6 +307,25 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
         <button class="btn-p" style="flex:0 0 auto;" onclick="addPlayer()">Add</button>
       </div>
     </div>
+    <!-- CSV Import -->
+    <div class="card" style="margin-bottom:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="(function(){const b=document.getElementById('csv-import-body');const a=document.getElementById('csv-chevron');const open=b.style.display!=='none';b.style.display=open?'none':'block';a.textContent=open?'▸':'▾';})()">
+        <div class="stitle" style="margin:0;">⬆ Import players from CSV</div>
+        <span id="csv-chevron" style="color:#5a7a9a;font-size:14px;">▸</span>
+      </div>
+      <div id="csv-import-body" style="display:none;margin-top:10px;">
+        <p style="font-size:11px;color:#5a7a9a;margin:0 0 8px;line-height:1.5;">
+          One player per line · Format: <code style="background:#0d2035;padding:1px 5px;border-radius:3px;">Last, First, MM/DD/YYYY, {Team1, Team2, …}, Cap#</code><br>
+          Cap# and teams are optional. Unknown teams are auto-created. Existing players (same name) are skipped.
+        </p>
+        <textarea id="csv-import-text" rows="5" placeholder="Wright, Colin, 11/25/2009, {Stanford Red 18u, C.C.U., 680 Drivers}, 11&#10;Barad, Calvin, 10/21/2009, {Stanford Red 18u, C.C.U., 680 Drivers, SMAC}, 7&#10;Cheline, Alejandro, 10/21/2009, {Stanford Red 18u, C.C.U., 680 Drivers, SMAC}, 12" style="width:100%;box-sizing:border-box;font-family:monospace;font-size:12px;padding:8px;background:#0d2035;border:1px solid #1e3a5a;color:#cce;border-radius:6px;resize:vertical;"></textarea>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:8px;">
+          <button class="btn-p" style="flex:0 0 auto;" onclick="importPlayersCSV()">Import</button>
+          <span id="csv-import-result" style="font-size:12px;"></span>
+        </div>
+      </div>
+    </div>
+
     <input id="player-search" type="search" placeholder="🔍 Search by name or team…" oninput="renderPlayersList(this.value)" style="margin-bottom:8px;" />
     <div id="players-list"></div>
 
@@ -833,7 +852,7 @@ function finalizeEvent(){
   ss('wp-events',state.events);
   autoPauseIfNeeded(row.type);
   closeModal(); renderEventLog(); updateScores();
-  const isGoal=row.type.match(/Goal/);
+  const isGoal=row.type.match(/^Goal \(/);
   showEventToast('✓ '+row.type,(row.team||'')+(row.cap?' · #'+row.cap:''),isGoal?'#22c55e':'#0a84c8');
   // Push to sheet after UI update so sheet errors never block the UI
   pushToSheet({action:'events', rows:eventToRows({...row, gameId:state.game.gameId||'', date:state.game.date||''})});
@@ -1482,8 +1501,8 @@ function renderGameUI(){
 function updateScores(){
   const g=state.game;
   const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
-  document.getElementById('dark-score').textContent=state.events.filter(e=>e.type.match(/Goal/)&&e.team===dN).length;
-  document.getElementById('white-score').textContent=state.events.filter(e=>e.type.match(/Goal/)&&e.team===wN).length;
+  document.getElementById('dark-score').textContent=state.events.filter(e=>e.type.match(/^Goal \(/)&&e.team===dN).length;
+  document.getElementById('white-score').textContent=state.events.filter(e=>e.type.match(/^Goal \(/)&&e.team===wN).length;
   renderTimeouts();
 }
 
@@ -1874,6 +1893,15 @@ function showQuarterStats(){
   _appendCopyBtn(txt.trim());
 }
 
+// ─── Name formatting helper ───────────────────────────────────
+// Returns null for Placeholder names; otherwise "F. Last" (first initial + last name)
+function fmtName(name){
+  if(!name||name.toLowerCase().includes('placeholder')) return null;
+  const parts=name.trim().split(/\s+/);
+  if(parts.length<2) return parts[0]||null; // single token, return as-is
+  return parts[0].charAt(0).toUpperCase()+'. '+parts.slice(1).join(' ');
+}
+
 // ─── Player stats summary ─────────────────────────────────────
 function showPlayerStats(playerId, cap, team){
   const g=state.game;
@@ -1881,7 +1909,7 @@ function showPlayerStats(playerId, cap, team){
   const isDark=team===dN;
   const roster=isDark?(g.darkRoster||[]):(g.whiteRoster||[]);
   const player=playerId?roster.find(p=>p.playerId===playerId):roster.find(p=>p.cap===String(cap));
-  const playerName=player?player.name:(cap&&cap!=='?'?'#'+cap:'Unknown');
+  const playerName=player?(fmtName(player.name)||('#'+cap)):(cap&&cap!=='?'?'#'+cap:'Unknown');
   const cls=isDark?'bdg-dk':'bdg-wh';
 
   // Collect all expanded rows for this player
@@ -1932,7 +1960,8 @@ function showPlayerStats(playerId, cap, team){
     html+=`</tbody></table>`;
   }
 
-  const title=player?playerName+(cap&&cap!=='?'?' #'+cap:''):(cap&&cap!=='?'?'#'+cap:'Player');
+  const _fmtd=player?fmtName(player.name):null;
+  const title=_fmtd?(_fmtd+(cap&&cap!=='?'?' #'+cap:'')):(cap&&cap!=='?'?'#'+cap:'Player');
 
   // Plain-text for clipboard
   let txt=`👤 ${title} — ${team}\n`;
@@ -1956,8 +1985,8 @@ function showPlayerStats(playerId, cap, team){
 function showGameSummary(){
   const g=state.game;
   const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
-  const dGoals=state.events.filter(e=>e.type.match(/Goal/)&&e.team===dN).length;
-  const wGoals=state.events.filter(e=>e.type.match(/Goal/)&&e.team===wN).length;
+  const dGoals=state.events.filter(e=>e.type.match(/^Goal \(/)&&e.team===dN).length;
+  const wGoals=state.events.filter(e=>e.type.match(/^Goal \(/)&&e.team===wN).length;
 
   function teamSummary(team){
     const allRows=[];
@@ -1967,12 +1996,12 @@ function showGameSummary(){
     const count=types=>allRows.filter(r=>types.includes(r.event)).length;
     // Top 3 scorers
     const capGoals={};
-    allRows.filter(r=>r.event.match(/Goal/)).forEach(r=>{
+    allRows.filter(r=>r.event.match(/^Goal \(/)).forEach(r=>{
       const k=r.cap||'?';
       if(!capGoals[k]){
         const roster=team===dN?(g.darkRoster||[]):(g.whiteRoster||[]);
         const p=r.playerId?roster.find(x=>x.playerId===r.playerId):roster.find(x=>x.cap===String(k));
-        capGoals[k]={name:p?p.name:null,g:0};
+        capGoals[k]={name:fmtName(p?p.name:null),g:0};
       }
       capGoals[k].g++;
     });
@@ -2471,6 +2500,95 @@ function addPlayer(){
   document.getElementById('p-last').value='';
   document.getElementById('p-dob').value='';
   renderPlayersList();
+}
+
+function importPlayersCSV(){
+  const raw=document.getElementById('csv-import-text').value.trim();
+  if(!raw) return;
+
+  const lines=raw.split('\n').map(l=>l.trim()).filter(l=>l);
+  let added=0, skipped=0, teamsCreated=0;
+  const errors=[];
+  const newTeamIds=new Set();
+
+  lines.forEach((line,idx)=>{
+    // Extract {Team, Team, …} block first to avoid commas inside it confusing the split
+    const teamMatch=line.match(/\{([^}]*)\}/);
+    const teamNames=teamMatch
+      ? teamMatch[1].split(',').map(t=>t.trim()).filter(Boolean)
+      : [];
+    const mainPart=line.replace(/\{[^}]*\}/,'').replace(/,\s*$/,'').trim();
+    const parts=mainPart.split(',').map(p=>p.trim());
+
+    if(parts.length<2){ errors.push(`Line ${idx+1}: not enough fields`); return; }
+
+    const last=parts[0]||'';
+    const first=parts[1]||'';
+    const dobRaw=parts[2]||'';
+    // Any non-empty fields after DOB (and after the removed team block) are extra — first is cap#
+    const extraParts=parts.slice(3).map(p=>p.trim()).filter(Boolean);
+    const defaultCap=extraParts[0]||'';
+
+    if(!first&&!last){ errors.push(`Line ${idx+1}: no name`); return; }
+
+    // Convert MM/DD/YYYY → YYYY-MM-DD; pass through anything else as-is
+    let dob='';
+    if(dobRaw){
+      const dm=dobRaw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      dob=dm?`${dm[3]}-${dm[1].padStart(2,'0')}-${dm[2].padStart(2,'0')}`:dobRaw;
+    }
+
+    // Duplicate check (case-insensitive first+last)
+    const exists=state.players.find(p=>
+      (p.first||'').toLowerCase()===first.toLowerCase()&&
+      (p.last||'').toLowerCase()===last.toLowerCase()
+    );
+    if(exists){ skipped++; return; }
+
+    // Resolve teams — create any that don't exist
+    const teamIds=teamNames.map(name=>{
+      let team=state.teams.find(t=>t.name.toLowerCase()===name.toLowerCase());
+      if(!team){
+        team={id:genId(),name};
+        state.teams.push(team);
+        newTeamIds.add(team.id);
+        teamsCreated++;
+      }
+      return team.id;
+    });
+
+    const player={id:genId(),first,last,dob,teamIds};
+    if(defaultCap) player.defaultCap=defaultCap;
+    state.players.push(player);
+    added++;
+  });
+
+  ss('wp-players',state.players);
+  ss('wp-teams',state.teams);
+
+  // Sync new players and any newly-created teams to sheet
+  if(state.rosterSheetUrl){
+    state.players.slice(-added).forEach(p=>syncPlayerToSheet(p));
+    state.teams.filter(t=>newTeamIds.has(t.id)).forEach(t=>rosterPost({action:'upsert-team',team:t}));
+  }
+
+  // Report
+  const result=document.getElementById('csv-import-result');
+  const summary=[];
+  if(added)        summary.push(`✓ Added ${added} player${added!==1?'s':''}`);
+  if(teamsCreated) summary.push(`${teamsCreated} new team${teamsCreated!==1?'s':''} created`);
+  if(skipped)      summary.push(`${skipped} skipped (duplicate)`);
+  if(errors.length)summary.push(`⚠ ${errors.join('; ')}`);
+
+  result.style.color=errors.length?'#ffaaaa':'#6ee7b7';
+  result.textContent=summary.join(' · ')||'Nothing to import';
+
+  if(added){
+    document.getElementById('csv-import-text').value='';
+    renderRosterUI();
+    populateTeamDropdowns();
+  }
+  setTimeout(()=>{ result.textContent=''; },6000);
 }
 
 function setDefaultCap(playerId, cap){
@@ -3080,8 +3198,9 @@ function showStatPopup(statTypes, title, opts) {
 
       caps.forEach(cap => {
         const p = groups[team][cap];
-        const playerLabel = p.name
-          ? `#${cap} <span style="color:#5a7a9a;font-size:11px;">${p.name}</span>`
+        const _pName = fmtName(p.name);
+        const playerLabel = _pName
+          ? `#${cap} <span style="color:#5a7a9a;font-size:11px;">${_pName}</span>`
           : `#${cap}`;
         const typeCells = multiType
           ? statTypes.map(t => `<td style="text-align:center;padding:6px 6px;color:#7a9bb8;">${p.types[t] || '—'}</td>`).join('')
@@ -3108,7 +3227,8 @@ function showStatPopup(statTypes, title, opts) {
       txt += `\n${team}  (${teamTotal})\n`;
       caps.forEach(cap => {
         const p = groups[team][cap];
-        const label = p.name ? `#${cap} ${p.name}` : `#${cap}`;
+        const _lName = fmtName(p.name);
+        const label = _lName ? `#${cap} ${_lName}` : `#${cap}`;
         txt += `  ${label.padEnd(20)} ${p.count}\n`;
       });
     });
@@ -3191,7 +3311,8 @@ function showCriticalStats() {
         if (combined >= 3)      warnBadge = `<span title="Permanently ejected!" style="margin-left:6px;font-size:14px;">🚨</span>`;
         else if (combined >= 2) warnBadge = `<span title="1 call away from permanent ejection" style="margin-left:6px;font-size:14px;">⚠️</span>`;
 
-        const playerLabel = p.name ? `#${cap} <span style="color:#5a7a9a;font-size:11px;">${p.name}</span>` : `#${cap}`;
+        const _ejName = fmtName(p.name);
+        const playerLabel = _ejName ? `#${cap} <span style="color:#5a7a9a;font-size:11px;">${_ejName}</span>` : `#${cap}`;
         const ejStr = totalEj > 0
           ? `<span style="color:#ff8888;font-weight:600;">${totalEj}</span>`
           : `<span style="color:#2a4a6a;">—</span>`;
@@ -3238,7 +3359,8 @@ function showCriticalStats() {
       caps.forEach(cap => {
         const p = groups[team][cap];
         const combined = p.ejections + p.fouls;
-        const label = p.name ? `#${cap} ${p.name}` : `#${cap}`;
+        const _ejLName = fmtName(p.name);
+        const label = _ejLName ? `#${cap} ${_ejLName}` : `#${cap}`;
         const status = combined>=3?'OUT':combined>=2?'DANGER':combined>=1?'Watch':'';
         txt += `  ${label.padEnd(20)} Ej:${p.ejections}  5M:${p.fouls}${status?' — '+status:''}\n`;
       });
