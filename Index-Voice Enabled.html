@@ -651,7 +651,6 @@ function changeQ(d){
 function populateGameSelector(){
   const sel=document.getElementById('game-sel');
   if(!sel) return;
-  // Sort saved games most-recent first
   const games=[...state.savedGames].sort((a,b)=>parseDate(b.date)-parseDate(a.date));
   sel.innerHTML='';
   if(!games.length){
@@ -663,6 +662,42 @@ function populateGameSelector(){
     const isSel=g.gameId===state.game.gameId?' selected':'';
     sel.innerHTML+=`<option value="${g.gameId}"${isSel}>${label}</option>`;
   });
+}
+
+// Fetch all games from the sheet and merge into savedGames, then refresh selector.
+// Sheet games give us the full history; local savedGames entries (with rosters) take precedence.
+async function refreshGameSelectorFromSheet(){
+  const url=state.game&&state.game.sheetUrl;
+  if(!url) return;
+  try {
+    const resp=await fetch(url+'?action=games',{cache:'no-store'});
+    const data=await resp.json();
+    const sheetGames=data.games||[];
+    let changed=false;
+    sheetGames.forEach(sg=>{
+      if(!sg.gameId) return;
+      const exists=state.savedGames.find(g=>g.gameId===sg.gameId);
+      if(!exists){
+        // Add a minimal entry — no local roster, events will be fetched from sheet if needed
+        state.savedGames.push({
+          gameId:sg.gameId,
+          date:sg.date||'',
+          darkTeam:sg.darkTeam||'Dark',
+          whiteTeam:sg.whiteTeam||'White',
+          darkTeamFull:sg.darkTeam||'Dark',
+          whiteTeamFull:sg.whiteTeam||'White',
+          darkRoster:[], whiteRoster:[],
+          sheetUrl:url,
+          _fromSheet:true
+        });
+        changed=true;
+      }
+    });
+    if(changed){
+      ss('wp-saved-games',state.savedGames);
+      populateGameSelector();
+    }
+  } catch(e){ /* silently ignore — sheet may be unreachable */ }
 }
 
 function switchGame(gameId){
@@ -685,18 +720,73 @@ function switchGame(gameId){
   state.game={...game};
   ss('wp-game',state.game);
 
-  state.events=state.gameEvents[gameId]||[];
-  ss('wp-events',state.events);
-
   state.q=game._lastQ||1;
   ss('wp-q',state.q);
 
   if(game.activeGoalie) state.activeGoalie=game.activeGoalie;
   ss('wp-active-goalie',state.activeGoalie);
 
-  renderGameUI();
-  renderSetupUI();
-  renderEventLog();
+  if(game._fromSheet&&!state.gameEvents[gameId]){
+    // Sheet-only game: fetch its events from the sheet, then render
+    state.events=[];
+    ss('wp-events',state.events);
+    renderGameUI(); renderSetupUI(); renderEventLog();
+    const url=game.sheetUrl||state.game.sheetUrl;
+    if(url){
+      fetch(url+'?action=events&gameId='+encodeURIComponent(gameId),{cache:'no-store'})
+        .then(r=>r.json())
+        .then(data=>{
+          // Convert sheet event rows into local event format.
+          // GAS may return groupId under various casings — try them all.
+          const rows=data.events||[];
+          // Counterpart-only event types produced by eventToRows that should not
+          // become stand-alone events when reconstructing from sheet rows.
+          const COUNTERPART_TYPES=new Set(['Shot On Goal','Ejection Drawn','5m Drawn']);
+          const groups={};
+          rows.forEach((r,idx)=>{
+            // Resolve groupId regardless of what casing the GAS uses
+            const gid=r.groupId??r.groupID??r.GroupID??r.group_id??null;
+            // Use gid as key when available; otherwise each row gets its own slot
+            const key=(gid!=null&&gid!=='')?String(gid):('_r'+idx);
+            if(!groups[key]){
+              groups[key]={
+                id:gid?(Number(gid)||Date.now()+idx):(Date.now()+idx),
+                q:r.q??r.Q??'', time:fmtGameTime(r.time??r.Time??''),
+                type:r.event??r.Event??'',
+                team:r.team??r.Team??'',
+                cap:r.cap??r.Cap??'',
+                capName:(r.cap??r.Cap??'')?'#'+(r.cap??r.Cap):'',
+                playerId:r.playerId??r.playerID??r.PlayerID??null,
+                zone:r.zone??r.Zone??'', gm:r.gm??r.GM??''
+              };
+            } else if(!COUNTERPART_TYPES.has(groups[key].type)&&COUNTERPART_TYPES.has(r.event??r.Event??'')){
+              // already have a non-counterpart primary — keep it, skip this counterpart row
+            } else if(COUNTERPART_TYPES.has(groups[key].type)&&!COUNTERPART_TYPES.has(r.event??r.Event??'')){
+              // promote: replace counterpart placeholder with the real primary row
+              groups[key].type=r.event??r.Event??groups[key].type;
+              groups[key].team=r.team??r.Team??groups[key].team;
+              groups[key].cap=r.cap??r.Cap??groups[key].cap;
+              groups[key].capName=(r.cap??r.Cap??'')?'#'+(r.cap??r.Cap):groups[key].capName;
+              groups[key].playerId=r.playerId??r.playerID??r.PlayerID??groups[key].playerId;
+              groups[key].zone=r.zone??r.Zone??groups[key].zone;
+            }
+          });
+          // Filter out pure counterpart events if groupId was not available (row-index keys)
+          state.events=Object.values(groups)
+            .filter(e=>!COUNTERPART_TYPES.has(e.type))
+            .sort((a,b)=>{ const qa=Number(a.q)||0, qb=Number(b.q)||0; return qa-qb||String(b.time).localeCompare(String(a.time)); });
+          state.gameEvents[gameId]=state.events;
+          ss('wp-events',state.events);
+          ss('wp-game-events',state.gameEvents);
+          renderEventLog(); updateScores();
+        })
+        .catch(()=>{});
+    }
+  } else {
+    state.events=state.gameEvents[gameId]||[];
+    ss('wp-events',state.events);
+    renderGameUI(); renderSetupUI(); renderEventLog();
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -709,7 +799,7 @@ function showTab(name){
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b=>{ if(b.textContent.trim().toLowerCase()===name) b.classList.add('active'); });
-  if(name==='game')   renderGameUI();
+  if(name==='game')   { renderGameUI(); refreshGameSelectorFromSheet(); }
   if(name==='setup')  renderSetupUI();
   if(name==='roster') renderRosterUI();
   if(name==='prefs')  renderPrefsTab();
@@ -1990,6 +2080,25 @@ function showQuarterStats(){
   document.getElementById('modal-body').innerHTML=html;
   document.getElementById('modal-overlay').style.display='flex';
   _appendCopyBtn(txt.trim());
+}
+
+// ─── Game-time formatting helper ─────────────────────────────
+// Google Sheets auto-converts "7:42" (game M:SS) into a time serial and returns
+// it as a full date string (e.g. "Sat Dec 30 1899 07:42:00 GMT-0800").
+// Recovery: hours → game-minutes, minutes → game-seconds.
+function fmtGameTime(t){
+  if(!t) return '';
+  const s=String(t).trim();
+  // Already clean M:SS or MM:SS — pass through
+  if(/^\d{1,2}:\d{2}$/.test(s)) return s;
+  // Full date string from Sheets serialisation
+  const dt=new Date(s);
+  if(!isNaN(dt)){
+    const mins=dt.getHours();
+    const secs=dt.getMinutes();
+    return `${mins}:${secs.toString().padStart(2,'0')}`;
+  }
+  return s;
 }
 
 // ─── Date parse helper (shared by game selector + Follow tab sort) ───────────
@@ -4359,7 +4468,7 @@ function renderFollowTimeline(ev, wN, dN){
         : '<span style="padding:1px 6px;border-radius:5px;font-size:10px;font-weight:700;background:#dde8f0;color:#1a2a3a;border:1px solid #aac0d0;flex:0 0 auto;">White</span>';
       const cap = e.cap ? '<span style="font-weight:700;color:#7abcdc;flex:0 0 auto;">#'+e.cap+'</span>' : '';
       html += '<div style="display:flex;align-items:center;gap:7px;padding:6px 0;border-bottom:1px solid #0d1e2e;font-size:12px;">'+
-        '<span style="color:#3a5a7a;font-variant-numeric:tabular-nums;min-width:38px;flex:0 0 auto;">'+(e.time||'')+'</span>'+
+        '<span style="color:#3a5a7a;font-variant-numeric:tabular-nums;min-width:38px;flex:0 0 auto;">'+fmtGameTime(e.time||'')+'</span>'+
         badge+cap+
         '<span style="flex:1;color:#c0d8f0;">'+(e.event||'')+'</span>'+
       '</div>';
@@ -4374,8 +4483,9 @@ function renderFollowTimeline(ev, wN, dN){
 // ═══════════════════════════════════════════════════════════
 updateTimerDisplay();
 renderGameUI();
-// Silently refresh roster from sheet on every page load
+// Silently refresh roster from sheet and populate game selector on every page load
 if(state.rosterSheetUrl) loadRosterFromSheet(false);
+refreshGameSelectorFromSheet();
 initVoice();
 updateCritStatsBtn();
 </script>
