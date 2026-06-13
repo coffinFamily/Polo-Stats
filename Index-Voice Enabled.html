@@ -726,64 +726,76 @@ function switchGame(gameId){
   if(game.activeGoalie) state.activeGoalie=game.activeGoalie;
   ss('wp-active-goalie',state.activeGoalie);
 
-  if(game._fromSheet&&!state.gameEvents[gameId]){
-    // Sheet-only game: fetch its events from the sheet, then render
+  if(game._fromSheet){
+    // Sheet game: always fetch fresh — never trust a potentially stale/buggy local cache
     state.events=[];
     ss('wp-events',state.events);
     renderGameUI(); renderSetupUI(); renderEventLog();
     const url=game.sheetUrl||state.game.sheetUrl;
     if(url){
       fetch(url+'?action=events&gameId='+encodeURIComponent(gameId),{cache:'no-store'})
-        .then(r=>r.json())
-        .then(data=>{
-          // Convert sheet event rows into local event format.
-          // GAS may return groupId under various casings — try them all.
-          const rows=data.events||[];
-          // Counterpart-only event types produced by eventToRows that should not
-          // become stand-alone events when reconstructing from sheet rows.
-          const COUNTERPART_TYPES=new Set(['Shot On Goal','Ejection Drawn','5m Drawn']);
-          const groups={};
-          rows.forEach((r,idx)=>{
-            // Resolve groupId regardless of what casing the GAS uses
-            const gid=r.groupId??r.groupID??r.GroupID??r.group_id??null;
-            // Use gid as key when available; otherwise each row gets its own slot
-            const key=(gid!=null&&gid!=='')?String(gid):('_r'+idx);
+        .then(function(resp){ return resp.json(); })
+        .then(function(data){
+          // Convert sheet rows into local event format.
+          // GAS field names may vary in casing — resolve each defensively.
+          var rows=data.events||[];
+          var COUNTERPART_TYPES={'Shot On Goal':1,'Ejection Drawn':1,'5m Drawn':1};
+
+          function gf(r,a,b){ return (r[a]!==undefined&&r[a]!==null&&r[a]!=='')?r[a]:((r[b]!==undefined&&r[b]!==null&&r[b]!=='')?r[b]:''); }
+
+          var groups={};
+          rows.forEach(function(r,idx){
+            // Try every casing the GAS might use for GroupID
+            var gid=r.groupId||r.groupID||r.GroupID||r.group_id||'';
+            var key=gid?String(gid):('_r'+idx);
+            var evType=r.event||r.Event||'';
             if(!groups[key]){
               groups[key]={
                 id:gid?(Number(gid)||Date.now()+idx):(Date.now()+idx),
-                q:r.q??r.Q??'', time:fmtGameTime(r.time??r.Time??''),
-                type:r.event??r.Event??'',
-                team:r.team??r.Team??'',
-                cap:r.cap??r.Cap??'',
-                capName:(r.cap??r.Cap??'')?'#'+(r.cap??r.Cap):'',
-                playerId:r.playerId??r.playerID??r.PlayerID??null,
-                zone:r.zone??r.Zone??'', gm:r.gm??r.GM??''
+                q:gf(r,'q','Q'),
+                time:fmtGameTime(gf(r,'time','Time')),
+                type:evType,
+                team:gf(r,'team','Team'),
+                cap:gf(r,'cap','Cap'),
+                capName:(gf(r,'cap','Cap')?'#'+gf(r,'cap','Cap'):''),
+                playerId:r.playerId||r.playerID||r.PlayerID||null,
+                zone:gf(r,'zone','Zone'),
+                gm:gf(r,'gm','GM')
               };
-            } else if(!COUNTERPART_TYPES.has(groups[key].type)&&COUNTERPART_TYPES.has(r.event??r.Event??'')){
-              // already have a non-counterpart primary — keep it, skip this counterpart row
-            } else if(COUNTERPART_TYPES.has(groups[key].type)&&!COUNTERPART_TYPES.has(r.event??r.Event??'')){
-              // promote: replace counterpart placeholder with the real primary row
-              groups[key].type=r.event??r.Event??groups[key].type;
-              groups[key].team=r.team??r.Team??groups[key].team;
-              groups[key].cap=r.cap??r.Cap??groups[key].cap;
-              groups[key].capName=(r.cap??r.Cap??'')?'#'+(r.cap??r.Cap):groups[key].capName;
-              groups[key].playerId=r.playerId??r.playerID??r.PlayerID??groups[key].playerId;
-              groups[key].zone=r.zone??r.Zone??groups[key].zone;
+            } else {
+              // If the slot holds a counterpart row but this row is a real event, promote it
+              var haveCounterpart=COUNTERPART_TYPES[groups[key].type];
+              var thisCounterpart=COUNTERPART_TYPES[evType];
+              if(haveCounterpart&&!thisCounterpart){
+                groups[key].type=evType;
+                groups[key].team=gf(r,'team','Team');
+                groups[key].cap=gf(r,'cap','Cap');
+                groups[key].capName=(gf(r,'cap','Cap')?'#'+gf(r,'cap','Cap'):'');
+                groups[key].playerId=r.playerId||r.playerID||r.PlayerID||groups[key].playerId;
+                groups[key].zone=gf(r,'zone','Zone');
+              }
+              // else keep what we have (primary already stored, skip counterpart)
             }
           });
-          // Filter out pure counterpart events if groupId was not available (row-index keys)
+
           state.events=Object.values(groups)
-            .filter(e=>!COUNTERPART_TYPES.has(e.type))
-            .sort((a,b)=>{ const qa=Number(a.q)||0, qb=Number(b.q)||0; return qa-qb||String(b.time).localeCompare(String(a.time)); });
+            .filter(function(e){ return !COUNTERPART_TYPES[e.type]; })
+            .sort(function(a,b){
+              var qa=Number(a.q)||0, qb=Number(b.q)||0;
+              return qa!==qb ? qa-qb : String(b.time).localeCompare(String(a.time));
+            });
           state.gameEvents[gameId]=state.events;
           ss('wp-events',state.events);
           ss('wp-game-events',state.gameEvents);
           renderEventLog(); updateScores();
         })
-        .catch(()=>{});
+        .catch(function(){});
     }
   } else {
-    state.events=state.gameEvents[gameId]||[];
+    // Local game — load from cache; sanitise any stale date-string times
+    state.events=(state.gameEvents[gameId]||[]).map(function(e){
+      return e.time&&e.time.length>10 ? Object.assign({},e,{time:fmtGameTime(e.time)}) : e;
+    });
     ss('wp-events',state.events);
     renderGameUI(); renderSetupUI(); renderEventLog();
   }
@@ -1141,7 +1153,7 @@ function eventToRows(ev){
   const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
   // Use full team names for sheet output; fall back to display names if not set
   const dFull=g.darkTeamFull||dN, wFull=g.whiteTeamFull||wN;
-  const isDarkEvent=ev.team===dN;
+  const isDarkEvent=ev.team===dN||ev.team===dFull;
   const fullTeam=isDarkEvent?dFull:wFull;
   const fullOpp=isDarkEvent?wFull:dFull;
   const base={gameId:ev.gameId||'', groupId:ev.id, q:ev.q, time:ev.time, date:ev.date||''};
@@ -2221,13 +2233,17 @@ function showPlayerStats(playerId, cap, team){
 function showGameSummary(){
   const g=state.game;
   const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
-  const dGoals=state.events.filter(e=>e.type.match(/^Goal \(/)&&e.team===dN).length;
-  const wGoals=state.events.filter(e=>e.type.match(/^Goal \(/)&&e.team===wN).length;
+  const dFull=g.darkTeamFull||dN, wFull=g.whiteTeamFull||wN;
+  // Match team names flexibly: sheet events store full names, local events store display names
+  const dGoals=state.events.filter(e=>e.type.match(/^Goal \(/)&&(e.team===dN||e.team===dFull)).length;
+  const wGoals=state.events.filter(e=>e.type.match(/^Goal \(/)&&(e.team===wN||e.team===wFull)).length;
 
   function teamSummary(team){
+    // eventToRows outputs full team names; also accept display name for local games
+    const teamFull=team===dN?dFull:wFull;
     const allRows=[];
     state.events.forEach(ev=>{
-      eventToRows({...ev,gameId:'',date:''}).forEach(r=>{ if(r.team===team) allRows.push(r); });
+      eventToRows({...ev,gameId:'',date:''}).forEach(r=>{ if(r.team===team||r.team===teamFull) allRows.push(r); });
     });
     const count=types=>allRows.filter(r=>types.includes(r.event)).length;
     // Top 3 scorers
@@ -2236,8 +2252,24 @@ function showGameSummary(){
       const k=r.cap||'?';
       if(!capGoals[k]){
         const roster=team===dN?(g.darkRoster||[]):(g.whiteRoster||[]);
-        const p=r.playerId?roster.find(x=>x.playerId===r.playerId):roster.find(x=>x.cap===String(k));
-        capGoals[k]={name:fmtName(p?p.name:null),g:0};
+        let p=r.playerId?roster.find(x=>x.playerId===r.playerId):roster.find(x=>x.cap===String(k));
+        let pName=null;
+        if(p){ pName=fmtName(p.name); }
+        else if(r.playerId){
+          // Fallback 1: look up by playerId in global player database
+          const sp=state.players.find(x=>String(x.id)===String(r.playerId));
+          if(sp) pName=fmtName(((sp.first||'')+' '+(sp.last||'')).trim());
+        }
+        if(!pName&&k&&k!=='?'){
+          // Fallback 2: look up by cap# + teamId in global player database
+          // (covers events recorded by cap-pick only, no playerId stored)
+          const teamId=team===dN?g.darkTeamId:g.whiteTeamId;
+          if(teamId){
+            const sp=state.players.find(x=>String(x.defaultCap)===String(k)&&(x.teamIds||[]).map(String).includes(String(teamId)));
+            if(sp) pName=fmtName(((sp.first||'')+' '+(sp.last||'')).trim());
+          }
+        }
+        capGoals[k]={name:pName,g:0};
       }
       capGoals[k].g++;
     });
