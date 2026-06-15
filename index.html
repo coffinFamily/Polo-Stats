@@ -3605,15 +3605,25 @@ let _scData = null; // { teamName, withZone, goalCount, missCount }
 function showShotChart(side) {
   const g = state.game;
   const dN = g.darkTeam || 'Dark', wN = g.whiteTeam || 'White';
+  const dFull = g.darkTeamFull || dN, wFull = g.whiteTeamFull || wN;
   const teamName = side === 'dark' ? dN : wN;
+  const teamFull = side === 'dark' ? dFull : wFull;
+  const oppName  = side === 'dark' ? wN : dN;
+  const oppFull  = side === 'dark' ? wFull : dFull;
+  const isThisTeam = e => e.team === teamName || e.team === teamFull;
+  const isOppTeam  = e => e.team === oppName  || e.team === oppFull;
   const {VBW, VBH, X, Y, W, H} = POOL;
   const L = POOL_LINES;
   const gCx = X + W/2, gW = W*0.15, gLeft = gCx - gW/2, gRight = gCx + gW/2;
   const GOAL_TYPES = ['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)'];
 
   const MISS_TYPES = ['Missed Shot','Missed Shot 5M'];
-  const shots    = state.events.filter(e => e.team === teamName &&
-    (GOAL_TYPES.includes(e.type) || MISS_TYPES.includes(e.type) || e.type === 'Goalie Block'));
+  // Goals and misses belong to the team that took the shot (this team).
+  // Goalie Block is recorded on the DEFENDING team, so it represents a shot
+  // attempt by the OPPOSING team — flip to opponent's team for shot attribution.
+  const shots = state.events.filter(e =>
+    (GOAL_TYPES.includes(e.type) || MISS_TYPES.includes(e.type)) ? isThisTeam(e) :
+    e.type === 'Goalie Block' ? isOppTeam(e) : false);
   const withZone  = shots.filter(e => e.zone && e.zone.includes(','));
   const noZone    = shots.filter(e => !e.zone || !e.zone.includes(','));
   const goalCount  = shots.filter(e => GOAL_TYPES.includes(e.type)).length;
