@@ -429,20 +429,16 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
     <div id="follow-no-url" class="warn" style="display:none;">⚠️ No sheet URL configured — set it in Game Setup.</div>
 
     <!-- Sort + Search controls -->
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
-      <div style="display:flex;gap:14px;align-items:center;">
-        <label style="font-size:12px;color:#7abcdc;display:flex;align-items:center;gap:5px;cursor:pointer;">
-          <input type="radio" name="follow-sort" value="recent" checked onchange="renderFollowGameList()"
-            style="accent-color:#7abcdc;"> Most recent
-        </label>
-        <label style="font-size:12px;color:#7abcdc;display:flex;align-items:center;gap:5px;cursor:pointer;">
-          <input type="radio" name="follow-sort" value="alpha" onchange="renderFollowGameList()"
-            style="accent-color:#7abcdc;"> A–Z
-        </label>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <div style="display:flex;border:1px solid #1e3a5a;border-radius:8px;overflow:hidden;flex-shrink:0;">
+        <button id="follow-sort-btn-recent" onclick="setFollowSort('recent')"
+          style="flex:1;padding:6px 10px;font-size:12px;border:none;border-right:1px solid #1e3a5a;background:#0a3a5a;color:#7abcdc;font-weight:700;cursor:pointer;white-space:nowrap;">🕐 Recent</button>
+        <button id="follow-sort-btn-alpha" onclick="setFollowSort('alpha')"
+          style="flex:1;padding:6px 10px;font-size:12px;border:none;background:transparent;color:#3a5a7a;font-weight:400;cursor:pointer;white-space:nowrap;">A–Z</button>
       </div>
       <input id="follow-game-search" type="search" placeholder="🔍 Filter games…"
         oninput="renderFollowGameList()"
-        style="flex:1 1 140px;min-width:0;font-size:12px;padding:5px 9px;border-radius:7px;border:1px solid #1e3a5a;background:#0a1820;color:#c0d8f0;" />
+        style="flex:1;min-width:0;font-size:12px;padding:5px 9px;border-radius:7px;border:1px solid #1e3a5a;background:#0a1820;color:#c0d8f0;" />
     </div>
 
     <select id="follow-game-sel" onchange="followSelectGame(this.value)"
@@ -4632,7 +4628,7 @@ function voiceStartFlow(eventType, prefill) {
 // ═══════════════════════════════════════════════════════════
 //  FOLLOW GAME TAB
 // ═══════════════════════════════════════════════════════════
-let _follow = { gameId:null, games:[], events:[], view:'players', flowType:'goals' };
+let _follow = { gameId:null, games:[], events:[], view:'players', flowType:'goals', sortMode:'recent' };
 let _followTimer = null;
 const FOLLOW_INTERVAL = 20000; // 20-second live refresh
 
@@ -4685,14 +4681,28 @@ function followSetStatus(msg){
   if(el) el.textContent = msg;
 }
 
+function setFollowSort(mode){
+  _follow.sortMode = mode;
+  const btnR = document.getElementById('follow-sort-btn-recent');
+  const btnA = document.getElementById('follow-sort-btn-alpha');
+  if(btnR && btnA){
+    const activeStyle  = {background:'#0a3a5a', color:'#7abcdc', fontWeight:'700'};
+    const inactiveStyle = {background:'transparent', color:'#3a5a7a', fontWeight:'400'};
+    const s = mode === 'recent' ? activeStyle : inactiveStyle;
+    const s2 = mode === 'alpha'  ? activeStyle : inactiveStyle;
+    Object.assign(btnR.style, s);
+    Object.assign(btnA.style, s2);
+  }
+  renderFollowGameList();
+}
+
 function renderFollowGameList(){
   const sel = document.getElementById('follow-game-sel');
   if(!sel) return;
   const cur = _follow.gameId;
 
   // Read sort preference
-  const sortRadio = document.querySelector('input[name="follow-sort"]:checked');
-  const sortMode = sortRadio ? sortRadio.value : 'recent';
+  const sortMode = _follow.sortMode || 'recent';
 
   // Read search filter
   const searchEl = document.getElementById('follow-game-search');
