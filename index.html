@@ -4652,6 +4652,7 @@ function renderFollowTimeline(ev, wN, dN){
 // ═══════════════════════════════════════════════════════════
 updateTimerDisplay();
 checkAuthOnLoad();        // restore session, handle magic-link hash, show/hide auth tabs
+initFollowTab();          // Follow is the landing page — load games immediately, no login needed
 // Silently refresh roster from sheet and populate game selector on every page load
 if(state.rosterSheetUrl) loadRosterFromSheet(false);
 refreshGameSelectorFromSheet();
