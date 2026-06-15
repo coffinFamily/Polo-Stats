@@ -13,6 +13,7 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
 .nav-btn{padding:6px 14px;border-radius:20px;background:transparent;color:#7a9bb8;border:1px solid transparent;font-weight:500;}
 .nav-btn.active{background:#0a84c8;color:#fff;border-color:#0a84c8;}
 .nav-btn:hover:not(.active){background:#1e3a5a;}
+.auth-tab{display:none;}/* hidden until signed in */
 .page{padding:12px;max-width:700px;margin:0 auto;}
 .card{background:#111d2c;border:1px solid #1e3a5a;border-radius:10px;padding:14px;margin-bottom:10px;}
 .btn-p{padding:8px 16px;border-radius:6px;background:#0a84c8;color:#fff;font-weight:500;}
@@ -103,16 +104,16 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
 
 <div class="nav">
   <span style="font-size:18px;margin-right:4px;">🤽</span>
-  <button class="nav-btn active" onclick="showTab('game')">Game</button>
-  <button class="nav-btn" onclick="showTab('setup')">Game Setup</button>
-  <button class="nav-btn" onclick="showTab('roster')">Roster</button>
-  <button class="nav-btn" onclick="showTab('prefs')">Prefs</button>
-  <button class="nav-btn" onclick="showTab('follow')">Follow</button>
-  <span id="game-label" style="margin-left:auto;font-size:11px;color:#5a7a9a;"></span>
+  <button class="nav-btn active" onclick="showTab('follow')">Follow</button>
+  <button class="nav-btn auth-tab" onclick="showTab('game')">Game</button>
+  <button class="nav-btn auth-tab" onclick="showTab('setup')">Game Setup</button>
+  <button class="nav-btn auth-tab" onclick="showTab('roster')">Roster</button>
+  <button class="nav-btn auth-tab" onclick="showTab('prefs')">Prefs</button>
+  <span id="auth-nav-status" style="margin-left:auto;font-size:11px;color:#5a7a9a;display:flex;align-items:center;gap:6px;white-space:nowrap;"></span>
 </div>
 
 <!-- ═══ GAME TAB ═══════════════════════════════════════════════════════ -->
-<div id="tab-game" class="tab-panel active page">
+<div id="tab-game" class="tab-panel page">
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;">
       <div style="text-align:center;min-width:72px;">
@@ -414,7 +415,28 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
 </div>
 
 <!-- ═══ FOLLOW TAB ════════════════════════════════════════════════════ -->
-<div id="tab-follow" class="tab-panel page">
+<div id="tab-follow" class="tab-panel active page">
+
+  <!-- ─── Auth card ──────────────────────────────────────── -->
+  <div id="auth-card" class="card" style="margin-bottom:10px;">
+    <!-- Logged-out state -->
+    <div id="auth-logged-out">
+      <div class="stitle" style="margin-bottom:6px;font-size:14px;">🔐 Coach Sign In</div>
+      <p style="font-size:12px;color:#7a9bb8;margin:0 0 10px;">Sign in to access the Game, Setup, Roster &amp; Prefs tabs.<br>No password — we'll email you a one-time link.</p>
+      <div style="display:flex;gap:8px;">
+        <input id="auth-email-input" type="email" placeholder="your@email.com"
+          style="flex:1;font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid #1e3a5a;background:#0a1820;color:#c0d8f0;outline:none;"
+          onkeydown="if(event.key==='Enter') requestMagicLink()">
+        <button class="btn-p" style="white-space:nowrap;padding:8px 14px;" onclick="requestMagicLink()">Send link →</button>
+      </div>
+      <p id="auth-status-msg" style="font-size:12px;margin:8px 0 0;display:none;"></p>
+    </div>
+    <!-- Logged-in state -->
+    <div id="auth-logged-in" style="display:none;align-items:center;justify-content:space-between;gap:8px;">
+      <span style="font-size:12px;color:#7abcdc;">✓ Signed in as <strong id="auth-email-display" style="color:#c0d8f0;"></strong></span>
+      <button class="btn-s" style="font-size:11px;padding:4px 10px;flex:0 0 auto;" onclick="logout()">Sign out</button>
+    </div>
+  </div>
 
   <div class="card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
@@ -517,6 +539,7 @@ let state = {
   timeouts: ls('wp-timeouts', {dark:0, white:0}),
   savedGames: ls('wp-saved-games', []),
   gameEvents: ls('wp-game-events', {}),
+  session: ls('wp-session', null),
   flow: null, flowIdx: 0, flowCtx: {}, pendingData: {},
 };
 
@@ -804,13 +827,127 @@ function switchGame(gameId){
 // ═══════════════════════════════════════════════════════════
 //  TAB SWITCHING
 // ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+//  AUTHENTICATION — magic-link email sign-in
+// ═══════════════════════════════════════════════════════════
+
+function _sessValid(){
+  const s=state.session;
+  return s && s.email && s.expires && (new Date(s.expires)>new Date());
+}
+
+function updateAuthUI(){
+  const ok=_sessValid();
+  // Show/hide protected nav tabs
+  document.querySelectorAll('.auth-tab').forEach(el=>{ el.style.display=ok?'':'none'; });
+  // Login card states
+  const lo=document.getElementById('auth-logged-out');
+  const li=document.getElementById('auth-logged-in');
+  const ed=document.getElementById('auth-email-display');
+  const ns=document.getElementById('auth-nav-status');
+  if(lo) lo.style.display=ok?'none':'';
+  if(li){ li.style.display=ok?'flex':'none'; }
+  if(ed&&state.session) ed.textContent=state.session.email;
+  if(ns){
+    ns.innerHTML=ok
+      ?`<span style="color:#4ade80;font-size:10px;">✓ ${state.session.email}</span>
+         <button class="btn-s" style="font-size:10px;padding:2px 7px;" onclick="logout()">Sign out</button>`
+      :'';
+  }
+}
+
+async function requestMagicLink(){
+  const input=document.getElementById('auth-email-input');
+  const msg=document.getElementById('auth-status-msg');
+  const email=(input?input.value:'').trim();
+  if(!email||!email.includes('@')){
+    if(msg){msg.textContent='⚠ Enter a valid email address.';msg.style.color='#ef4444';msg.style.display='';}
+    return;
+  }
+  if(msg){msg.textContent='Sending…';msg.style.color='#7abcdc';msg.style.display='';}
+  try{
+    const url=(state.game&&state.game.sheetUrl)||DEFAULT_SHEET_URL;
+    const resp=await fetch(url+'?action=requestLogin&email='+encodeURIComponent(email),{cache:'no-store'});
+    const data=await resp.json();
+    if(data.ok){
+      if(msg){msg.textContent='✓ Check your email — a sign-in link is on its way.';msg.style.color='#4ade80';}
+    } else {
+      if(msg){msg.textContent='⚠ '+(data.error||'Something went wrong.');msg.style.color='#ef4444';}
+    }
+  }catch(e){
+    if(msg){msg.textContent='⚠ Could not reach the server. Check your connection.';msg.style.color='#ef4444';}
+  }
+}
+
+async function verifyMagicToken(token){
+  const msg=document.getElementById('auth-status-msg');
+  if(msg){msg.textContent='Verifying sign-in link…';msg.style.color='#7abcdc';msg.style.display='';}
+  try{
+    const url=(state.game&&state.game.sheetUrl)||DEFAULT_SHEET_URL;
+    const resp=await fetch(url+'?action=verifyToken&token='+encodeURIComponent(token),{cache:'no-store'});
+    const data=await resp.json();
+    if(data.ok&&data.session){
+      state.session={token:data.session,email:data.email,expires:data.expires};
+      ss('wp-session',state.session);
+      // Clean the magic-link hash out of the URL
+      history.replaceState(null,'',window.location.pathname+window.location.search);
+      updateAuthUI();
+      showTab('game');
+    } else {
+      if(msg){msg.textContent='⚠ Sign-in link is invalid or expired. Request a new one.';msg.style.color='#ef4444';}
+    }
+  }catch(e){
+    if(msg){msg.textContent='⚠ Could not verify link. Check your connection.';msg.style.color='#ef4444';}
+  }
+}
+
+async function validateSessionRemote(){
+  if(!_sessValid()) return;
+  try{
+    const url=(state.game&&state.game.sheetUrl)||DEFAULT_SHEET_URL;
+    const resp=await fetch(url+'?action=validateSession&session='+encodeURIComponent(state.session.token),{cache:'no-store'});
+    const data=await resp.json();
+    if(!data.ok){
+      state.session=null;
+      ss('wp-session',null);
+      updateAuthUI();
+      showTab('follow');
+    }
+  }catch(e){ /* network error — keep local session, retry on next load */ }
+}
+
+function logout(){
+  state.session=null;
+  ss('wp-session',null);
+  updateAuthUI();
+  showTab('follow');
+}
+
+function checkAuthOnLoad(){
+  // 1. Magic link in URL hash?  e.g. index.html#ml=TOKEN
+  const mlMatch=window.location.hash.match(/[#&]ml=([^&]+)/);
+  if(mlMatch){
+    // Show follow tab so the status message has somewhere to render
+    verifyMagicToken(decodeURIComponent(mlMatch[1]));
+    return;
+  }
+  // 2. Restore session from localStorage
+  updateAuthUI();
+  if(_sessValid()) validateSessionRemote();
+}
+
 function showTab(name){
+  // Guard: protected tabs require a valid session
+  const PROTECTED=['game','setup','roster','prefs'];
+  if(PROTECTED.includes(name)&&!_sessValid()){
+    name='follow';
+  }
   // Stop follow refresh whenever we leave that tab
   if(typeof _followTimer!=='undefined' && _followTimer){ clearInterval(_followTimer); _followTimer=null; }
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
-  document.querySelectorAll('.nav-btn').forEach(b=>{ if(b.textContent.trim().toLowerCase()===name) b.classList.add('active'); });
+  document.querySelectorAll('.nav-btn').forEach(b=>{ if(b.textContent.trim().toLowerCase()===name||b.textContent.trim().toLowerCase()==='game setup'&&name==='setup') b.classList.add('active'); });
   if(name==='game')   { renderGameUI(); refreshGameSelectorFromSheet(); }
   if(name==='setup')  renderSetupUI();
   if(name==='roster') renderRosterUI();
@@ -2666,7 +2803,7 @@ function ngwSave(){
 
   // Push init to sheet using full team names
   const sg=state.game;
-  if(sheetUrl) pushToSheet({action:'init',darkTeam:sg.darkTeamFull||sg.darkTeam,whiteTeam:sg.whiteTeamFull||sg.whiteTeam,date:sg.date,gameId:sg.gameId});
+  if(sheetUrl) pushToSheet({action:'init',darkTeam:sg.darkTeamFull||sg.darkTeam,whiteTeam:sg.whiteTeamFull||sg.whiteTeam,date:sg.date,gameId:sg.gameId,creatorEmail:(state.session&&state.session.email)||''});
 
   closeModal();
   renderGameUI();
@@ -4514,7 +4651,7 @@ function renderFollowTimeline(ev, wN, dN){
 //  INIT
 // ═══════════════════════════════════════════════════════════
 updateTimerDisplay();
-renderGameUI();
+checkAuthOnLoad();        // restore session, handle magic-link hash, show/hide auth tabs
 // Silently refresh roster from sheet and populate game selector on every page load
 if(state.rosterSheetUrl) loadRosterFromSheet(false);
 refreshGameSelectorFromSheet();
