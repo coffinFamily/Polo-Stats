@@ -478,10 +478,11 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
     <div id="follow-chips-card"></div>
 
     <!-- View toggle -->
-    <div style="display:flex;gap:6px;margin-bottom:8px;">
-      <button id="follow-btn-players" class="btn-p" style="flex:1;padding:8px 4px;font-size:12px;" onclick="followSetView('players')">👤 Players</button>
-      <button id="follow-btn-timeline" class="btn-s" style="flex:1;padding:8px 4px;font-size:12px;" onclick="followSetView('timeline')">📋 Timeline</button>
-      <button id="follow-btn-flow" class="btn-s" style="flex:1;padding:8px 4px;font-size:12px;" onclick="followSetView('flow')">📈 Flow</button>
+    <div style="display:flex;gap:5px;margin-bottom:8px;">
+      <button id="follow-btn-players"  class="btn-p" style="flex:1;padding:7px 2px;font-size:11px;" onclick="followSetView('players')">👤 Players</button>
+      <button id="follow-btn-timeline" class="btn-s" style="flex:1;padding:7px 2px;font-size:11px;" onclick="followSetView('timeline')">📋 Timeline</button>
+      <button id="follow-btn-flow"     class="btn-s" style="flex:1;padding:7px 2px;font-size:11px;" onclick="followSetView('flow')">📈 Flow</button>
+      <button id="follow-btn-recap"    class="btn-s" style="flex:1;padding:7px 2px;font-size:11px;" onclick="followSetView('recap')">📊 Recap</button>
     </div>
     <!-- Shot chart buttons -->
     <div style="display:flex;gap:6px;margin-bottom:10px;">
@@ -495,7 +496,8 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
 
     <div id="follow-players-view"></div>
     <div id="follow-timeline-view" style="display:none;"></div>
-    <div id="follow-flow-view" style="display:none;"></div>
+    <div id="follow-flow-view"     style="display:none;"></div>
+    <div id="follow-recap-view"    style="display:none;"></div>
 
   </div>
 </div>
@@ -4709,26 +4711,22 @@ function followSelectGame(gameId){
 
 function followSetView(v){
   _follow.view = v;
-  const bp = document.getElementById('follow-btn-players');
-  const bt = document.getElementById('follow-btn-timeline');
-  const bf = document.getElementById('follow-btn-flow');
-  const pv = document.getElementById('follow-players-view');
-  const tv = document.getElementById('follow-timeline-view');
-  const fv = document.getElementById('follow-flow-view');
-  const btnBase = 'flex:1;padding:8px 4px;font-size:12px;';
-  if(bp){ bp.className = v==='players' ? 'btn-p' : 'btn-s'; bp.style.cssText=btnBase; }
-  if(bt){ bt.className = v==='timeline' ? 'btn-p' : 'btn-s'; bt.style.cssText=btnBase; }
-  if(bf){ bf.className = v==='flow'    ? 'btn-p' : 'btn-s'; bf.style.cssText=btnBase; }
-  if(pv) pv.style.display = v==='players'  ? 'block' : 'none';
-  if(tv) tv.style.display = v==='timeline' ? 'block' : 'none';
-  if(fv) fv.style.display = v==='flow'     ? 'block' : 'none';
-  // Re-render active view with latest data
+  const btnBase = 'flex:1;padding:7px 2px;font-size:11px;';
+  [['players','btn-p'],['timeline','btn-s'],['flow','btn-s'],['recap','btn-s']].forEach(([k,def])=>{
+    const b=document.getElementById('follow-btn-'+k);
+    if(b){ b.className=v===k?'btn-p':def; b.style.cssText=btnBase; }
+  });
+  ['players','timeline','flow','recap'].forEach(k=>{
+    const el=document.getElementById('follow-'+k+'-view');
+    if(el) el.style.display=v===k?'block':'none';
+  });
   const game = _follow.games.find(g=>g.gameId===_follow.gameId);
   if(!game) return;
   const wN = game.whiteTeam||'White', dN = game.darkTeam||'Dark';
-  if(v==='players')  renderFollowPlayers(_follow.events, wN, dN);
+  if(v==='players')       renderFollowPlayers(_follow.events, wN, dN);
   else if(v==='timeline') renderFollowTimeline(_follow.events, wN, dN);
-  else renderFollowFlow(_follow.events, wN, dN);
+  else if(v==='flow')     renderFollowFlow(_follow.events, wN, dN);
+  else                    renderFollowRecap(_follow.events, wN, dN);
 }
 
 function renderFollowContent(){
@@ -4769,7 +4767,8 @@ function renderFollowContent(){
   // ── Active view ──────────────────────────────────────
   if(_follow.view==='players')       renderFollowPlayers(ev, wN, dN);
   else if(_follow.view==='timeline') renderFollowTimeline(ev, wN, dN);
-  else                               renderFollowFlow(ev, wN, dN);
+  else if(_follow.view==='flow')     renderFollowFlow(ev, wN, dN);
+  else if(_follow.view==='recap')    renderFollowRecap(ev, wN, dN);
 }
 
 const FOLLOW_CHIPS = [
@@ -4906,6 +4905,228 @@ function renderFollowTimeline(ev, wN, dN){
     html += '</div>';
   });
   el.innerHTML = html || '<div class="card" style="color:#3a5a7a;font-size:12px;">No events yet.</div>';
+}
+
+// ─── Game Recap + Analysis ───────────────────────────────────────────────────
+function renderFollowRecap(ev, wN, dN){
+  const el = document.getElementById('follow-recap-view');
+  if(!el) return;
+  if(!ev.length){ el.innerHTML='<div class="card" style="color:#3a5a7a;font-size:12px;">No events yet.</div>'; return; }
+
+  // ── stat helpers (all relative to team name) ─────────────────────────
+  const cnt = (t,fn) => ev.filter(e=>e.team===t&&fn(e)).length;
+  const isGoal  = e => /^Goal \(/i.test(e.event||'');
+  const is65    = e => e.event==='Goal (6-5)';
+  const is5mG   = e => e.event==='Goal (5M)' || e.event==='5M Goal';
+  const isMiss  = e => /^Missed Shot/i.test(e.event||'');
+  const isBlk   = e => e.event==='Goalie Block';
+  const isEj    = e => e.event==='Ejection';
+  const is5mF   = e => e.event==='5M Foul';
+  const isTO    = e => e.event==='Turnover';
+  const isSteal = e => e.event==='Steal';
+
+  const dG=cnt(dN,isGoal), wG=cnt(wN,isGoal);
+  const d65=cnt(dN,is65),  w65=cnt(wN,is65);
+  const d5mG=cnt(dN,is5mG),w5mG=cnt(wN,is5mG);
+  const dM=cnt(dN,isMiss), wM=cnt(wN,isMiss);
+  // Goalie blocks: e.team = the GOALIE's team (the defending team)
+  const dBlk=cnt(dN,isBlk), wBlk=cnt(wN,isBlk);
+  const dEj=cnt(dN,isEj),   wEj=cnt(wN,isEj);
+  const d5mF=cnt(dN,is5mF), w5mF=cnt(wN,is5mF);
+  const dTO=cnt(dN,isTO),   wTO=cnt(wN,isTO);
+  const dStl=cnt(dN,isSteal),wStl=cnt(wN,isSteal);
+
+  const dShots=dG+dM, wShots=wG+wM;
+  const dPct = dShots>0 ? Math.round(dG/dShots*100) : 0;
+  const wPct = wShots>0 ? Math.round(wG/wShots*100) : 0;
+
+  // Quarter goal counts
+  const qg = q=>({
+    d:cnt(dN,e=>String(e.q)===q&&isGoal(e)),
+    w:cnt(wN,e=>String(e.q)===q&&isGoal(e))
+  });
+  const Q=[null,qg('1'),qg('2'),qg('3'),qg('4')]; // 1-indexed
+
+  // Winner
+  const tied=dG===wG, winT=dG>wG?dN:wN, loseT=dG>wG?wN:dN;
+  const margin=Math.abs(dG-wG);
+
+  // Opening run (recording order by id)
+  const goalEvs = ev.filter(isGoal).sort((a,b)=>Number(a.id||0)-Number(b.id||0));
+  let runTeam=null, runLen=0;
+  for(const g of goalEvs){
+    if(!runTeam) runTeam=g.team;
+    if(g.team===runTeam) runLen++;
+    else break;
+  }
+  if(runLen<2){ runTeam=null; runLen=0; }
+
+  // Biggest single-quarter swing
+  let swingQ=0, swingTeam=null, swingAmt=0;
+  for(let i=1;i<=4;i++){
+    const diff=Q[i].d-Q[i].w; // positive = dark dominated
+    if(Math.abs(diff)>Math.abs(swingAmt)&&(Q[i].d+Q[i].w)>0){ swingAmt=diff; swingQ=i; }
+  }
+  if(swingQ) swingTeam=swingAmt>0?dN:wN;
+
+  // ── Build analysis factors ────────────────────────────────────────────
+  const facts=[];
+  const push=(score,icon,text)=>facts.push({score,icon,text});
+
+  // Opening run
+  if(runLen>=4)      push(runLen*3,'🚀',`${runTeam} stormed out to an early ${runLen}-0 run that immediately put ${runTeam===winT?loseT:winT} on the back foot`);
+  else if(runLen===3) push(8,'🚀',`${runTeam} opened with three unanswered goals, forcing ${runTeam===dN?wN:dN} to play catch-up from the start`);
+  else if(runLen===2) push(4,'🚀',`${runTeam} scored the game's first two goals to gain early control`);
+
+  // Ejection disadvantage
+  const ejBig=Math.max(dEj,wEj), ejSml=Math.min(dEj,wEj);
+  const ejBadT=dEj>wEj?dN:wN, ejGoodT=dEj>wEj?wN:dN;
+  if(dEj!==wEj){
+    if(ejBig-ejSml>=3) push((ejBig-ejSml)*3,'🟥',`${ejBadT}'s ${ejBig} ejections (vs ${ejSml}) were a game-changer, repeatedly leaving them a player short`);
+    else if(ejBig-ejSml===2) push(5,'🟥',`${ejBadT} committed ${ejBig} ejections to ${ejSml} for ${ejGoodT}, creating repeated 6-5 opportunities for the opponent`);
+    else if(ejBig>=5) push(3,'🟥',`Both teams combined for ${dEj+wEj} ejections — physicality was a defining theme throughout`);
+  }
+
+  // Man-up (6-5) conversion efficiency
+  const big65=Math.max(d65,w65), sml65=Math.min(d65,w65);
+  const eff65T=d65>w65?dN:wN, poor65T=d65>w65?wN:dN;
+  if(big65-sml65>=2) push((big65-sml65)*2.5,'💪',`${eff65T} converted ${big65} 6-5 opportunities to ${poor65T}'s ${sml65} — man-up efficiency was a decisive factor`);
+  else if(big65>=3&&big65===sml65) push(2,'💪',`Both teams each converted ${big65} 6-5 opportunities, keeping man-up advantage balanced`);
+
+  // 5M foul differential
+  const big5mF=Math.max(d5mF,w5mF), sml5mF=Math.min(d5mF,w5mF);
+  const penBenT=d5mF>w5mF?wN:dN; // team that drew more fouls (benefited)
+  const penComT=d5mF>w5mF?dN:wN; // team that committed more fouls
+  if(big5mF-sml5mF>=2) push((big5mF-sml5mF)*2,'⚡',`${penComT}'s ${big5mF} 5m fouls (vs ${sml5mF}) gave ${penBenT} ${big5mF} penalty shots — a significant scoring advantage`);
+
+  // Turnover differential
+  const bigTO=Math.max(dTO,wTO), smlTO=Math.min(dTO,wTO);
+  const moreTOT=dTO>wTO?dN:wN;
+  if(bigTO-smlTO>=4) push((bigTO-smlTO)*1.5,'🔄',`${moreTOT}'s ${bigTO} turnovers (vs ${smlTO}) handed the opponent far too many extra possessions`);
+  else if(bigTO-smlTO>=2&&bigTO>=5) push((bigTO-smlTO),'🔄',`Turnover margin favored ${dTO<wTO?dN:wN} ${smlTO}-${bigTO}, a consistent pressure advantage`);
+
+  // Steal differential
+  const bigStl=Math.max(dStl,wStl), smlStl=Math.min(dStl,wStl);
+  const moreStlT=dStl>wStl?dN:wN;
+  if(bigStl-smlStl>=3) push((bigStl-smlStl)*1.5,'🤽',`${moreStlT} dominated the ball-denial game with ${bigStl} steals to ${moreStlT===dN?wN:dN}'s ${smlStl}`);
+
+  // Goalie performance
+  // dBlk = dark goalie saved dBlk shots; wBlk = white goalie saved wBlk shots
+  const bigBlk=Math.max(dBlk,wBlk), smlBlk=Math.min(dBlk,wBlk);
+  const betterGKT=dBlk>wBlk?dN:wN;
+  if(bigBlk-smlBlk>=3) push((bigBlk-smlBlk)*1.5,'🧤',`${betterGKT}'s goalkeeper was outstanding, making ${bigBlk} saves compared to ${smlBlk} for the opponent`);
+
+  // Shooting efficiency
+  if(Math.abs(dPct-wPct)>=15&&dShots>=5&&wShots>=5){
+    const betPctT=dPct>wPct?dN:wN, betPct=Math.max(dPct,wPct), worPct=Math.min(dPct,wPct);
+    push(Math.abs(dPct-wPct)*0.4,'🎯',`${betPctT} shot ${betPct}% compared to ${betPctT===dN?wN:dN}'s ${worPct}%, reflecting a clear edge in shot selection and finishing`);
+  }
+
+  // Quarter blowout
+  if(swingQ&&Math.abs(swingAmt)>=3){
+    const won=swingAmt>0?Q[swingQ].d:Q[swingQ].w, lost=swingAmt>0?Q[swingQ].w:Q[swingQ].d;
+    push(Math.abs(swingAmt)*1.2,'📈',`A dominant Q${swingQ} from ${swingTeam} (${won}-${lost}) swung the game's momentum decisively`);
+  }
+
+  // Sort by score, keep top 3
+  facts.sort((a,b)=>b.score-a.score);
+  const topFacts=facts.slice(0,3);
+
+  // ── Render ────────────────────────────────────────────────────────────
+  // Quarter breakdown cells
+  const qCells=[1,2,3,4].map(i=>{
+    const dW=Q[i].d>Q[i].w, tie=Q[i].d===Q[i].w;
+    return `<div style="text-align:center;padding:6px 2px;">
+      <div style="font-size:9px;color:#2a5a7a;font-weight:700;letter-spacing:.5px;margin-bottom:3px;">Q${i}</div>
+      <div style="font-size:13px;line-height:1;">
+        <span style="font-weight:${dW?700:400};color:${dW?'#7abcdc':tie?'#3a5a7a':'#3a5a7a'}">${Q[i].d}</span>
+        <span style="color:#1a3a5a;font-size:10px;"> – </span>
+        <span style="font-weight:${!dW&&!tie?700:400};color:${!dW&&!tie?'#c0d8f0':tie?'#3a5a7a':'#3a5a7a'}">${Q[i].w}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Stat rows — only show rows where at least one team has data
+  const statDefs=[
+    {label:'Goals',       d:dG,    w:wG,    good:'high'},
+    {label:'Shooting %',  d:dPct,  w:wPct,  good:'high', fmt:v=>v+'%'},
+    {label:'GK Saves',    d:dBlk,  w:wBlk,  good:'high'},
+    {label:'6-5 Goals',   d:d65,   w:w65,   good:'high'},
+    {label:'5M Goals',    d:d5mG,  w:w5mG,  good:'high'},
+    {label:'5M Fouls',    d:d5mF,  w:w5mF,  good:'low'},
+    {label:'Ejections',   d:dEj,   w:wEj,   good:'low'},
+    {label:'Turnovers',   d:dTO,   w:wTO,   good:'low'},
+    {label:'Steals',      d:dStl,  w:wStl,  good:'high'},
+  ].filter(r=>r.d+r.w>0);
+
+  const statRows=statDefs.map(r=>{
+    const dBetter=r.good==='high'?r.d>r.w:r.d<r.w;
+    const wBetter=r.good==='high'?r.w>r.d:r.w<r.d;
+    const fmt=r.fmt||(v=>v);
+    const dClr=dBetter?'#4ade80':r.d===r.w?'#7abcdc':'#ef4444';
+    const wClr=wBetter?'#4ade80':r.d===r.w?'#c0d8f0':'#ef4444';
+    return `<div style="display:flex;align-items:center;padding:5px 0;border-bottom:1px solid #0a1820;">
+      <div style="flex:1;text-align:center;font-size:14px;font-weight:700;color:${dClr};">${fmt(r.d)}</div>
+      <div style="flex:2;text-align:center;font-size:10px;color:#2a4a6a;letter-spacing:.5px;padding:0 4px;">${r.label}</div>
+      <div style="flex:1;text-align:center;font-size:14px;font-weight:700;color:${wClr};">${fmt(r.w)}</div>
+    </div>`;
+  }).join('');
+
+  // Analysis text
+  const winSentence = tied
+    ? `${dN} and ${wN} played to a ${dG}-${wG} draw in a closely contested match.`
+    : margin===1
+      ? `${winT} edged ${loseT} ${Math.max(dG,wG)}-${Math.min(dG,wG)} in a tight contest.`
+      : margin<=3
+        ? `${winT} defeated ${loseT} ${Math.max(dG,wG)}-${Math.min(dG,wG)}.`
+        : `${winT} had a strong ${Math.max(dG,wG)}-${Math.min(dG,wG)} victory over ${loseT}.`;
+
+  const factHTML=topFacts.length
+    ? topFacts.map(f=>`
+        <div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid #0a1820;">
+          <span style="font-size:18px;flex:0 0 auto;line-height:1.3;">${f.icon}</span>
+          <span style="font-size:13px;color:#a8c8e0;line-height:1.6;">${f.text}.</span>
+        </div>`).join('')
+    : `<p style="font-size:12px;color:#3a5a7a;">Not enough event data to generate analysis yet.</p>`;
+
+  el.innerHTML=`
+    <!-- Score hero -->
+    <div class="card" style="padding:14px 12px;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div style="text-align:center;flex:1;">
+          <div style="font-size:11px;color:#5a8aaa;font-weight:600;margin-bottom:4px;">${dN}</div>
+          <div style="font-size:48px;font-weight:800;color:${dG>=wG?'#c8e0ff':'#2a4a6a'};line-height:1;">${dG}</div>
+          <div style="font-size:9px;color:#2a4a6a;margin-top:2px;">DARK</div>
+        </div>
+        <div style="font-size:28px;color:#0f2a3a;padding:0 8px;">–</div>
+        <div style="text-align:center;flex:1;">
+          <div style="font-size:11px;color:#7abcdc;font-weight:600;margin-bottom:4px;">${wN}</div>
+          <div style="font-size:48px;font-weight:800;color:${wG>=dG?'#c8e0ff':'#2a4a6a'};line-height:1;">${wG}</div>
+          <div style="font-size:9px;color:#2a4a6a;margin-top:2px;">WHITE</div>
+        </div>
+      </div>
+      <!-- Team name header row above quarter cells -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid #0f2030;padding-top:6px;">
+        ${qCells}
+      </div>
+    </div>
+
+    <!-- Stat comparison -->
+    <div class="card" style="padding:10px 12px;margin-bottom:8px;">
+      <div style="display:flex;margin-bottom:6px;">
+        <div style="flex:1;text-align:center;font-size:10px;color:#3a6a8a;font-weight:700;letter-spacing:.5px;">${dN}</div>
+        <div style="flex:2;"></div>
+        <div style="flex:1;text-align:center;font-size:10px;color:#3a6a8a;font-weight:700;letter-spacing:.5px;">${wN}</div>
+      </div>
+      ${statRows||'<p style="font-size:12px;color:#3a5a7a;margin:0;">No stats yet.</p>'}
+    </div>
+
+    <!-- Analysis -->
+    <div class="card" style="padding:12px;margin-bottom:8px;">
+      <div style="font-size:10px;font-weight:700;color:#2a5a7a;letter-spacing:1px;margin-bottom:8px;">GAME ANALYSIS</div>
+      <p style="font-size:13px;color:#c0d8f0;margin:0 0 4px;line-height:1.6;">${winSentence}</p>
+      ${factHTML}
+    </div>`;
 }
 
 // ─── Game Flow visual ────────────────────────────────────────────────────────
