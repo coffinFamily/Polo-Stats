@@ -1786,7 +1786,7 @@ function renderGameUI(){
   document.getElementById('white-name-score').textContent=wN;
   document.getElementById('dark-btn-title').textContent=dN+' — Dark';
   document.getElementById('white-btn-title').textContent=wN+' — White';
-  document.getElementById('game-label').textContent=dN+' vs '+wN;
+  const _gl=document.getElementById('game-label'); if(_gl) _gl.textContent=dN+' vs '+wN;
   document.getElementById('q-display').textContent='Q'+state.q+(state.q>4?' (OT)':'');
   populateGameSelector();
   updateTimerDisplay(); updateScores();
