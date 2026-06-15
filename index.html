@@ -3672,7 +3672,11 @@ function showShotChart(side) {
       <span style="color:#e0f0ff;">5M Miss</span>
     </span>
     <span style="display:flex;align-items:center;gap:5px;">
-      <span style="width:10px;height:10px;border-radius:50%;background:#f97316;border:1.5px solid #ea580c;display:inline-block;flex:0 0 auto;"></span>
+      <svg width="12" height="12" viewBox="0 0 12 12" style="flex:0 0 auto;">
+        <circle cx="6" cy="6" r="5" fill="#3a0d0d" stroke="#ef4444" stroke-width="1.5"/>
+        <line x1="2.5" y1="2.5" x2="9.5" y2="9.5" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="9.5" y1="2.5" x2="2.5" y2="9.5" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
       <span style="color:#e0f0ff;">Blocks <strong>${blockCount}</strong></span>
     </span>
     <span style="color:#7abcdc;">Shooting% <strong>${pct}%</strong></span>
@@ -3733,7 +3737,13 @@ function renderShotChartMarkers(filterCap) {
     if (isGoal) {
       html += `<circle cx="${cx}" cy="${cy}" r="4" fill="#16a34a" stroke="#ffffff" stroke-width="1" opacity="${op}"/>`;
     } else if (isBlock) {
-      html += `<circle cx="${cx}" cy="${cy}" r="4" fill="#f97316" stroke="#ea580c" stroke-width="1" opacity="${op}"/>`;
+      // Block: same circle as a miss, plus a black × reaching the circle edge
+      const d = 2.8; // r*cos(45°) ≈ 4*0.707
+      html += `<g opacity="${op}">
+        <circle cx="${cx}" cy="${cy}" r="4" fill="#3a0d0d" stroke="#ef4444" stroke-width="1"/>
+        <line x1="${cx-d}" y1="${cy-d}" x2="${cx+d}" y2="${cy+d}" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="${cx+d}" y1="${cy-d}" x2="${cx-d}" y2="${cy+d}" stroke="#000000" stroke-width="1.5" stroke-linecap="round"/>
+      </g>`;
     } else if (e.type === 'Missed Shot 5M') {
       // 5M miss: hollow red ring to distinguish from regular miss
       html += `<circle cx="${cx}" cy="${cy}" r="5" fill="none" stroke="#ef4444" stroke-width="2" opacity="${op}"/>`;
