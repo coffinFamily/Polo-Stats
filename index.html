@@ -839,7 +839,7 @@ function _sessValid(){
 function updateAuthUI(){
   const ok=_sessValid();
   // Show/hide protected nav tabs
-  document.querySelectorAll('.auth-tab').forEach(el=>{ el.style.display=ok?'':'none'; });
+  document.querySelectorAll('.auth-tab').forEach(el=>{ el.style.display=ok?'inline-flex':'none'; });
   // Login card states
   const lo=document.getElementById('auth-logged-out');
   const li=document.getElementById('auth-logged-in');
