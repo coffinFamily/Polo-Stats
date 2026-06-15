@@ -5205,14 +5205,19 @@ function renderFollowFlow(ev, wN, dN){
   const DARK_CLR  = '#4a7ae0';   // vivid blue  — dark caps
   const WHITE_CLR = '#e8eef4';   // near-white  — white caps
 
-  // Radio toggle
-  let html = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">`;
-  FLOW_TYPES.forEach(t => {
+  // Segmented button control — 3 equal-width buttons in a locked row, no wrapping
+  let html = `<div style="display:flex;border:1px solid #1e3a5a;border-radius:8px;overflow:hidden;margin-bottom:12px;">`;
+  FLOW_TYPES.forEach((t, i) => {
     const active = t.key === activeKey;
-    html += `<label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#7abcdc;cursor:pointer;white-space:nowrap;padding:5px 10px;border-radius:14px;border:1px solid ${active?'#0a84c8':'#1e3a5a'};background:${active?'#0a3a5a':'transparent'};">
-      <input type="radio" name="follow-flow-type" value="${t.key}" ${active?'checked':''} onchange="_follow.flowType=this.value;renderFollowFlowActive()" style="accent-color:#0a84c8;flex:0 0 auto;">
+    const borderL = i > 0 ? 'border-left:1px solid #1e3a5a;' : '';
+    html += `<button onclick="_follow.flowType='${t.key}';renderFollowFlowActive()"
+      style="flex:1;padding:8px 4px;font-size:12px;border:none;${borderL}
+             background:${active?'#0a3a5a':'transparent'};
+             color:${active?'#7abcdc':'#3a5a7a'};
+             font-weight:${active?'700':'400'};cursor:pointer;
+             white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
       ${t.icon} ${t.label}
-    </label>`;
+    </button>`;
   });
   html += `</div>`;
 
