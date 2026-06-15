@@ -5205,11 +5205,17 @@ function renderFollowFlow(ev, wN, dN){
     </div>
   </div>`;
 
-  // Quarter grid
+  // Quarter grid — variable column widths proportional to event count;
+  // empty quarters get 0.4fr so they stay visible but clearly narrower.
+  const qWeights = showQs.map(q => {
+    const n = (byQ[q]||[]).length;
+    return n === 0 ? 0.4 : n;
+  });
+  const gridCols = qWeights.map(w => `${w}fr`).join(' ');
+
   let cumD = 0, cumW = 0;
-  html += `<div class="card" style="padding:10px 6px;overflow-x:auto;">
-    <div style="display:grid;grid-template-columns:repeat(${showQs.length},1fr);
-                min-width:${showQs.length*64}px;gap:0;">`;
+  html += `<div class="card" style="padding:10px 6px;">
+    <div style="display:grid;grid-template-columns:${gridCols};gap:0;">`;
 
   showQs.forEach((q, qi) => {
     const events = byQ[q] || [];
