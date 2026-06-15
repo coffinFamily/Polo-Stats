@@ -725,10 +725,8 @@ async function refreshGameSelectorFromSheet(){
         }
       }
     });
-    if(changed){
-      ss('wp-saved-games',state.savedGames);
-      populateGameSelector();
-    }
+    if(changed) ss('wp-saved-games',state.savedGames);
+    populateGameSelector(); // always refresh UI — selector may be empty even if nothing changed
   } catch(e){ /* silently ignore — sheet may be unreachable */ }
 }
 
