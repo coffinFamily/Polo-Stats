@@ -246,6 +246,7 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
   <div class="card">
     <div style="display:flex;align-items:center;gap:10px;">
       <button class="btn-p" onclick="startNewGameWizard()" style="white-space:nowrap;padding:9px 14px;font-size:13px;font-weight:700;">🏊 New Game</button>
+      <button class="btn-s" onclick="showManageAccess()" style="white-space:nowrap;padding:9px 14px;font-size:13px;">👥 Manage Access</button>
       <div style="flex:1;">
         <div class="stitle" style="margin-top:0;margin-bottom:4px;">Game date</div>
         <input type="date" id="game-date" style="width:100%;" />
@@ -568,6 +569,7 @@ if(DEFAULT_SHEET_URL)  { state.game.sheetUrl=DEFAULT_SHEET_URL;   ss('wp-sheet-u
   if(!state.prefs.dark)  state.prefs.dark  = defTeam();
   if(!state.prefs.white) state.prefs.white = defTeam();
   if(!state.prefs.shared) state.prefs.shared = {}; // keep for legacy compat, no longer used in UI
+  if(!state.prefs.standingCollaborators) state.prefs.standingCollaborators = [];
   // Fill in any keys added later that may not exist in stored prefs
   Object.assign(state.prefs.dark,  Object.fromEntries(Object.entries(defTeam()).filter(([k])=>!(k in state.prefs.dark))));
   Object.assign(state.prefs.white, Object.fromEntries(Object.entries(defTeam()).filter(([k])=>!(k in state.prefs.white))));
@@ -711,9 +713,16 @@ async function refreshGameSelectorFromSheet(){
           whiteTeamFull:sg.whiteTeam||'White',
           darkRoster:[], whiteRoster:[],
           sheetUrl:url,
+          creatorEmail:sg.creatorEmail||'',
           _fromSheet:true
         });
         changed=true;
+      } else {
+        // Always sync creatorEmail from sheet — catches manual edits and wizard updates
+        if((sg.creatorEmail||'')!==(exists.creatorEmail||'')){
+          exists.creatorEmail=sg.creatorEmail||'';
+          changed=true;
+        }
       }
     });
     if(changed){
@@ -934,6 +943,15 @@ function checkAuthOnLoad(){
   // 2. Restore session from localStorage
   updateAuthUI();
   if(_sessValid()) validateSessionRemote();
+}
+
+// Returns true if the signed-in user is in a game's creatorEmail CSV list.
+// Unowned games (empty creatorEmail) are editable by any signed-in user.
+function canEditGame(game){
+  if(!_sessValid()) return false;
+  const email=(state.session.email||'').toLowerCase().trim();
+  const list=(game.creatorEmail||'').split(',').map(e=>e.toLowerCase().trim()).filter(Boolean);
+  return list.length===0||list.includes(email);
 }
 
 function showTab(name){
@@ -2367,6 +2385,156 @@ function showPlayerStats(playerId, cap, team){
 }
 
 // ─── Game summary export ──────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
+//  MANAGE ACCESS WIZARD
+// ═══════════════════════════════════════════════════════════
+
+function showManageAccess(){
+  if(!_sessValid()){ alert('Sign in first to manage game access.'); return; }
+  const myGames=state.savedGames.filter(g=>canEditGame(g));
+  const cur=state.game;
+  const sc=state.prefs.standingCollaborators||[];
+
+  document.getElementById('modal-title').textContent='👥 Manage Access';
+  document.getElementById('modal-body').innerHTML=`
+    <p style="font-size:12px;color:#7a9bb8;margin:0 0 14px;line-height:1.6;">
+      Grant or revoke editing access for another coach. Access is stored as a comma-separated list on each game.</p>
+
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px;color:#5a7a9a;display:block;margin-bottom:4px;">Coach email to add or remove</label>
+      <input id="access-email" type="email" placeholder="coach@email.com"
+        style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;border:1px solid #1e3a5a;background:#0a1820;color:#c0d8f0;box-sizing:border-box;outline:none;">
+    </div>
+
+    <div style="margin-bottom:12px;">
+      <label style="font-size:12px;color:#5a7a9a;display:block;margin-bottom:8px;">Which games?</label>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <label style="display:flex;align-items:flex-start;gap:9px;font-size:13px;color:#c0d8f0;cursor:pointer;">
+          <input type="radio" name="access-scope" value="this" checked style="margin-top:2px;accent-color:#0a84c8;">
+          <span><strong>This game only</strong><br><span style="font-size:11px;color:#5a7a9a;">${cur.darkTeam||'Dark'} vs ${cur.whiteTeam||'White'} · ${fmtDate(cur.date)||'no date'}</span></span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:9px;font-size:13px;color:#c0d8f0;cursor:pointer;">
+          <input type="radio" name="access-scope" value="pick" style="margin-top:2px;accent-color:#0a84c8;">
+          <span><strong>Select specific games</strong><br><span style="font-size:11px;color:#5a7a9a;">Choose from a list of your games</span></span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:9px;font-size:13px;color:#c0d8f0;cursor:pointer;">
+          <input type="radio" name="access-scope" value="all" style="margin-top:2px;accent-color:#0a84c8;">
+          <span><strong>All my games</strong><br><span style="font-size:11px;color:#5a7a9a;">${myGames.length} game${myGames.length!==1?'s':''} you currently own</span></span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:9px;font-size:13px;color:#c0d8f0;cursor:pointer;">
+          <input type="radio" name="access-scope" value="future" style="margin-top:2px;accent-color:#0a84c8;">
+          <span><strong>All games — now &amp; future</strong><br><span style="font-size:11px;color:#5a7a9a;">Updates all current games AND auto-includes on every new game</span></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Game checklist — shown only when "pick" is selected -->
+    <div id="access-pick-list" style="display:none;margin-bottom:12px;max-height:160px;overflow-y:auto;
+         border:1px solid #1e3a5a;border-radius:8px;padding:8px 10px;">
+      ${myGames.length
+        ? myGames.map(g=>`
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#c0d8f0;cursor:pointer;padding:3px 0;">
+            <input type="checkbox" class="access-game-chk" value="${g.gameId}" checked style="accent-color:#0a84c8;">
+            <span>${fmtDate(g.date)||'—'} &nbsp;${g.darkTeam} vs ${g.whiteTeam}</span>
+          </label>`).join('')
+        : '<p style="font-size:12px;color:#5a7a9a;margin:0;">No editable games found.</p>'
+      }
+    </div>
+
+    ${sc.length?`<p style="font-size:11px;color:#5a7a9a;margin:0 0 12px;">Standing collaborators (auto-added to new games): <strong style="color:#7abcdc;">${sc.join(', ')}</strong></p>`:''}
+
+    <div style="display:flex;gap:8px;">
+      <button class="btn-p" style="flex:1;" onclick="applyManageAccess('add')">➕ Add access</button>
+      <button class="btn-s" style="flex:1;border-color:#ef4444;color:#ef4444;" onclick="applyManageAccess('remove')">✕ Remove access</button>
+    </div>
+    <p id="access-status" style="font-size:12px;margin:10px 0 0;display:none;"></p>
+  `;
+
+  // Wire scope radio → show/hide checklist
+  document.getElementById('modal-overlay').style.display='flex';
+  document.querySelectorAll('input[name="access-scope"]').forEach(r=>{
+    r.addEventListener('change',()=>{
+      const pl=document.getElementById('access-pick-list');
+      if(pl) pl.style.display=(r.value==='pick'&&r.checked)?'':'none';
+    });
+  });
+}
+
+async function applyManageAccess(action){
+  const emailEl=document.getElementById('access-email');
+  const scopeEl=document.querySelector('input[name="access-scope"]:checked');
+  const statusEl=document.getElementById('access-status');
+  const coachEmail=((emailEl?emailEl.value:'')).trim().toLowerCase();
+
+  if(!coachEmail||!coachEmail.includes('@')){
+    if(statusEl){statusEl.textContent='⚠ Enter a valid email address.';statusEl.style.color='#ef4444';statusEl.style.display='';}
+    return;
+  }
+  const scope=scopeEl?scopeEl.value:'this';
+
+  // Build game list to update
+  let games=[];
+  if(scope==='this'){
+    games=[state.game];
+  } else if(scope==='pick'){
+    document.querySelectorAll('.access-game-chk:checked').forEach(cb=>{
+      const g=state.savedGames.find(x=>x.gameId===cb.value);
+      if(g) games.push(g);
+    });
+  } else {
+    games=state.savedGames.filter(g=>canEditGame(g));
+  }
+
+  // Handle standing collaborator list (future games)
+  if(scope==='future'){
+    let sc=state.prefs.standingCollaborators||[];
+    if(action==='add'&&!sc.includes(coachEmail)){
+      sc=[...sc,coachEmail];
+    } else if(action==='remove'){
+      sc=sc.filter(e=>e!==coachEmail);
+    }
+    state.prefs.standingCollaborators=sc;
+    ss('wp-prefs',state.prefs);
+  }
+
+  if(!games.length){
+    if(statusEl){statusEl.textContent='No games selected.';statusEl.style.color='#e8c84a';statusEl.style.display='';}
+    return;
+  }
+
+  if(statusEl){statusEl.textContent=`Updating ${games.length} game(s)…`;statusEl.style.color='#7abcdc';statusEl.style.display='';}
+
+  const url=(state.game&&state.game.sheetUrl)||DEFAULT_SHEET_URL;
+  let updated=0;
+
+  for(const game of games){
+    const current=(game.creatorEmail||'').split(',').map(e=>e.trim().toLowerCase()).filter(Boolean);
+    let newList;
+    if(action==='add'){
+      newList=current.includes(coachEmail)?current:[...current,coachEmail];
+    } else {
+      newList=current.filter(e=>e!==coachEmail);
+    }
+    const newCSV=newList.join(', ');
+    // Update local copy
+    game.creatorEmail=newCSV;
+    if(game.gameId===state.game.gameId) state.game.creatorEmail=newCSV;
+    // Push to sheet
+    try{
+      await fetch(url+'?action=updateCreators&gameId='+encodeURIComponent(game.gameId)+'&creators='+encodeURIComponent(newCSV),{cache:'no-store'});
+      updated++;
+    }catch(err){}
+  }
+
+  ss('wp-saved-games',state.savedGames);
+  ss('wp-game',state.game);
+
+  if(statusEl){
+    statusEl.textContent=`✓ ${action==='add'?'Added':'Removed'} access for ${coachEmail} on ${updated} game(s).`;
+    statusEl.style.color='#4ade80';
+  }
+}
+
 function showGameSummary(){
   const g=state.game;
   const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
@@ -2803,7 +2971,12 @@ function ngwSave(){
 
   // Push init to sheet using full team names
   const sg=state.game;
-  if(sheetUrl) pushToSheet({action:'init',darkTeam:sg.darkTeamFull||sg.darkTeam,whiteTeam:sg.whiteTeamFull||sg.whiteTeam,date:sg.date,gameId:sg.gameId,creatorEmail:(state.session&&state.session.email)||''});
+  // Build creator list: session email + any standing collaborators
+  const _myEmail=(state.session&&state.session.email)||'';
+  const _sc=state.prefs.standingCollaborators||[];
+  const _creators=[_myEmail,..._sc].filter(Boolean).join(', ');
+  sg.creatorEmail=_creators;
+  if(sheetUrl) pushToSheet({action:'init',darkTeam:sg.darkTeamFull||sg.darkTeam,whiteTeam:sg.whiteTeamFull||sg.whiteTeam,date:sg.date,gameId:sg.gameId,creatorEmail:_creators});
 
   closeModal();
   renderGameUI();
