@@ -4947,7 +4947,8 @@ function renderFollowFlow(ev, wN, dN){
     const q = String(e.q||'1');
     (byQ[q] || byQ['OT']).push(e);
   });
-  QS.forEach(q => byQ[q].sort((a,b)=>String(b.time||'').localeCompare(String(a.time||''))));
+  // Sort by recording id (numeric timestamp) if present; otherwise keep sheet-row order.
+  QS.forEach(q => { if(byQ[q].length>1 && byQ[q][0]?.id) byQ[q].sort((a,b)=>Number(a.id)-Number(b.id)); });
 
   const showQs = ['1','2','3','4'];
   if(byQ['OT'].length) showQs.push('OT');
