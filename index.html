@@ -109,8 +109,8 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
   <button class="nav-btn auth-tab" onclick="showTab('setup')">Game Setup</button>
   <button class="nav-btn auth-tab" onclick="showTab('roster')">Roster</button>
   <button class="nav-btn auth-tab" onclick="showTab('prefs')">Prefs</button>
-  <span id="auth-nav-status" style="margin-left:auto;font-size:11px;color:#5a7a9a;display:flex;align-items:center;gap:6px;white-space:nowrap;"></span>
 </div>
+<div id="auth-nav-status" style="display:none;background:#0d1b2a;border-bottom:1px solid #1a3050;padding:4px 12px;font-size:11px;color:#5a7a9a;align-items:center;justify-content:flex-end;gap:6px;white-space:nowrap;"></div>
 
 <!-- ═══ GAME TAB ═══════════════════════════════════════════════════════ -->
 <div id="tab-game" class="tab-panel page">
@@ -856,10 +856,14 @@ function updateAuthUI(){
   if(li){ li.style.display=ok?'flex':'none'; }
   if(ed&&state.session) ed.textContent=state.session.email;
   if(ns){
-    ns.innerHTML=ok
-      ?`<span style="color:#4ade80;font-size:10px;">✓ ${state.session.email}</span>
-         <button class="btn-s" style="font-size:10px;padding:2px 7px;" onclick="logout()">Sign out</button>`
-      :'';
+    if(ok){
+      ns.innerHTML=`<span style="color:#4ade80;font-size:10px;">✓ ${state.session.email}</span>
+         <button class="btn-s" style="font-size:10px;padding:2px 7px;" onclick="logout()">Sign out</button>`;
+      ns.style.display='flex';
+    } else {
+      ns.innerHTML='';
+      ns.style.display='none';
+    }
   }
 }
 
