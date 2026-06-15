@@ -2405,24 +2405,23 @@ function showManageAccess(){
     </div>
 
     <div style="margin-bottom:12px;">
-      <label style="font-size:12px;color:#5a7a9a;display:block;margin-bottom:8px;">Which games?</label>
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        <label style="display:flex;align-items:flex-start;gap:9px;font-size:13px;color:#c0d8f0;cursor:pointer;">
-          <input type="radio" name="access-scope" value="this" checked style="margin-top:2px;accent-color:#0a84c8;">
-          <span><strong>This game only</strong><br><span style="font-size:11px;color:#5a7a9a;">${cur.darkTeam||'Dark'} vs ${cur.whiteTeam||'White'} · ${fmtDate(cur.date)||'no date'}</span></span>
-        </label>
-        <label style="display:flex;align-items:flex-start;gap:9px;font-size:13px;color:#c0d8f0;cursor:pointer;">
-          <input type="radio" name="access-scope" value="pick" style="margin-top:2px;accent-color:#0a84c8;">
-          <span><strong>Select specific games</strong><br><span style="font-size:11px;color:#5a7a9a;">Choose from a list of your games</span></span>
-        </label>
-        <label style="display:flex;align-items:flex-start;gap:9px;font-size:13px;color:#c0d8f0;cursor:pointer;">
-          <input type="radio" name="access-scope" value="all" style="margin-top:2px;accent-color:#0a84c8;">
-          <span><strong>All my games</strong><br><span style="font-size:11px;color:#5a7a9a;">${myGames.length} game${myGames.length!==1?'s':''} you currently own</span></span>
-        </label>
-        <label style="display:flex;align-items:flex-start;gap:9px;font-size:13px;color:#c0d8f0;cursor:pointer;">
-          <input type="radio" name="access-scope" value="future" style="margin-top:2px;accent-color:#0a84c8;">
-          <span><strong>All games — now &amp; future</strong><br><span style="font-size:11px;color:#5a7a9a;">Updates all current games AND auto-includes on every new game</span></span>
-        </label>
+      <div style="font-size:12px;color:#5a7a9a;margin-bottom:6px;">Which games?</div>
+      <div style="border:1px solid #1e3a5a;border-radius:8px;overflow:hidden;">
+        ${[
+          {v:'this',  title:'This game only',         sub:`${cur.darkTeam||'Dark'} vs ${cur.whiteTeam||'White'} · ${fmtDate(cur.date)||'no date'}`},
+          {v:'pick',  title:'Select specific games',   sub:'Choose from a checklist'},
+          {v:'all',   title:'All my games',            sub:`${myGames.length} game${myGames.length!==1?'s':''} you own`},
+          {v:'future',title:'All games — now & future',sub:'Current + auto-add to every new game'},
+        ].map((opt,i)=>`
+          <label style="display:grid;grid-template-columns:20px 1fr;gap:8px;align-items:start;
+                 cursor:pointer;padding:10px 12px;${i?'border-top:1px solid #1e3a5a;':''}">
+            <input type="radio" name="access-scope" value="${opt.v}" ${opt.v==='this'?'checked':''}
+              style="accent-color:#0a84c8;margin-top:3px;width:16px;height:16px;">
+            <div>
+              <div style="font-size:13px;color:#c0d8f0;font-weight:600;line-height:1.3;">${opt.title}</div>
+              <div style="font-size:11px;color:#5a7a9a;margin-top:2px;line-height:1.4;">${opt.sub}</div>
+            </div>
+          </label>`).join('')}
       </div>
     </div>
 
