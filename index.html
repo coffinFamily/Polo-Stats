@@ -3600,18 +3600,44 @@ function updateCritStatsBtn() {
   }
 }
 
-// Follow-tab wrapper: maps _follow.events (e.event) → showShotChart format (e.type)
-// then temporarily patches state.game/state.events so showShotChart works unchanged.
+// Follow-tab shot chart wrapper.
+// Mirrors the Game tab's groupId-based deduplication and field-casing
+// normalisation (zone vs Zone) so shot location data reaches showShotChart.
 function showFollowShotChart(side){
   const game = _follow.games && _follow.games.find(g=>g.gameId===_follow.gameId);
   if(!game){ return; }
-  const prevGame   = state.game;
-  const prevEvents = state.events;
-  state.game   = game;
-  state.events = (_follow.events||[]).map(e=>Object.assign({}, e, {type: e.event}));
+
+  const COUNTERPART = {'Shot On Goal':1,'Ejection Drawn':1,'5m Drawn':1,'5M Drawn':1};
+  function gf(r,lo,hi){ const v=r[lo]; return (v!==undefined&&v!==null&&v!=='') ? v : (r[hi]||''); }
+
+  const groups = {};
+  (_follow.events||[]).forEach(function(r, idx){
+    const gid    = r.groupId||r.groupID||r.GroupID||'';
+    const key    = gid ? String(gid) : ('_r'+idx);
+    const evType = r.event||r.Event||r.type||'';
+    const zone   = gf(r,'zone','Zone');
+    if(!groups[key]){
+      groups[key]={ id: gid?(Number(gid)||Date.now()+idx):(Date.now()+idx),
+        q:gf(r,'q','Q'), time:gf(r,'time','Time'), type:evType,
+        team:gf(r,'team','Team'), cap:gf(r,'cap','Cap'), zone:zone };
+    } else {
+      const storedIsCp = COUNTERPART[groups[key].type];
+      const thisIsCp   = COUNTERPART[evType];
+      if(storedIsCp && !thisIsCp){
+        groups[key].type=evType; groups[key].team=gf(r,'team','Team')||groups[key].team;
+        groups[key].cap=gf(r,'cap','Cap')||groups[key].cap;
+        if(zone) groups[key].zone=zone;
+      } else if(!groups[key].zone && zone){
+        groups[key].zone=zone; // pick up zone from counterpart row if primary lacked it
+      }
+    }
+  });
+
+  const mapped = Object.values(groups).filter(e=>!COUNTERPART[e.type]);
+  const prevGame=state.game, prevEvents=state.events;
+  state.game=game; state.events=mapped;
   showShotChart(side);
-  state.game   = prevGame;
-  state.events = prevEvents;
+  state.game=prevGame; state.events=prevEvents;
 }
 
 function showShotChartPicker() {
