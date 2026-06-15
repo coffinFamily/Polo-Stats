@@ -5179,14 +5179,11 @@ function renderFollowFlow(ev, wN, dN){
   const WHITE_CLR = '#e8eef4';   // near-white  — white caps
 
   // Radio toggle
-  let html = `<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px;">`;
+  let html = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">`;
   FLOW_TYPES.forEach(t => {
-    html += `<label style="display:flex;align-items:center;gap:5px;font-size:12px;
-                           color:#7abcdc;cursor:pointer;">
-      <input type="radio" name="follow-flow-type" value="${t.key}"
-             ${t.key===activeKey?'checked':''}
-             onchange="_follow.flowType=this.value;renderFollowFlowActive()"
-             style="accent-color:#0a84c8;flex:0 0 auto;">
+    const active = t.key === activeKey;
+    html += `<label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#7abcdc;cursor:pointer;white-space:nowrap;padding:5px 10px;border-radius:14px;border:1px solid ${active?'#0a84c8':'#1e3a5a'};background:${active?'#0a3a5a':'transparent'};">
+      <input type="radio" name="follow-flow-type" value="${t.key}" ${active?'checked':''} onchange="_follow.flowType=this.value;renderFollowFlowActive()" style="accent-color:#0a84c8;flex:0 0 auto;">
       ${t.icon} ${t.label}
     </label>`;
   });
