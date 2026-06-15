@@ -479,8 +479,9 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
 
     <!-- View toggle -->
     <div style="display:flex;gap:6px;margin-bottom:8px;">
-      <button id="follow-btn-players" class="btn-p" style="flex:1;padding:9px;font-size:13px;" onclick="followSetView('players')">👤 Players</button>
-      <button id="follow-btn-timeline" class="btn-s" style="flex:1;padding:9px;font-size:13px;" onclick="followSetView('timeline')">📋 Timeline</button>
+      <button id="follow-btn-players" class="btn-p" style="flex:1;padding:8px 4px;font-size:12px;" onclick="followSetView('players')">👤 Players</button>
+      <button id="follow-btn-timeline" class="btn-s" style="flex:1;padding:8px 4px;font-size:12px;" onclick="followSetView('timeline')">📋 Timeline</button>
+      <button id="follow-btn-flow" class="btn-s" style="flex:1;padding:8px 4px;font-size:12px;" onclick="followSetView('flow')">📈 Flow</button>
     </div>
     <!-- Shot chart buttons -->
     <div style="display:flex;gap:6px;margin-bottom:10px;">
@@ -494,6 +495,7 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
 
     <div id="follow-players-view"></div>
     <div id="follow-timeline-view" style="display:none;"></div>
+    <div id="follow-flow-view" style="display:none;"></div>
 
   </div>
 </div>
@@ -4601,7 +4603,7 @@ function voiceStartFlow(eventType, prefill) {
 // ═══════════════════════════════════════════════════════════
 //  FOLLOW GAME TAB
 // ═══════════════════════════════════════════════════════════
-let _follow = { gameId:null, games:[], events:[], view:'players' };
+let _follow = { gameId:null, games:[], events:[], view:'players', flowType:'goals' };
 let _followTimer = null;
 const FOLLOW_INTERVAL = 20000; // 20-second live refresh
 
@@ -4709,18 +4711,24 @@ function followSetView(v){
   _follow.view = v;
   const bp = document.getElementById('follow-btn-players');
   const bt = document.getElementById('follow-btn-timeline');
+  const bf = document.getElementById('follow-btn-flow');
   const pv = document.getElementById('follow-players-view');
   const tv = document.getElementById('follow-timeline-view');
-  if(bp){ bp.className = v==='players' ? 'btn-p' : 'btn-s'; bp.style.cssText='flex:1;padding:9px;font-size:13px;'; }
-  if(bt){ bt.className = v==='timeline' ? 'btn-p' : 'btn-s'; bt.style.cssText='flex:1;padding:9px;font-size:13px;'; }
-  if(pv) pv.style.display = v==='players' ? 'block' : 'none';
+  const fv = document.getElementById('follow-flow-view');
+  const btnBase = 'flex:1;padding:8px 4px;font-size:12px;';
+  if(bp){ bp.className = v==='players' ? 'btn-p' : 'btn-s'; bp.style.cssText=btnBase; }
+  if(bt){ bt.className = v==='timeline' ? 'btn-p' : 'btn-s'; bt.style.cssText=btnBase; }
+  if(bf){ bf.className = v==='flow'    ? 'btn-p' : 'btn-s'; bf.style.cssText=btnBase; }
+  if(pv) pv.style.display = v==='players'  ? 'block' : 'none';
   if(tv) tv.style.display = v==='timeline' ? 'block' : 'none';
+  if(fv) fv.style.display = v==='flow'     ? 'block' : 'none';
   // Re-render active view with latest data
   const game = _follow.games.find(g=>g.gameId===_follow.gameId);
   if(!game) return;
   const wN = game.whiteTeam||'White', dN = game.darkTeam||'Dark';
-  if(v==='players') renderFollowPlayers(_follow.events, wN, dN);
-  else renderFollowTimeline(_follow.events, wN, dN);
+  if(v==='players')  renderFollowPlayers(_follow.events, wN, dN);
+  else if(v==='timeline') renderFollowTimeline(_follow.events, wN, dN);
+  else renderFollowFlow(_follow.events, wN, dN);
 }
 
 function renderFollowContent(){
@@ -4759,8 +4767,9 @@ function renderFollowContent(){
   if(fscW) fscW.textContent = wN;
 
   // ── Active view ──────────────────────────────────────
-  if(_follow.view==='players') renderFollowPlayers(ev, wN, dN);
-  else renderFollowTimeline(ev, wN, dN);
+  if(_follow.view==='players')       renderFollowPlayers(ev, wN, dN);
+  else if(_follow.view==='timeline') renderFollowTimeline(ev, wN, dN);
+  else                               renderFollowFlow(ev, wN, dN);
 }
 
 const FOLLOW_CHIPS = [
@@ -4897,6 +4906,141 @@ function renderFollowTimeline(ev, wN, dN){
     html += '</div>';
   });
   el.innerHTML = html || '<div class="card" style="color:#3a5a7a;font-size:12px;">No events yet.</div>';
+}
+
+// ─── Game Flow visual ────────────────────────────────────────────────────────
+function renderFollowFlowActive(){
+  const game = _follow.games.find(g=>g.gameId===_follow.gameId);
+  if(!game) return;
+  renderFollowFlow(_follow.events, game.whiteTeam||'White', game.darkTeam||'Dark');
+}
+
+function renderFollowFlow(ev, wN, dN){
+  const el = document.getElementById('follow-flow-view');
+  if(!el) return;
+  if(!ev.length){
+    el.innerHTML='<div class="card" style="color:#3a5a7a;font-size:12px;">No events yet.</div>';
+    return;
+  }
+
+  const FLOW_TYPES = [
+    { key:'goals',
+      label:'Goals', icon:'🥅',
+      filter: e => /^Goal \(/i.test(e.event||'') || /^5M Goal/i.test(e.event||'') },
+    { key:'ejections',
+      label:'Ejections', icon:'🟥',
+      filter: e => e.event==='Ejection' },
+    { key:'5m',
+      label:'5M Fouls', icon:'⚡',
+      filter: e => e.event==='5M Foul' },
+  ];
+
+  const activeKey  = _follow.flowType || 'goals';
+  const activeType = FLOW_TYPES.find(t=>t.key===activeKey) || FLOW_TYPES[0];
+  const filtered   = ev.filter(activeType.filter);
+
+  // Group by quarter — sort each group chronologically (countdown timer: bigger = earlier)
+  const QS = ['1','2','3','4','OT'];
+  const byQ = {};
+  QS.forEach(q => byQ[q] = []);
+  filtered.forEach(e => {
+    const q = String(e.q||'1');
+    (byQ[q] || byQ['OT']).push(e);
+  });
+  QS.forEach(q => byQ[q].sort((a,b)=>String(b.time||'').localeCompare(String(a.time||''))));
+
+  const showQs = ['1','2','3','4'];
+  if(byQ['OT'].length) showQs.push('OT');
+
+  // Team colours
+  const DARK_CLR  = '#4a7ae0';   // vivid blue  — dark caps
+  const WHITE_CLR = '#e8eef4';   // near-white  — white caps
+
+  // Radio toggle
+  let html = `<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px;">`;
+  FLOW_TYPES.forEach(t => {
+    html += `<label style="display:flex;align-items:center;gap:5px;font-size:12px;
+                           color:#7abcdc;cursor:pointer;">
+      <input type="radio" name="follow-flow-type" value="${t.key}"
+             ${t.key===activeKey?'checked':''}
+             onchange="_follow.flowType=this.value;renderFollowFlowActive()"
+             style="accent-color:#0a84c8;flex:0 0 auto;">
+      ${t.icon} ${t.label}
+    </label>`;
+  });
+  html += `</div>`;
+
+  // Legend
+  html += `<div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#c0d8f0;">
+      <div style="width:5px;height:22px;background:${DARK_CLR};border-radius:2px;flex:0 0 auto;"></div>
+      ${dN}
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#c0d8f0;">
+      <div style="width:5px;height:22px;background:${WHITE_CLR};border-radius:2px;
+                  border:1px solid #4a6a80;flex:0 0 auto;"></div>
+      ${wN}
+    </div>
+  </div>`;
+
+  // Quarter grid
+  let cumD = 0, cumW = 0;
+  html += `<div class="card" style="padding:10px 6px;overflow-x:auto;">
+    <div style="display:grid;grid-template-columns:repeat(${showQs.length},1fr);
+                min-width:${showQs.length*64}px;gap:0;">`;
+
+  showQs.forEach((q, qi) => {
+    const events = byQ[q] || [];
+    const qD = events.filter(e=>e.team===dN).length;
+    const qW = events.filter(e=>e.team===wN).length;
+    const borderL = qi > 0 ? 'border-left:1px solid #1a3050;' : '';
+
+    // Build pipe markers
+    let pipes = '';
+    events.forEach(e => {
+      const isDark = e.team === dN;
+      const clr    = isDark ? DARK_CLR : WHITE_CLR;
+      const border = isDark ? '' : 'border:1px solid #4a6a80;';
+      const tip    = `${e.cap?'#'+e.cap+' ':''}${e.event||''}`;
+      pipes += `<div style="width:5px;height:30px;background:${clr};border-radius:2px;
+                            flex:0 0 auto;${border}" title="${tip}"></div>`;
+    });
+
+    // Score line
+    let scoreLine = '';
+    if(activeKey === 'goals'){
+      cumD += qD; cumW += qW;
+      scoreLine = `<div style="margin-top:5px;text-align:center;line-height:1.5;">
+        <div style="font-size:11px;">
+          <span style="color:${DARK_CLR};font-weight:700;">${qD}</span>
+          <span style="color:#2a4a5a;"> – </span>
+          <span style="color:${WHITE_CLR};font-weight:700;">${qW}</span>
+        </div>
+        <div style="font-size:9px;color:#2a4a6a;letter-spacing:0.3px;">${cumD}–${cumW}</div>
+      </div>`;
+    } else {
+      cumD += qD; cumW += qW;
+      scoreLine = `<div style="margin-top:5px;text-align:center;font-size:11px;">
+        <span style="color:${DARK_CLR};">${qD}</span>
+        <span style="color:#2a4a5a;"> / </span>
+        <span style="color:${WHITE_CLR};">${qW}</span>
+      </div>`;
+    }
+
+    html += `<div style="padding:4px 6px;${borderL}">
+      <div style="font-size:10px;font-weight:700;color:#2a5a8a;letter-spacing:1px;
+                  text-align:center;margin-bottom:6px;">Q${q}</div>
+      <div style="display:flex;gap:3px;flex-wrap:wrap;align-items:flex-start;
+                  min-height:44px;padding:5px 4px;background:#05101a;
+                  border-radius:6px;">
+        ${pipes || '<div style="flex:1;"></div>'}
+      </div>
+      ${scoreLine}
+    </div>`;
+  });
+
+  html += `</div></div>`;
+  el.innerHTML = html;
 }
 
 // ═══════════════════════════════════════════════════════════
