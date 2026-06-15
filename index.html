@@ -2408,10 +2408,11 @@ function showManageAccess(){
       <div style="font-size:12px;color:#5a7a9a;margin-bottom:6px;">Which games?</div>
       <div style="border:1px solid #1e3a5a;border-radius:8px;overflow:hidden;">
         ${[
-          {v:'this',  title:'This game only',         sub:`${cur.darkTeam||'Dark'} vs ${cur.whiteTeam||'White'} · ${fmtDate(cur.date)||'no date'}`},
-          {v:'pick',  title:'Select specific games',   sub:'Choose from a checklist'},
-          {v:'all',   title:'All my games',            sub:`${myGames.length} game${myGames.length!==1?'s':''} you own`},
-          {v:'future',title:'All games — now & future',sub:'Current + auto-add to every new game'},
+          {v:'this',  title:'This game only',           sub:`${cur.darkTeam||'Dark'} vs ${cur.whiteTeam||'White'} · ${fmtDate(cur.date)||'no date'}`},
+          {v:'pick',  title:'Select specific games',     sub:'Choose from a checklist'},
+          {v:'all',   title:'All my games',              sub:`${myGames.length} game${myGames.length!==1?'s':''} you own`},
+          {v:'future',title:'All games — now & future',  sub:'Current + auto-add to every new game'},
+          {v:'team',  title:'All games for a team',      sub:'Every game where that team appears as dark or white'},
         ].map((opt,i)=>`
           <label style="display:grid;grid-template-columns:20px 1fr;gap:8px;align-items:start;
                  cursor:pointer;padding:10px 12px;${i?'border-top:1px solid #1e3a5a;':''}">
@@ -2438,6 +2439,22 @@ function showManageAccess(){
       }
     </div>
 
+    <!-- Team selector — shown only when "team" is selected -->
+    <div id="access-team-wrap" style="display:none;margin-bottom:12px;">
+      <label style="font-size:12px;color:#5a7a9a;display:block;margin-bottom:4px;">Select team</label>
+      ${(()=>{
+        const names=[...new Set(
+          state.savedGames.flatMap(g=>[g.darkTeamFull||g.darkTeam,g.whiteTeamFull||g.whiteTeam]).filter(Boolean)
+        )].sort();
+        return names.length
+          ? `<select id="access-team-select" style="width:100%;font-size:13px;padding:8px 10px;border-radius:8px;
+               border:1px solid #1e3a5a;background:#0a1820;color:#c0d8f0;box-sizing:border-box;outline:none;">
+               ${names.map(n=>`<option value="${n}">${n}</option>`).join('')}
+             </select>`
+          : `<p style="font-size:12px;color:#5a7a9a;margin:0;">No team names found in saved games.</p>`;
+      })()}
+    </div>
+
     ${sc.length?`<p style="font-size:11px;color:#5a7a9a;margin:0 0 12px;">Standing collaborators (auto-added to new games): <strong style="color:#7abcdc;">${sc.join(', ')}</strong></p>`:''}
 
     <div style="display:flex;gap:8px;">
@@ -2447,12 +2464,14 @@ function showManageAccess(){
     <p id="access-status" style="font-size:12px;margin:10px 0 0;display:none;"></p>
   `;
 
-  // Wire scope radio → show/hide checklist
+  // Wire scope radio → show/hide checklist and team picker
   document.getElementById('modal-overlay').style.display='flex';
   document.querySelectorAll('input[name="access-scope"]').forEach(r=>{
     r.addEventListener('change',()=>{
       const pl=document.getElementById('access-pick-list');
-      if(pl) pl.style.display=(r.value==='pick'&&r.checked)?'':'none';
+      const tw=document.getElementById('access-team-wrap');
+      if(pl) pl.style.display=(r.value==='pick'&&r.checked)?'block':'none';
+      if(tw) tw.style.display=(r.value==='team'&&r.checked)?'block':'none';
     });
   });
 }
@@ -2478,6 +2497,16 @@ async function applyManageAccess(action){
       const g=state.savedGames.find(x=>x.gameId===cb.value);
       if(g) games.push(g);
     });
+  } else if(scope==='team'){
+    const teamSel=document.getElementById('access-team-select');
+    const selectedTeam=(teamSel?teamSel.value:'').toLowerCase().trim();
+    if(!selectedTeam){
+      if(statusEl){statusEl.textContent='⚠ Select a team first.';statusEl.style.color='#ef4444';statusEl.style.display='';}
+      return;
+    }
+    games=state.savedGames.filter(g=>canEditGame(g)&&[
+      g.darkTeam,g.darkTeamFull,g.whiteTeam,g.whiteTeamFull
+    ].some(n=>n&&n.toLowerCase()===selectedTeam));
   } else {
     games=state.savedGames.filter(g=>canEditGame(g));
   }
