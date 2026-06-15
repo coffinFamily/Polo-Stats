@@ -478,9 +478,18 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
     <div id="follow-chips-card"></div>
 
     <!-- View toggle -->
-    <div style="display:flex;gap:6px;margin-bottom:10px;">
+    <div style="display:flex;gap:6px;margin-bottom:8px;">
       <button id="follow-btn-players" class="btn-p" style="flex:1;padding:9px;font-size:13px;" onclick="followSetView('players')">👤 Players</button>
       <button id="follow-btn-timeline" class="btn-s" style="flex:1;padding:9px;font-size:13px;" onclick="followSetView('timeline')">📋 Timeline</button>
+    </div>
+    <!-- Shot chart buttons -->
+    <div style="display:flex;gap:6px;margin-bottom:10px;">
+      <button class="btn-s" style="flex:1;padding:9px;font-size:13px;white-space:nowrap;" onclick="showFollowShotChart('dark')">
+        📊 <span id="follow-sc-dark-label">Dark</span>
+      </button>
+      <button class="btn-s" style="flex:1;padding:9px;font-size:13px;white-space:nowrap;" onclick="showFollowShotChart('white')">
+        📊 <span id="follow-sc-white-label">White</span>
+      </button>
     </div>
 
     <div id="follow-players-view"></div>
@@ -3587,6 +3596,20 @@ function updateCritStatsBtn() {
   }
 }
 
+// Follow-tab wrapper: maps _follow.events (e.event) → showShotChart format (e.type)
+// then temporarily patches state.game/state.events so showShotChart works unchanged.
+function showFollowShotChart(side){
+  const game = _follow.games && _follow.games.find(g=>g.gameId===_follow.gameId);
+  if(!game){ return; }
+  const prevGame   = state.game;
+  const prevEvents = state.events;
+  state.game   = game;
+  state.events = (_follow.events||[]).map(e=>Object.assign({}, e, {type: e.event}));
+  showShotChart(side);
+  state.game   = prevGame;
+  state.events = prevEvents;
+}
+
 function showShotChartPicker() {
   const g = state.game;
   const dN = g.darkTeam || 'Dark', wN = g.whiteTeam || 'White';
@@ -4728,6 +4751,12 @@ function renderFollowContent(){
 
   // ── Stat chips ───────────────────────────────────────
   renderFollowChips(ev, wN, dN);
+
+  // ── Shot chart button labels ──────────────────────────
+  const fscD = document.getElementById('follow-sc-dark-label');
+  const fscW = document.getElementById('follow-sc-white-label');
+  if(fscD) fscD.textContent = dN;
+  if(fscW) fscW.textContent = wN;
 
   // ── Active view ──────────────────────────────────────
   if(_follow.view==='players') renderFollowPlayers(ev, wN, dN);
