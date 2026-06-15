@@ -4680,8 +4680,25 @@ async function initFollowTab(){
   const noUrl = document.getElementById('follow-no-url');
   if(!url){ if(noUrl) noUrl.style.display='block'; return; }
   if(noUrl) noUrl.style.display='none';
+
+  // Restore last-selected game + view from localStorage (survives page refresh)
+  const savedId   = localStorage.getItem('follow-last-gameId');
+  const savedView = localStorage.getItem('follow-last-view');
+  if(savedView && ['players','timeline','flow','recap'].includes(savedView)){
+    _follow.view = savedView;
+  }
+
   await followLoadGames();
-  if(_follow.gameId) await followLoadEvents();
+
+  // Re-select the previously chosen game if it still exists in the list
+  if(savedId && _follow.games.find(g=>g.gameId===savedId)){
+    _follow.gameId = savedId;
+    renderFollowGameList(); // re-render selector with correct option highlighted
+    await followLoadEvents();
+  }
+
+  // Clear any old timer before starting a new one (guards against double-init)
+  if(_followTimer){ clearInterval(_followTimer); _followTimer=null; }
   _followTimer = setInterval(async()=>{
     if(_follow.gameId) await followLoadEvents();
     else await followLoadGames();
@@ -4783,6 +4800,9 @@ function renderFollowGameList(){
 function followSelectGame(gameId){
   _follow.gameId = gameId || null;
   _follow.events = [];
+  // Persist selection so a page refresh lands back on the same game
+  if(gameId) localStorage.setItem('follow-last-gameId', gameId);
+  else localStorage.removeItem('follow-last-gameId');
   const content = document.getElementById('follow-content');
   if(!gameId){ if(content) content.style.display='none'; return; }
   if(content) content.style.display='block';
@@ -4791,6 +4811,7 @@ function followSelectGame(gameId){
 
 function followSetView(v){
   _follow.view = v;
+  localStorage.setItem('follow-last-view', v);
   const btnBase = 'flex:1;padding:7px 2px;font-size:11px;';
   [['players','btn-p'],['timeline','btn-s'],['flow','btn-s'],['recap','btn-s']].forEach(([k,def])=>{
     const b=document.getElementById('follow-btn-'+k);
