@@ -174,7 +174,7 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
               style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;position:relative;">
         ⚑ Fouls<span id="crit-badge" style="display:none;margin-left:5px;padding:1px 5px;border-radius:10px;font-size:10px;font-weight:700;background:#0a84c8;color:#fff;vertical-align:middle;"></span>
       </button>
-      <button class="btn-s" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showStatPopup(['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)'],wpBall()+'Goals')">
+      <button class="btn-s" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showStatPopup(['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)'],wpBall()+'Goals',{missTypes:['Missed Shot','Missed Shot 5M']})">
         <svg width="13" height="13" viewBox="0 0 14 14" style="vertical-align:middle;margin-right:3px;flex-shrink:0;display:inline-block;"><circle cx="7" cy="7" r="6.5" fill="#f5c518" stroke="#c8960e" stroke-width="0.6"/><path d="M1.5 5Q7 1.5 12.5 5" fill="none" stroke="#c8960e" stroke-width="0.8"/><path d="M1.5 9Q7 12.5 12.5 9" fill="none" stroke="#c8960e" stroke-width="0.8"/><path d="M4.5 1Q2 7 4.5 13" fill="none" stroke="#c8960e" stroke-width="0.8"/><path d="M9.5 1Q12 7 9.5 13" fill="none" stroke="#c8960e" stroke-width="0.8"/></svg>Goals <span id="stat-goals" style="margin-left:4px;padding:1px 5px;border-radius:10px;font-size:10px;font-weight:700;background:#1a3a5a;color:#7abcdc;vertical-align:middle;">0</span>
       </button>
       <button class="btn-s" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showStatPopup(['Assist'],'🤝 Assists')">
@@ -3864,52 +3864,66 @@ function filterShotChart(cap) {
   });
 }
 
-// opts (optional): { rows, game }
-//   rows — pre-expanded event rows (Follow tab); skips eventToRows when provided
-//   game — override game object (darkTeam / whiteTeam); defaults to state.game
+// opts (optional): { rows, game, missTypes }
+//   rows      — pre-expanded event rows (Follow tab); skips eventToRows when provided
+//   game      — override game object (darkTeam / whiteTeam); defaults to state.game
+//   missTypes — extra event types (e.g. misses) shown in a Miss column + % column;
+//               not counted in Total
 function showStatPopup(statTypes, title, opts) {
   opts = opts || {};
   const g = opts.game || state.game;
   const dN = g.darkTeam || 'Dark', wN = g.whiteTeam || 'White';
+  const missTypes = opts.missTypes || [];
+  const hasMiss   = missTypes.length > 0;
 
-  // Collect expanded rows matching the stat types, group by team → cap
-  const groups = {};
+  // groups    = goals:  team → cap → { name, count, types{} }
+  // missGroups = misses: team → cap → { count }
+  const groups     = {};
+  const missGroups = {};
+
+  function addGoal(r, name) {
+    const team = r.team || 'Unknown';
+    if (!groups[team]) groups[team] = {};
+    const cap = r.cap || '?';
+    if (!groups[team][cap]) groups[team][cap] = { name: name||null, count: 0, types: {} };
+    groups[team][cap].count++;
+    groups[team][cap].types[r.event] = (groups[team][cap].types[r.event] || 0) + 1;
+  }
+  function addMiss(r) {
+    const team = r.team || 'Unknown';
+    if (!missGroups[team]) missGroups[team] = {};
+    const cap = r.cap || '?';
+    if (!missGroups[team][cap]) missGroups[team][cap] = { count: 0 };
+    missGroups[team][cap].count++;
+  }
 
   if (opts.rows) {
-    // Follow mode: rows already expanded from sheet — skip eventToRows
+    // Follow mode: rows already expanded from sheet
     opts.rows.forEach(r => {
-      if (!statTypes.includes(r.event)) return;
-      const team = r.team || 'Unknown';
-      if (!groups[team]) groups[team] = {};
-      const cap = r.cap || '?';
-      if (!groups[team][cap]) {
+      if (statTypes.includes(r.event)) {
         let name = null;
         if (r.playerId) {
           const p = state.players.find(p => String(p.id) === String(r.playerId));
           if (p) name = ((p.first||'')+' '+(p.last||'')).trim() || null;
         }
-        groups[team][cap] = { name, count: 0, types: {} };
+        addGoal(r, name);
+      } else if (hasMiss && missTypes.includes(r.event)) {
+        addMiss(r);
       }
-      groups[team][cap].count++;
-      groups[team][cap].types[r.event] = (groups[team][cap].types[r.event] || 0) + 1;
     });
   } else {
     // Game mode: expand local events via eventToRows
     state.events.forEach(ev => {
       eventToRows({...ev, gameId:'', date:''}).forEach(r => {
-        if (!statTypes.includes(r.event)) return;
-        const team = r.team || 'Unknown';
-        if (!groups[team]) groups[team] = {};
-        const cap = r.cap || '?';
-        if (!groups[team][cap]) {
-          const roster = team === dN ? (g.darkRoster||[]) : (g.whiteRoster||[]);
+        if (statTypes.includes(r.event)) {
+          const roster = (r.team === dN ? (g.darkRoster||[]) : (g.whiteRoster||[]));
           const player = r.playerId
             ? roster.find(p => p.playerId === r.playerId)
-            : roster.find(p => p.cap === String(cap));
-          groups[team][cap] = { name: player ? player.name : null, count: 0, types: {} };
+            : roster.find(p => p.cap === String(r.cap||'?'));
+          addGoal(r, player ? player.name : null);
+        } else if (hasMiss && missTypes.includes(r.event)) {
+          addMiss(r);
         }
-        groups[team][cap].count++;
-        groups[team][cap].types[r.event] = (groups[team][cap].types[r.event] || 0) + 1;
       });
     });
   }
@@ -3918,29 +3932,44 @@ function showStatPopup(statTypes, title, opts) {
   const grandTotal = Object.values(groups).reduce((s, caps) =>
     s + Object.values(caps).reduce((s2, p) => s2 + p.count, 0), 0);
 
+  // Header cell helpers
+  const thC  = (label, color) =>
+    `<th style="text-align:center;padding:4px 6px;font-weight:500;border-bottom:1px solid #1e3a5a;color:${color||'#5a7a9a'};">${label}</th>`;
+  const thL  = label =>
+    `<th style="text-align:left;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">${label}</th>`;
+  const tdC  = (val, style) =>
+    `<td style="text-align:center;padding:5px 6px;${style||''}">${val}</td>`;
+
+  const multiType = statTypes.length > 1;
+
   let html = '';
   if (grandTotal === 0) {
-    html = `<div style="color:#5a7a9a;font-size:13px;text-align:center;padding:20px 0;">No ${title.replace(/^.+ /,'')} recorded yet.</div>`;
+    html = `<div style="color:#5a7a9a;font-size:13px;text-align:center;padding:20px 0;">No goals recorded yet.</div>`;
   } else {
-    // Multiple goal types? Show type breakdown column
-    const multiType = statTypes.length > 1;
     teamOrder.forEach(team => {
       if (!groups[team]) return;
       const isDark = team === dN, isWhite = team === wN;
       const badgeCls = isDark ? 'bdg-dk' : isWhite ? 'bdg-wh' : 'bdg-nt';
       const caps = Object.keys(groups[team]).sort((a,b) => groups[team][b].count - groups[team][a].count);
-      const teamTotal = caps.reduce((s, c) => s + groups[team][c].count, 0);
+      const teamGoals  = caps.reduce((s, c) => s + groups[team][c].count, 0);
+      const teamMisses = hasMiss ? caps.reduce((s, c) => s + ((missGroups[team]?.[c]?.count)||0), 0) : 0;
+      const teamAtt    = teamGoals + teamMisses;
+      const teamPct    = teamAtt > 0 ? Math.round(teamGoals / teamAtt * 100) + '%' : '—';
 
       html += `<div style="margin-bottom:16px;">
-        <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
+        <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <span class="bdg ${badgeCls}" style="font-size:12px;padding:3px 12px;">${team}</span>
-          <span style="font-size:12px;color:#5a7a9a;">${teamTotal} total</span>
+          <span style="font-size:12px;color:#5a7a9a;">${teamGoals} goals</span>
+          ${hasMiss ? `<span style="font-size:12px;color:#e87070;">${teamMisses} miss</span>
+          <span style="font-size:12px;color:#4ade80;font-weight:600;">${teamPct}</span>` : ''}
         </div>
         <table style="width:100%;border-collapse:collapse;font-size:13px;">
           <thead><tr>
-            <th style="text-align:left;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">Player</th>
-            ${multiType ? statTypes.map(t => `<th style="text-align:center;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">${t.replace('Goal ','').replace('(','').replace(')','')}</th>`).join('') : ''}
-            <th style="text-align:center;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">Total</th>
+            ${thL('Player')}
+            ${multiType ? statTypes.map(t => thC(t.replace('Goal ','').replace(/[()]/g,''))).join('') : ''}
+            ${hasMiss ? thC('Miss','#e87070') : ''}
+            ${thC('Total','#7abcdc')}
+            ${hasMiss ? thC('%','#a0c870') : ''}
           </tr></thead>
           <tbody>`;
 
@@ -3950,34 +3979,45 @@ function showStatPopup(statTypes, title, opts) {
         const playerLabel = _pName
           ? `#${cap} <span style="color:#5a7a9a;font-size:11px;">${_pName}</span>`
           : `#${cap}`;
-        const typeCells = multiType
-          ? statTypes.map(t => `<td style="text-align:center;padding:6px 6px;color:#7a9bb8;">${p.types[t] || '—'}</td>`).join('')
-          : '';
+        const missCount = hasMiss ? ((missGroups[team]?.[cap]?.count)||0) : 0;
+        const attempts  = p.count + missCount;
+        const pct       = attempts > 0 ? Math.round(p.count / attempts * 100) : null;
+        const pctStr    = pct !== null ? pct + '%' : '—';
+        const pctColor  = pct === null ? '#5a7a9a' : pct >= 60 ? '#4ade80' : pct >= 40 ? '#fbbf24' : '#f87171';
+
         html += `<tr>
-          <td style="padding:6px 6px;font-weight:600;">${playerLabel}</td>
-          ${typeCells}
-          <td style="text-align:center;padding:6px 6px;font-weight:700;color:#7abcdc;">${p.count}</td>
+          <td style="padding:5px 6px;font-weight:600;">${playerLabel}</td>
+          ${multiType ? statTypes.map(t => tdC(p.types[t]||'—','color:#7a9bb8;')).join('') : ''}
+          ${hasMiss ? tdC(missCount||'—','color:#e87070;') : ''}
+          ${tdC(p.count,'font-weight:700;color:#7abcdc;')}
+          ${hasMiss ? tdC(pctStr,`font-weight:600;color:${pctColor};`) : ''}
         </tr>`;
       });
       html += `</tbody></table></div>`;
     });
   }
 
-  // Build plain-text version for clipboard
-  let txt = title + '\n';
-  if(grandTotal === 0){
-    txt += 'No events recorded yet.';
+  // Plain-text clipboard version
+  let txt = title.replace(/<[^>]+>/g,'') + '\n';
+  if (grandTotal === 0) {
+    txt += 'No goals recorded yet.';
   } else {
     teamOrder.forEach(team => {
-      if(!groups[team]) return;
+      if (!groups[team]) return;
       const caps = Object.keys(groups[team]).sort((a,b)=>groups[team][b].count-groups[team][a].count);
-      const teamTotal = caps.reduce((s,c)=>s+groups[team][c].count,0);
-      txt += `\n${team}  (${teamTotal})\n`;
+      const teamGoals  = caps.reduce((s,c)=>s+groups[team][c].count,0);
+      const teamMisses = hasMiss ? caps.reduce((s,c)=>s+((missGroups[team]?.[c]?.count)||0),0) : 0;
+      const teamAtt    = teamGoals + teamMisses;
+      const teamPct    = teamAtt > 0 ? Math.round(teamGoals/teamAtt*100)+'%' : '';
+      txt += `\n${team}  (${teamGoals}G${hasMiss?` ${teamMisses}M ${teamPct}`:''})\n`;
       caps.forEach(cap => {
         const p = groups[team][cap];
         const _lName = fmtName(p.name);
         const label = _lName ? `#${cap} ${_lName}` : `#${cap}`;
-        txt += `  ${label.padEnd(20)} ${p.count}\n`;
+        const mc = hasMiss ? ((missGroups[team]?.[cap]?.count)||0) : 0;
+        const att = p.count + mc;
+        const pct = att > 0 ? Math.round(p.count/att*100)+'%' : '';
+        txt += `  ${label.padEnd(20)} ${String(p.count).padStart(2)}G${hasMiss?`  ${String(mc).padStart(2)}M  ${pct}`:''}\n`;
       });
     });
   }
@@ -4877,7 +4917,7 @@ function renderFollowContent(){
 }
 
 const FOLLOW_CHIPS = [
-  {label:'Goals',  icon:wpBall(), types:['Goal (Reg)','Goal (6-5)','Goal (5M)']},
+  {label:'Goals',  icon:wpBall(), types:['Goal (Reg)','Goal (6-5)','Goal (5M)'], missTypes:['Missed Shot','Missed Shot 5M']},
   {label:'Assists',icon:'👍', types:['Assist']},
   {label:'Steals', icon:'🏴‍☠️',types:['Steal']},
   {label:'Ej',     icon:'🟡', types:['Ejection']},
@@ -4913,8 +4953,9 @@ function renderFollowChips(ev, wN, dN){
 function showFollowStatPopup(chipIdx, teamName){
   const chip = FOLLOW_CHIPS[chipIdx];
   const game = _follow.games.find(g=>g.gameId===_follow.gameId);
-  const rows = _follow.events.filter(e=>e.team===teamName&&chip.types.includes(e.event));
-  showStatPopup(chip.types, chip.icon+' '+chip.label+' — '+teamName, {rows, game});
+  const allTypes = [...chip.types, ...(chip.missTypes||[])];
+  const rows = _follow.events.filter(e=>e.team===teamName && allTypes.includes(e.event));
+  showStatPopup(chip.types, chip.icon+' '+chip.label+' — '+teamName, {rows, game, missTypes: chip.missTypes||[]});
 }
 
 function renderFollowPlayers(ev, wN, dN){
