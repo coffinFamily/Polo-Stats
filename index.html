@@ -174,8 +174,8 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
               style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;position:relative;">
         ⚑ Fouls<span id="crit-badge" style="display:none;margin-left:5px;padding:1px 5px;border-radius:10px;font-size:10px;font-weight:700;background:#0a84c8;color:#fff;vertical-align:middle;"></span>
       </button>
-      <button class="btn-s" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showStatPopup(['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)'],'⚽ Goals')">
-        ⚽ Goals <span id="stat-goals" style="margin-left:4px;padding:1px 5px;border-radius:10px;font-size:10px;font-weight:700;background:#1a3a5a;color:#7abcdc;vertical-align:middle;">0</span>
+      <button class="btn-s" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showStatPopup(['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)'],wpBall()+'Goals')">
+        <svg width="13" height="13" viewBox="0 0 14 14" style="vertical-align:middle;margin-right:3px;flex-shrink:0;display:inline-block;"><circle cx="7" cy="7" r="6.5" fill="#f5c518" stroke="#c8960e" stroke-width="0.6"/><path d="M1.5 5Q7 1.5 12.5 5" fill="none" stroke="#c8960e" stroke-width="0.8"/><path d="M1.5 9Q7 12.5 12.5 9" fill="none" stroke="#c8960e" stroke-width="0.8"/><path d="M4.5 1Q2 7 4.5 13" fill="none" stroke="#c8960e" stroke-width="0.8"/><path d="M9.5 1Q12 7 9.5 13" fill="none" stroke="#c8960e" stroke-width="0.8"/></svg>Goals <span id="stat-goals" style="margin-left:4px;padding:1px 5px;border-radius:10px;font-size:10px;font-weight:700;background:#1a3a5a;color:#7abcdc;vertical-align:middle;">0</span>
       </button>
       <button class="btn-s" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showStatPopup(['Assist'],'🤝 Assists')">
         🤝 Assists <span id="stat-assists" style="margin-left:4px;padding:1px 5px;border-radius:10px;font-size:10px;font-weight:700;background:#1a3a5a;color:#7abcdc;vertical-align:middle;">0</span>
@@ -1795,11 +1795,15 @@ function ngwSelectAllPrefs(side){
   ngwRender();
 }
 
+// Global water polo ball SVG — yellow by default, coloured by fill/stroke args.
+// Looks like a volleyball: smooth panels with 4 curved seam lines.
+function wpBall(fill, stroke){
+  fill   = fill   || '#f5c518';
+  stroke = stroke || '#c8960e';
+  return `<svg width="13" height="13" viewBox="0 0 14 14" style="vertical-align:middle;margin-right:3px;flex-shrink:0;display:inline-block;"><circle cx="7" cy="7" r="6.5" fill="${fill}" stroke="${stroke}" stroke-width="0.6"/><path d="M1.5 5Q7 1.5 12.5 5" fill="none" stroke="${stroke}" stroke-width="0.8"/><path d="M1.5 9Q7 12.5 12.5 9" fill="none" stroke="${stroke}" stroke-width="0.8"/><path d="M4.5 1Q2 7 4.5 13" fill="none" stroke="${stroke}" stroke-width="0.8"/><path d="M9.5 1Q12 7 9.5 13" fill="none" stroke="${stroke}" stroke-width="0.8"/></svg>`;
+}
+
 function evtIcon(type){
-  // Inline SVG water polo ball
-  function wpBall(fill, stroke){
-    return `<svg width="13" height="13" viewBox="0 0 14 14" style="vertical-align:middle;margin-right:3px;flex-shrink:0;display:inline-block;"><circle cx="7" cy="7" r="6.5" fill="${fill}" stroke="${stroke}" stroke-width="0.6"/><path d="M1.5 5Q7 1.5 12.5 5" fill="none" stroke="${stroke}" stroke-width="0.8"/><path d="M1.5 9Q7 12.5 12.5 9" fill="none" stroke="${stroke}" stroke-width="0.8"/><path d="M4.5 1Q2 7 4.5 13" fill="none" stroke="${stroke}" stroke-width="0.8"/><path d="M9.5 1Q12 7 9.5 13" fill="none" stroke="${stroke}" stroke-width="0.8"/></svg>`;
-  }
   // Inline SVG faces
   const redFrown   = `<svg width="13" height="13" viewBox="0 0 14 14" style="vertical-align:middle;margin-right:3px;flex-shrink:0;display:inline-block;"><circle cx="7" cy="7" r="6.5" fill="#ef4444" stroke="#b03030" stroke-width="0.6"/><circle cx="4.8" cy="5.5" r="0.9" fill="#fff"/><circle cx="9.2" cy="5.5" r="0.9" fill="#fff"/><path d="M4.2 10Q7 7.5 9.8 10" fill="none" stroke="#fff" stroke-width="1.1" stroke-linecap="round"/></svg>`;
   const greenSmile = `<svg width="13" height="13" viewBox="0 0 14 14" style="vertical-align:middle;margin-right:3px;flex-shrink:0;display:inline-block;"><circle cx="7" cy="7" r="6.5" fill="#22c55e" stroke="#16a34a" stroke-width="0.6"/><circle cx="4.8" cy="5.5" r="0.9" fill="#fff"/><circle cx="9.2" cy="5.5" r="0.9" fill="#fff"/><path d="M4.2 8.5Q7 11.5 9.8 8.5" fill="none" stroke="#fff" stroke-width="1.1" stroke-linecap="round"/></svg>`;
@@ -3978,7 +3982,7 @@ function showStatPopup(statTypes, title, opts) {
     });
   }
 
-  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-title').innerHTML = title;
   document.getElementById('modal-body').innerHTML = html;
   document.getElementById('modal-overlay').style.display = 'flex';
   _appendCopyBtn(txt.trim());
@@ -4873,7 +4877,7 @@ function renderFollowContent(){
 }
 
 const FOLLOW_CHIPS = [
-  {label:'Goals',  icon:'⚽', types:['Goal (Reg)','Goal (6-5)','Goal (5M)']},
+  {label:'Goals',  icon:wpBall(), types:['Goal (Reg)','Goal (6-5)','Goal (5M)']},
   {label:'Assists',icon:'👍', types:['Assist']},
   {label:'Steals', icon:'🏴‍☠️',types:['Steal']},
   {label:'Ej',     icon:'🟡', types:['Ejection']},
@@ -5247,7 +5251,7 @@ function renderFollowFlow(ev, wN, dN){
 
   const FLOW_TYPES = [
     { key:'goals',
-      label:'Goals', icon:'🥅',
+      label:'Goals', icon:wpBall(),
       filter: e => /^Goal \(/i.test(e.event||'') || /^5M Goal/i.test(e.event||'') },
     { key:'ejections',
       label:'Ejections', icon:'🟥',
