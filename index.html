@@ -4070,7 +4070,6 @@ function showCriticalStats() {
             <th style="text-align:center;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">Ej</th>
             <th style="text-align:center;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">5M</th>
             <th style="text-align:center;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">Total</th>
-            <th style="text-align:left;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">Status</th>
           </tr></thead>
           <tbody>`;
 
@@ -4113,11 +4112,6 @@ function showCriticalStats() {
           <td style="text-align:center;padding:6px 6px;">${ejStr}</td>
           <td style="text-align:center;padding:6px 6px;">${foulStr}</td>
           <td style="text-align:center;padding:6px 6px;">${dots}${warnBadge}</td>
-          <td style="padding:6px 6px;font-size:12px;color:#7a9bb8;">
-            ${combined >= 3 ? '<span style="color:#ff4444;font-weight:700;">OUT</span>' :
-              combined === 2 ? '<span style="color:#ffaa22;font-weight:700;">DANGER</span>' :
-              combined === 1 ? '<span style="color:#22c55e;">Watch</span>' : ''}
-          </td>
         </tr>`;
       });
 
@@ -4149,8 +4143,7 @@ function showCriticalStats() {
         const combined = p.ejections + p.fouls;
         const _ejLName = fmtName(p.name);
         const label = _ejLName ? `#${cap} ${_ejLName}` : `#${cap}`;
-        const status = combined>=3?'OUT':combined>=2?'DANGER':combined>=1?'Watch':'';
-        txt += `  ${label.padEnd(20)} Ej:${p.ejections}  5M:${p.fouls}${status?' — '+status:''}\n`;
+        txt += `  ${label.padEnd(20)} Ej:${p.ejections}  5M:${p.fouls}\n`;
       });
     });
   }
