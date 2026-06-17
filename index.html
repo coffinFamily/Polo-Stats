@@ -5075,22 +5075,53 @@ function renderFollowRecap(ev, wN, dN){
   const dTO=cnt(dN,isTO),   wTO=cnt(wN,isTO);
   const dStl=cnt(dN,isSteal),wStl=cnt(wN,isSteal);
 
-  const dShots=dG+dM, wShots=wG+wM;
-  const dPct = dShots>0 ? Math.round(dG/dShots*100) : 0;
-  const wPct = wShots>0 ? Math.round(wG/wShots*100) : 0;
+  // Shooting % — only valid when misses are actually tracked for that team
+  const dShots = dG + dM, wShots = wG + wM;
+  const dPct = dM > 0 ? Math.round(dG / dShots * 100) : null;
+  const wPct = wM > 0 ? Math.round(wG / wShots * 100) : null;
+
+  // Detect "our team" — the team being closely tracked by the stats-taker.
+  // Heuristic: whichever side has shot-attempt data (misses) or more
+  // detailed stats (steals, turnovers) is the primary tracked team.
+  const dTracked = dM > 0 || dStl > 0 || dTO > 0;
+  const wTracked = wM > 0 || wStl > 0 || wTO > 0;
+  let ourT, oppT;
+  if (dTracked && !wTracked)      { ourT = dN; oppT = wN; }
+  else if (wTracked && !dTracked) { ourT = wN; oppT = dN; }
+  else {
+    // Both (or neither) tracked — pick team with more total events
+    const dEvts = dG+dM+dStl+dTO+dBlk+dEj+d5mF;
+    const wEvts = wG+wM+wStl+wTO+wBlk+wEj+w5mF;
+    ourT = dEvts >= wEvts ? dN : wN;
+    oppT = ourT === dN ? wN : dN;
+  }
+  const isOurDark = ourT === dN;
+  const ourG  = isOurDark ? dG  : wG,  oppG  = isOurDark ? wG  : dG;
+  const ourM  = isOurDark ? dM  : wM,  oppM  = isOurDark ? wM  : dM;
+  const our65 = isOurDark ? d65 : w65, opp65 = isOurDark ? w65 : d65;
+  const our5mG= isOurDark ? d5mG: w5mG;
+  const our5mF= isOurDark ? d5mF: w5mF, opp5mF= isOurDark ? w5mF: d5mF;
+  const ourEj = isOurDark ? dEj : wEj,  oppEj = isOurDark ? wEj : dEj;
+  const ourTO = isOurDark ? dTO : wTO,  oppTO = isOurDark ? wTO : dTO;
+  const ourStl= isOurDark ? dStl: wStl, oppStl= isOurDark ? wStl: dStl;
+  const ourBlk= isOurDark ? dBlk: wBlk, oppBlk= isOurDark ? wBlk: dBlk;
+  const ourPct = isOurDark ? dPct : wPct;
+  const oppPct = isOurDark ? wPct : dPct;
+  const ourShots = ourG + ourM;
 
   // Quarter goal counts
   const qg = q=>({
-    d:cnt(dN,e=>String(e.q)===q&&isGoal(e)),
-    w:cnt(wN,e=>String(e.q)===q&&isGoal(e))
+    our: cnt(ourT, e=>String(e.q)===q&&isGoal(e)),
+    opp: cnt(oppT, e=>String(e.q)===q&&isGoal(e))
   });
   const Q=[null,qg('1'),qg('2'),qg('3'),qg('4')]; // 1-indexed
 
-  // Winner
-  const tied=dG===wG, winT=dG>wG?dN:wN, loseT=dG>wG?wN:dN;
-  const margin=Math.abs(dG-wG);
+  // Winner / margin
+  const tied=ourG===oppG, weWon=ourG>oppG;
+  const winT=weWon?ourT:oppT, loseT=weWon?oppT:ourT;
+  const margin=Math.abs(ourG-oppG);
 
-  // Opening run (recording order by id)
+  // Opening run
   const goalEvs = ev.filter(isGoal).sort((a,b)=>Number(a.id||0)-Number(b.id||0));
   let runTeam=null, runLen=0;
   for(const g of goalEvs){
@@ -5100,71 +5131,115 @@ function renderFollowRecap(ev, wN, dN){
   }
   if(runLen<2){ runTeam=null; runLen=0; }
 
-  // Biggest single-quarter swing
-  let swingQ=0, swingTeam=null, swingAmt=0;
+  // Biggest single-quarter swing (from our perspective: positive = we led that quarter)
+  let swingQ=0, swingAmt=0;
   for(let i=1;i<=4;i++){
-    const diff=Q[i].d-Q[i].w; // positive = dark dominated
-    if(Math.abs(diff)>Math.abs(swingAmt)&&(Q[i].d+Q[i].w)>0){ swingAmt=diff; swingQ=i; }
+    const diff = Q[i].our - Q[i].opp;
+    if(Math.abs(diff)>Math.abs(swingAmt)&&(Q[i].our+Q[i].opp)>0){ swingAmt=diff; swingQ=i; }
   }
-  if(swingQ) swingTeam=swingAmt>0?dN:wN;
 
-  // ── Build analysis factors ────────────────────────────────────────────
+  // ── Build analysis factors (our-team perspective) ────────────────────
   const facts=[];
   const push=(score,icon,text)=>facts.push({score,icon,text});
 
   // Opening run
-  if(runLen>=4)      push(runLen*3,'🚀',`${runTeam} stormed out to an early ${runLen}-0 run that immediately put ${runTeam===winT?loseT:winT} on the back foot`);
-  else if(runLen===3) push(8,'🚀',`${runTeam} opened with three unanswered goals, forcing ${runTeam===dN?wN:dN} to play catch-up from the start`);
-  else if(runLen===2) push(4,'🚀',`${runTeam} scored the game's first two goals to gain early control`);
-
-  // Ejection disadvantage
-  const ejBig=Math.max(dEj,wEj), ejSml=Math.min(dEj,wEj);
-  const ejBadT=dEj>wEj?dN:wN, ejGoodT=dEj>wEj?wN:dN;
-  if(dEj!==wEj){
-    if(ejBig-ejSml>=3) push((ejBig-ejSml)*3,'🟥',`${ejBadT}'s ${ejBig} ejections (vs ${ejSml}) were a game-changer, repeatedly leaving them a player short`);
-    else if(ejBig-ejSml===2) push(5,'🟥',`${ejBadT} committed ${ejBig} ejections to ${ejSml} for ${ejGoodT}, creating repeated 6-5 opportunities for the opponent`);
-    else if(ejBig>=5) push(3,'🟥',`Both teams combined for ${dEj+wEj} ejections — physicality was a defining theme throughout`);
+  if(runTeam){
+    const runIsUs = runTeam === ourT;
+    if(runLen>=4)       push(runLen*3,'🚀', runIsUs
+      ? `${ourT} stormed out to a ${runLen}-0 run to open the game, putting ${oppT} immediately on the back foot`
+      : `${oppT} came out fast with ${runLen} unanswered goals before ${ourT} could respond`);
+    else if(runLen===3) push(8,'🚀', runIsUs
+      ? `${ourT} opened with three straight goals to set an early tone`
+      : `${oppT} scored the game's first three goals, forcing ${ourT} to play from behind`);
+    else if(runLen===2) push(4,'🚀', runIsUs
+      ? `${ourT} got off to a quick 2-0 start`
+      : `${oppT} scored the first two goals before ${ourT} got on the board`);
   }
 
-  // Man-up (6-5) conversion efficiency
-  const big65=Math.max(d65,w65), sml65=Math.min(d65,w65);
-  const eff65T=d65>w65?dN:wN, poor65T=d65>w65?wN:dN;
-  if(big65-sml65>=2) push((big65-sml65)*2.5,'💪',`${eff65T} converted ${big65} 6-5 opportunities to ${poor65T}'s ${sml65} — man-up efficiency was a decisive factor`);
-  else if(big65>=3&&big65===sml65) push(2,'💪',`Both teams each converted ${big65} 6-5 opportunities, keeping man-up advantage balanced`);
-
-  // 5M foul differential
-  const big5mF=Math.max(d5mF,w5mF), sml5mF=Math.min(d5mF,w5mF);
-  const penBenT=d5mF>w5mF?wN:dN; // team that drew more fouls (benefited)
-  const penComT=d5mF>w5mF?dN:wN; // team that committed more fouls
-  if(big5mF-sml5mF>=2) push((big5mF-sml5mF)*2,'⚡',`${penComT}'s ${big5mF} 5m fouls (vs ${sml5mF}) gave ${penBenT} ${big5mF} penalty shots — a significant scoring advantage`);
-
-  // Turnover differential
-  const bigTO=Math.max(dTO,wTO), smlTO=Math.min(dTO,wTO);
-  const moreTOT=dTO>wTO?dN:wN;
-  if(bigTO-smlTO>=4) push((bigTO-smlTO)*1.5,'🔄',`${moreTOT}'s ${bigTO} turnovers (vs ${smlTO}) handed the opponent far too many extra possessions`);
-  else if(bigTO-smlTO>=2&&bigTO>=5) push((bigTO-smlTO),'🔄',`Turnover margin favored ${dTO<wTO?dN:wN} ${smlTO}-${bigTO}, a consistent pressure advantage`);
-
-  // Steal differential
-  const bigStl=Math.max(dStl,wStl), smlStl=Math.min(dStl,wStl);
-  const moreStlT=dStl>wStl?dN:wN;
-  if(bigStl-smlStl>=3) push((bigStl-smlStl)*1.5,'🤽',`${moreStlT} dominated the ball-denial game with ${bigStl} steals to ${moreStlT===dN?wN:dN}'s ${smlStl}`);
-
-  // Goalie performance
-  // dBlk = dark goalie saved dBlk shots; wBlk = white goalie saved wBlk shots
-  const bigBlk=Math.max(dBlk,wBlk), smlBlk=Math.min(dBlk,wBlk);
-  const betterGKT=dBlk>wBlk?dN:wN;
-  if(bigBlk-smlBlk>=3) push((bigBlk-smlBlk)*1.5,'🧤',`${betterGKT}'s goalkeeper was outstanding, making ${bigBlk} saves compared to ${smlBlk} for the opponent`);
-
-  // Shooting efficiency
-  if(Math.abs(dPct-wPct)>=15&&dShots>=5&&wShots>=5){
-    const betPctT=dPct>wPct?dN:wN, betPct=Math.max(dPct,wPct), worPct=Math.min(dPct,wPct);
-    push(Math.abs(dPct-wPct)*0.4,'🎯',`${betPctT} shot ${betPct}% compared to ${betPctT===dN?wN:dN}'s ${worPct}%, reflecting a clear edge in shot selection and finishing`);
+  // Our ejection discipline
+  if(ourEj > 0 || oppEj > 0){
+    const ejComparable = ourEj > 0 && oppEj > 0;
+    if(ejComparable){
+      if(ourEj - oppEj >= 3)  push((ourEj-oppEj)*3,'🟥',`Ejection discipline was a major issue — ${ourT} committed ${ourEj} ejections to ${oppT}'s ${oppEj}, repeatedly playing shorthanded`);
+      else if(ourEj - oppEj === 2) push(5,'🟥',`${ourT}'s ${ourEj} ejections (vs ${oppEj} for ${oppT}) handed the opponent multiple 6-5 chances`);
+      else if(oppEj - ourEj >= 3)  push((oppEj-ourEj)*3,'💪',`${ourT} forced ${oppEj} ejections (took only ${ourEj}), creating repeated man-up opportunities`);
+      else if(oppEj - ourEj === 2) push(5,'💪',`${ourT} drew ${oppEj} ejections from ${oppT} vs only ${ourEj} of their own — a clear discipline advantage`);
+      else if(ourEj >= 5)          push(3,'🟥',`${ourT} committed ${ourEj} ejections — staying out of foul trouble would have helped`);
+    } else if(ourEj > 0){
+      if(ourEj >= 4) push(ourEj*1.5,'🟥',`${ourT} picked up ${ourEj} ejections — keeping players in the pool is an area to focus on`);
+    }
   }
 
-  // Quarter blowout
-  if(swingQ&&Math.abs(swingAmt)>=3){
-    const won=swingAmt>0?Q[swingQ].d:Q[swingQ].w, lost=swingAmt>0?Q[swingQ].w:Q[swingQ].d;
-    push(Math.abs(swingAmt)*1.2,'📈',`A dominant Q${swingQ} from ${swingTeam} (${won}-${lost}) swung the game's momentum decisively`);
+  // Man-up (6-5) conversion — only compare if both have ejections (both had 6-5 chances)
+  const ejComparable = ourEj > 0 && oppEj > 0;
+  if(ejComparable){
+    if(our65 - opp65 >= 2) push((our65-opp65)*2.5,'💪',`${ourT} capitalized on man-up opportunities, converting ${our65} 6-5 chances to ${oppT}'s ${opp65}`);
+    else if(opp65 - our65 >= 2) push((opp65-our65)*2.5,'⚠️',`${ourT} converted only ${our65} of their 6-5 chances while ${oppT} made the most of theirs (${opp65})`);
+    else if(our65 >= 3 && our65 === opp65) push(2,'💪',`Both teams converted ${our65} 6-5 opportunities — man-up was balanced on both sides`);
+  } else if(our65 > 0){
+    push(our65,'💪',`${ourT} converted ${our65} man-up goal${our65>1?'s':''} on the power play`);
+  }
+
+  // 5M fouls — our fouls hurt us, opponent fouls help us
+  if(our5mF > 0 || opp5mF > 0){
+    const foulComparable = our5mF > 0 && opp5mF > 0;
+    if(foulComparable){
+      if(our5mF - opp5mF >= 2) push((our5mF-opp5mF)*2,'⚡',`${ourT} committed ${our5mF} 5m fouls vs ${opp5mF} for ${oppT} — too many unnecessary penalty chances given away`);
+      else if(opp5mF - our5mF >= 2) push((opp5mF-our5mF)*2,'⚡',`${ourT} drew ${opp5mF} penalty shots vs only ${our5mF} called against them — a favorable penalty margin`);
+    } else if(our5mF > 0 && our5mF >= 2){
+      push(our5mF*1.5,'⚡',`${ourT} gave away ${our5mF} 5m penalties — cutting those down would remove easy opponent scoring chances`);
+    }
+  }
+
+  // Turnovers — only compare if both teams have turnover data
+  const toComparable = ourTO > 0 && oppTO > 0;
+  if(toComparable){
+    if(ourTO - oppTO >= 4)   push((ourTO-oppTO)*1.5,'🔄',`Turnovers were costly — ${ourT} gave the ball away ${ourTO} times vs ${oppTO} for ${oppT}`);
+    else if(ourTO - oppTO >= 2 && ourTO >= 5) push(ourTO-oppTO,'🔄',`${ourT}'s ${ourTO} turnovers to ${oppT}'s ${oppTO} created too many extra possessions for the opponent`);
+    else if(oppTO - ourTO >= 4) push((oppTO-ourTO)*1.5,'🔄',`${ourT} forced ${oppTO} turnovers and committed only ${ourTO} — a strong ball-security advantage`);
+  } else if(ourTO > 0 && ourTO >= 4){
+    push(ourTO,'🔄',`${ourT} turned the ball over ${ourTO} times — improving possession retention is a key area`);
+  }
+
+  // Steals — only compare if both tracked
+  const stlComparable = ourStl > 0 && oppStl > 0;
+  if(stlComparable){
+    if(ourStl - oppStl >= 3) push((ourStl-oppStl)*1.5,'🤽',`${ourT} dominated the ball-denial game with ${ourStl} steals compared to ${oppT}'s ${oppStl}`);
+  } else if(ourStl > 0 && ourStl >= 3){
+    push(ourStl,'🤽',`${ourT} came up with ${ourStl} steals, creating extra offensive possessions`);
+  }
+
+  // Goalie — compare only if both tracked
+  const blkComparable = ourBlk > 0 && oppBlk > 0;
+  if(blkComparable){
+    if(ourBlk - oppBlk >= 3)  push((ourBlk-oppBlk)*1.5,'🧤',`${ourT}'s goalkeeper was outstanding with ${ourBlk} saves compared to ${oppBlk} for ${oppT}`);
+    else if(oppBlk - ourBlk >= 3) push((oppBlk-ourBlk)*1.5,'🧤',`${oppT}'s keeper made ${oppBlk} saves vs ${ourBlk} — ${ourT} needs to find better looks on goal`);
+  } else if(ourBlk > 0){
+    if(ourBlk >= 5) push(ourBlk,'🧤',`${ourT}'s goalkeeper was busy with ${ourBlk} saves — a standout performance between the pipes`);
+  }
+
+  // Shooting % — only when misses are actually tracked; don't compare if only one side tracked
+  if(ourPct !== null){
+    if(oppPct !== null){
+      // Both tracked — safe to compare
+      if(Math.abs(ourPct - oppPct) >= 15 && ourShots >= 5 && (oppG+oppM) >= 5){
+        if(ourPct > oppPct) push(Math.abs(ourPct-oppPct)*0.4,'🎯',`${ourT} converted ${ourPct}% of shots vs ${oppT}'s ${oppPct}% — a clear finishing edge`);
+        else                push(Math.abs(ourPct-oppPct)*0.4,'🎯',`Shot conversion was a challenge — ${ourT} finished at ${ourPct}% vs ${oppT}'s ${oppPct}%`);
+      }
+    } else {
+      // Only our team tracked — report standalone
+      if(ourShots >= 5){
+        if(ourPct >= 65)      push(3,'🎯',`${ourT} was clinical in front of goal, converting ${ourPct}% of their ${ourShots} attempts`);
+        else if(ourPct <= 40) push(3,'🎯',`Shot conversion was a challenge for ${ourT} — finishing at ${ourPct}% from ${ourShots} attempts`);
+      }
+    }
+  }
+
+  // Quarter dominance (our perspective)
+  if(swingQ && Math.abs(swingAmt) >= 3){
+    const ourQ=Q[swingQ].our, oppQ=Q[swingQ].opp;
+    if(swingAmt > 0) push(Math.abs(swingAmt)*1.2,'📈',`A dominant Q${swingQ} (${ourQ}-${oppQ}) from ${ourT} swung the game's momentum`);
+    else             push(Math.abs(swingAmt)*1.2,'📉',`${ourT} struggled in Q${swingQ} (${ourQ}-${oppQ}) — that quarter was where the deficit grew`);
   }
 
   // Sort by score, keep top 3
@@ -5172,23 +5247,28 @@ function renderFollowRecap(ev, wN, dN){
   const topFacts=facts.slice(0,3);
 
   // ── Render ────────────────────────────────────────────────────────────
-  // Quarter breakdown cells
+  // Quarter breakdown cells (Q[i] now has .our / .opp)
   const qCells=[1,2,3,4].map(i=>{
-    const dW=Q[i].d>Q[i].w, tie=Q[i].d===Q[i].w;
+    const ourW=Q[i].our>Q[i].opp, tie=Q[i].our===Q[i].opp;
+    // Display always as dark–white but highlight correctly
+    const qd = isOurDark ? Q[i].our : Q[i].opp;
+    const qw = isOurDark ? Q[i].opp : Q[i].our;
+    const dW = qd > qw;
     return `<div style="text-align:center;padding:6px 2px;">
       <div style="font-size:9px;color:#2a5a7a;font-weight:700;letter-spacing:.5px;margin-bottom:3px;">Q${i}</div>
       <div style="font-size:13px;line-height:1;">
-        <span style="font-weight:${dW?700:400};color:${dW?'#7abcdc':tie?'#3a5a7a':'#3a5a7a'}">${Q[i].d}</span>
+        <span style="font-weight:${dW?700:400};color:${dW?'#7abcdc':tie?'#3a5a7a':'#3a5a7a'}">${qd}</span>
         <span style="color:#1a3a5a;font-size:10px;"> – </span>
-        <span style="font-weight:${!dW&&!tie?700:400};color:${!dW&&!tie?'#c0d8f0':tie?'#3a5a7a':'#3a5a7a'}">${Q[i].w}</span>
+        <span style="font-weight:${!dW&&!tie?700:400};color:${!dW&&!tie?'#c0d8f0':tie?'#3a5a7a':'#3a5a7a'}">${qw}</span>
       </div>
     </div>`;
   }).join('');
 
-  // Stat rows — only show rows where at least one team has data
+  // Stat rows — only show rows where at least one team has data.
+  // Shooting % is only shown when misses were tracked for that team (null = not tracked).
   const statDefs=[
     {label:'Goals',       d:dG,    w:wG,    good:'high'},
-    {label:'Shooting %',  d:dPct,  w:wPct,  good:'high', fmt:v=>v+'%'},
+    {label:'Shooting %',  d:dPct,  w:wPct,  good:'high', fmt:v=>v!==null?v+'%':'—', nullable:true},
     {label:'GK Saves',    d:dBlk,  w:wBlk,  good:'high'},
     {label:'6-5 Goals',   d:d65,   w:w65,   good:'high'},
     {label:'5M Goals',    d:d5mG,  w:w5mG,  good:'high'},
@@ -5196,29 +5276,32 @@ function renderFollowRecap(ev, wN, dN){
     {label:'Ejections',   d:dEj,   w:wEj,   good:'low'},
     {label:'Turnovers',   d:dTO,   w:wTO,   good:'low'},
     {label:'Steals',      d:dStl,  w:wStl,  good:'high'},
-  ].filter(r=>r.d+r.w>0);
+  ].filter(r=> r.nullable ? (r.d!==null||r.w!==null) : ((r.d||0)+(r.w||0)>0));
 
   const statRows=statDefs.map(r=>{
-    const dBetter=r.good==='high'?r.d>r.w:r.d<r.w;
-    const wBetter=r.good==='high'?r.w>r.d:r.w<r.d;
-    const fmt=r.fmt||(v=>v);
-    const dClr=dBetter?'#4ade80':r.d===r.w?'#7abcdc':'#ef4444';
-    const wClr=wBetter?'#4ade80':r.d===r.w?'#c0d8f0':'#ef4444';
+    const dv = r.d ?? null, wv = r.w ?? null;
+    const dBetter = r.good==='high' ? (dv!==null&&(wv===null||dv>wv)) : (dv!==null&&(wv===null||dv<wv));
+    const wBetter = r.good==='high' ? (wv!==null&&(dv===null||wv>dv)) : (wv!==null&&(dv===null||wv<dv));
+    const fmt = r.fmt || (v=>v!==null?v:'—');
+    const dClr = dv===null?'#2a4a6a':dBetter?'#4ade80':dv===(wv??dv)?'#7abcdc':'#ef4444';
+    const wClr = wv===null?'#2a4a6a':wBetter?'#4ade80':wv===(dv??wv)?'#c0d8f0':'#ef4444';
     return `<div style="display:flex;align-items:center;padding:5px 0;border-bottom:1px solid #0a1820;">
-      <div style="flex:1;text-align:center;font-size:14px;font-weight:700;color:${dClr};">${fmt(r.d)}</div>
+      <div style="flex:1;text-align:center;font-size:14px;font-weight:700;color:${dClr};">${fmt(dv)}</div>
       <div style="flex:2;text-align:center;font-size:10px;color:#2a4a6a;letter-spacing:.5px;padding:0 4px;">${r.label}</div>
-      <div style="flex:1;text-align:center;font-size:14px;font-weight:700;color:${wClr};">${fmt(r.w)}</div>
+      <div style="flex:1;text-align:center;font-size:14px;font-weight:700;color:${wClr};">${fmt(wv)}</div>
     </div>`;
   }).join('');
 
-  // Analysis text
+  // Opening summary — from our team's perspective
   const winSentence = tied
-    ? `${dN} and ${wN} played to a ${dG}-${wG} draw in a closely contested match.`
-    : margin===1
-      ? `${winT} edged ${loseT} ${Math.max(dG,wG)}-${Math.min(dG,wG)} in a tight contest.`
-      : margin<=3
-        ? `${winT} defeated ${loseT} ${Math.max(dG,wG)}-${Math.min(dG,wG)}.`
-        : `${winT} had a strong ${Math.max(dG,wG)}-${Math.min(dG,wG)} victory over ${loseT}.`;
+    ? `${ourT} and ${oppT} played to a ${ourG}-${oppG} draw.`
+    : weWon
+      ? margin===1 ? `${ourT} edged ${oppT} ${ourG}-${oppG} in a tight contest.`
+        : margin<=3 ? `${ourT} defeated ${oppT} ${ourG}-${oppG}.`
+        : `${ourT} had a strong ${ourG}-${oppG} victory over ${oppT}.`
+      : margin===1 ? `${oppT} edged ${ourT} ${oppG}-${ourG} in a close game.`
+        : margin<=3 ? `${ourT} fell to ${oppT} ${ourG}-${oppG}.`
+        : `${ourT} were outscored ${ourG}-${oppG} by ${oppT}.`;
 
   const factHTML=topFacts.length
     ? topFacts.map(f=>`
