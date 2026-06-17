@@ -345,6 +345,15 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
         <input id="t-name" placeholder="e.g. Stanford Red 18U" style="flex:1 1 160px;" />
         <button class="btn-p" style="flex:0 0 auto;" onclick="addTeam()">Add</button>
       </div>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12px;color:#7a9bb8;cursor:pointer;user-select:none;">
+        <input type="checkbox" id="t-placeholder" style="accent-color:#0a84c8;width:15px;height:15px;flex:0 0 auto;"
+          onchange="document.getElementById('t-placeholder-hint').style.display=this.checked?'block':'none'">
+        Unknown roster — link to placeholder players
+      </label>
+      <p id="t-placeholder-hint" style="display:none;font-size:11px;color:#4a7a9a;margin:5px 0 0 23px;line-height:1.5;">
+        Adds this team to all existing placeholder players so they appear in the roster builder.<br>
+        If no placeholder players exist yet, 13 will be created (one per cap #).
+      </p>
     </div>
     <input id="team-search" type="search" placeholder="🔍 Search teams…" oninput="renderTeamsList(this.value)" style="margin-bottom:8px;" />
     <div id="teams-list"></div>
@@ -3482,13 +3491,60 @@ function mergePlayers(){
 }
 
 function addTeam(){
-  const name=document.getElementById('t-name').value.trim();
+  const name = document.getElementById('t-name').value.trim();
   if(!name) return;
-  const team={id:genId(),name};
+
+  // Create and persist the team
+  const team = {id: genId(), name};
   state.teams.push(team);
-  ss('wp-teams',state.teams);
+  ss('wp-teams', state.teams);
   syncTeamToSheet(team);
-  document.getElementById('t-name').value='';
+  document.getElementById('t-name').value = '';
+
+  // "Unknown roster" checkbox — link placeholder players to this team
+  const usePlaceholder = document.getElementById('t-placeholder')?.checked;
+  if(usePlaceholder){
+    const isPholder = p =>
+      (p.first||'').toLowerCase().includes('placeholder') ||
+      (p.last||'').toLowerCase().includes('placeholder');
+
+    let pholders = state.players.filter(isPholder);
+
+    if(pholders.length === 0){
+      // No placeholders yet — create one per standard water polo cap (1-13)
+      for(let cap = 1; cap <= 13; cap++){
+        const p = {
+          id: genId(),
+          first: 'Placeholder',
+          last: String(cap),
+          dob: '',
+          teamIds: [team.id],
+          defaultCap: String(cap)
+        };
+        state.players.push(p);
+        pholders.push(p);
+      }
+    } else {
+      // Placeholders exist — add this team to each one that doesn't already have it
+      pholders.forEach(p => {
+        const ids = (p.teamIds||[]).map(String);
+        if(!ids.includes(String(team.id))){
+          p.teamIds = [...(p.teamIds||[]), team.id];
+        }
+      });
+    }
+
+    ss('wp-players', state.players);
+    // Sync all affected players to sheet in one go
+    pholders.forEach(p => syncPlayerToSheet(p));
+
+    // Reset checkbox
+    const cb = document.getElementById('t-placeholder');
+    if(cb) cb.checked = false;
+    const hint = document.getElementById('t-placeholder-hint');
+    if(hint) hint.style.display = 'none';
+  }
+
   renderTeamsList();
   renderPlayersList();
 }
