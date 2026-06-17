@@ -473,30 +473,39 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="follow-selector-card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
       <div class="stitle" style="margin:0;">Follow a game</div>
       <span id="follow-sync-status" style="font-size:10px;color:#3a5a7a;"></span>
     </div>
     <div id="follow-no-url" class="warn" style="display:none;">⚠️ No sheet URL configured — set it in Game Setup.</div>
 
-    <!-- Sort + Search controls -->
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-      <div style="display:flex;border:1px solid #1e3a5a;border-radius:8px;overflow:hidden;flex-shrink:0;">
-        <button id="follow-sort-btn-recent" onclick="setFollowSort('recent')"
-          style="flex:1;padding:6px 10px;font-size:12px;border:none;border-right:1px solid #1e3a5a;background:#0a3a5a;color:#7abcdc;font-weight:700;cursor:pointer;white-space:nowrap;">🕐 Recent</button>
-        <button id="follow-sort-btn-alpha" onclick="setFollowSort('alpha')"
-          style="flex:1;padding:6px 10px;font-size:12px;border:none;background:transparent;color:#3a5a7a;font-weight:400;cursor:pointer;white-space:nowrap;">A–Z</button>
+    <!-- Collapsed state: shown once a game is selected -->
+    <div id="follow-selector-collapsed" style="display:none;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span id="follow-selected-label" style="flex:1;font-size:13px;font-weight:600;color:#c0d8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
+        <button onclick="expandFollowSelector()" style="flex:0 0 auto;font-size:11px;padding:4px 10px;border-radius:7px;border:1px solid #1e3a5a;background:#0a1e2e;color:#5a9abb;cursor:pointer;white-space:nowrap;">Change ▾</button>
       </div>
-      <input id="follow-game-search" type="search" placeholder="🔍 Filter games…"
-        oninput="renderFollowGameList()"
-        style="flex:1;min-width:0;font-size:12px;padding:5px 9px;border-radius:7px;border:1px solid #1e3a5a;background:#0a1820;color:#c0d8f0;" />
     </div>
 
-    <select id="follow-game-sel" onchange="followSelectGame(this.value)"
-      style="width:100%;font-size:13px;padding:9px 10px;border-radius:8px;border:1px solid #1e3a5a;background:#0a1820;color:#c0d8f0;">
-      <option value="">— Select a game —</option>
-    </select>
+    <!-- Expanded state: sort + search + dropdown -->
+    <div id="follow-selector-expanded">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <div style="display:flex;border:1px solid #1e3a5a;border-radius:8px;overflow:hidden;flex-shrink:0;">
+          <button id="follow-sort-btn-recent" onclick="setFollowSort('recent')"
+            style="flex:1;padding:6px 10px;font-size:12px;border:none;border-right:1px solid #1e3a5a;background:#0a3a5a;color:#7abcdc;font-weight:700;cursor:pointer;white-space:nowrap;">🕐 Recent</button>
+          <button id="follow-sort-btn-alpha" onclick="setFollowSort('alpha')"
+            style="flex:1;padding:6px 10px;font-size:12px;border:none;background:transparent;color:#3a5a7a;font-weight:400;cursor:pointer;white-space:nowrap;">A–Z</button>
+        </div>
+        <input id="follow-game-search" type="search" placeholder="🔍 Filter games…"
+          oninput="renderFollowGameList()"
+          style="flex:1;min-width:0;font-size:12px;padding:5px 9px;border-radius:7px;border:1px solid #1e3a5a;background:#0a1820;color:#c0d8f0;" />
+      </div>
+      <select id="follow-game-sel" onchange="followSelectGame(this.value)"
+        style="width:100%;font-size:13px;padding:9px 10px;border-radius:8px;border:1px solid #1e3a5a;background:#0a1820;color:#c0d8f0;">
+        <option value="">— Select a game —</option>
+      </select>
+    </div>
   </div>
 
   <div id="follow-content" style="display:none;">
@@ -4796,6 +4805,9 @@ async function initFollowTab(){
     _follow.gameId = savedId;
     renderFollowGameList(); // re-render selector with correct option highlighted
     await followLoadEvents();
+    collapseFollowSelector(_followGameLabel(savedId));
+    const content = document.getElementById('follow-content');
+    if(content) content.style.display = 'block';
   }
 
   // Clear any old timer before starting a new one (guards against double-init)
@@ -4898,6 +4910,30 @@ function renderFollowGameList(){
   });
 }
 
+function _followGameLabel(gameId){
+  const game = _follow.games.find(g=>g.gameId===gameId);
+  if(!game) return '';
+  return (game.whiteTeam||'White') + ' vs ' + (game.darkTeam||'Dark') + ' — ' + fmtDate(game.date);
+}
+
+function collapseFollowSelector(label){
+  const exp  = document.getElementById('follow-selector-expanded');
+  const coll = document.getElementById('follow-selector-collapsed');
+  const lbl  = document.getElementById('follow-selected-label');
+  if(exp)  exp.style.display  = 'none';
+  if(coll) coll.style.display = 'block';
+  if(lbl)  lbl.textContent    = label || '';
+}
+
+function expandFollowSelector(){
+  const exp  = document.getElementById('follow-selector-expanded');
+  const coll = document.getElementById('follow-selector-collapsed');
+  if(exp)  exp.style.display  = 'block';
+  if(coll) coll.style.display = 'none';
+  // Focus search so the user can start typing immediately
+  setTimeout(()=>{ document.getElementById('follow-game-search')?.focus(); }, 80);
+}
+
 function followSelectGame(gameId){
   _follow.gameId = gameId || null;
   _follow.events = [];
@@ -4905,8 +4941,13 @@ function followSelectGame(gameId){
   if(gameId) localStorage.setItem('follow-last-gameId', gameId);
   else localStorage.removeItem('follow-last-gameId');
   const content = document.getElementById('follow-content');
-  if(!gameId){ if(content) content.style.display='none'; return; }
+  if(!gameId){
+    if(content) content.style.display='none';
+    expandFollowSelector(); // no game → show full selector again
+    return;
+  }
   if(content) content.style.display='block';
+  collapseFollowSelector(_followGameLabel(gameId));
   followLoadEvents();
 }
 
