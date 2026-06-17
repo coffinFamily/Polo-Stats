@@ -162,6 +162,26 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
   </div>
 
 
+  <!-- Empty-state hero — shown when no game is configured yet -->
+  <div id="new-game-hero" style="display:none;margin-bottom:4px;">
+    <div style="text-align:center;padding:28px 16px 24px;border:2px dashed #1a4a6a;border-radius:14px;background:linear-gradient(180deg,#0a1e30 0%,#050f18 100%);">
+      <div style="font-size:44px;line-height:1;margin-bottom:10px;">🏊</div>
+      <div style="font-size:17px;font-weight:700;color:#c0d8f0;margin-bottom:6px;">No game loaded</div>
+      <div style="font-size:12px;color:#3a6a8a;line-height:1.6;margin-bottom:22px;">
+        Set up your teams, pick rosters,<br>and start tracking live stats.
+      </div>
+      <button onclick="startNewGameWizard()" style="
+        display:block;width:100%;padding:16px 12px;
+        font-size:18px;font-weight:800;letter-spacing:0.04em;
+        border-radius:12px;border:2px solid #0a84c8;
+        background:linear-gradient(135deg,#0a3a6a 0%,#061828 100%);
+        color:#7adcff;cursor:pointer;
+        box-shadow:0 0 24px rgba(10,132,200,0.35),inset 0 1px 0 rgba(255,255,255,0.05);">
+        ▶&nbsp; Start New Game
+      </button>
+    </div>
+  </div>
+
   <div class="stitle" id="white-btn-title">White events</div>
   <div id="white-btns"></div>
   <div class="stitle" id="dark-btn-title">Dark events</div>
@@ -1929,6 +1949,14 @@ function renderGameUI(){
   document.getElementById('dark-btns').innerHTML  = ROWS.map(r=>buildRow(r,'dark', dp)).join('');
   document.getElementById('white-btns').innerHTML = ROWS.map(r=>buildRow(r,'white',wp)).join('');
   renderEventLog();
+
+  // Show the "Start New Game" hero when no game has been configured yet
+  const hero = document.getElementById('new-game-hero');
+  if(hero){
+    const isDefault = (!g.darkTeam || g.darkTeam === 'Dark') &&
+                      (!g.whiteTeam || g.whiteTeam === 'White');
+    hero.style.display = isDefault ? 'block' : 'none';
+  }
 }
 
 function updateScores(){
