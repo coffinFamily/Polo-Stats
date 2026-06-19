@@ -3200,7 +3200,13 @@ function saveGame(){
   errEl.style.display='none';
   // --- End duplicate check ---
 
-  state.activeGoalie={dark:readGK('dark',darkTeamId), white:readGK('white',whiteTeamId)};
+  // Only overwrite each GK when the dropdown had a team; otherwise preserve the
+  // existing active goalie so a blank dropdown can't silently clear it mid-game.
+  const prevGoalie=state.activeGoalie||{};
+  state.activeGoalie={
+    dark:  darkTeamId  ? readGK('dark', darkTeamId)  : prevGoalie.dark,
+    white: whiteTeamId ? readGK('white',whiteTeamId) : prevGoalie.white,
+  };
   ss('wp-active-goalie', state.activeGoalie);
 
   // Preserve existing gameId — Save Game Setup updates the current game, never creates a new one.
