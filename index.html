@@ -194,7 +194,7 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
               style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;position:relative;">
         ⚑ Fouls<span id="crit-badge" style="display:none;margin-left:5px;padding:1px 5px;border-radius:10px;font-size:10px;font-weight:700;background:#0a84c8;color:#fff;vertical-align:middle;"></span>
       </button>
-      <button class="btn-s" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showStatPopup(['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)'],wpBall()+'Goals',{missTypes:['Missed Shot','Missed Shot 5M']})">
+      <button class="btn-s" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showStatPopup(['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)','Goal (Counter)'],wpBall()+'Goals',{missTypes:['Missed Shot','Missed Shot 5M']})">
         <svg width="13" height="13" viewBox="0 0 14 14" style="vertical-align:middle;margin-right:3px;flex-shrink:0;display:inline-block;"><circle cx="7" cy="7" r="6.5" fill="#f5c518" stroke="#c8960e" stroke-width="0.6"/><path d="M1.5 5Q7 1.5 12.5 5" fill="none" stroke="#c8960e" stroke-width="0.8"/><path d="M1.5 9Q7 12.5 12.5 9" fill="none" stroke="#c8960e" stroke-width="0.8"/><path d="M4.5 1Q2 7 4.5 13" fill="none" stroke="#c8960e" stroke-width="0.8"/><path d="M9.5 1Q12 7 9.5 13" fill="none" stroke="#c8960e" stroke-width="0.8"/></svg>Goals <span id="stat-goals" style="margin-left:4px;padding:1px 5px;border-radius:10px;font-size:10px;font-weight:700;background:#1a3a5a;color:#7abcdc;vertical-align:middle;">0</span>
       </button>
       <button class="btn-s" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showStatPopup(['Assist'],'🤝 Assists')">
@@ -673,9 +673,10 @@ state.players = state.players.map(p => {
 //  EVENT DEFINITIONS
 // ═══════════════════════════════════════════════════════════
 const EVENT_DEFS = {
-  'goal-reg':       {label:'Goal (Reg)',       flow:['cap','zone','gm']},
+  'goal-reg':       {label:'Goal (Reg)',       btnLabel:'Goal', flow:['cap','zone','gm']},
   'goal-65':        {label:'Goal (6-5)',        flow:['cap','zone','gm']},
   'goal-5m':        {label:'Goal (5M)',         flow:['cap','gm']},
+  'goal-counter':   {label:'Goal (Counter)',    flow:['cap','zone','gm']},
   'miss':           {label:'Missed Shot',       flow:['cap','zone']},
   'miss-5m':        {label:'Missed Shot 5M',    flow:['cap']},
   'ejection':       {label:'Ejection',          flow:['cap']},
@@ -1199,7 +1200,7 @@ function deletePlayerFromSheet(id){ rosterPost({action:'delete-player',id}); }
 function applyPrefFilters(flow, side, eventType){
   if(!side) return flow;
   const tp=(state.prefs||{})[side]||{};
-  const isGoal  = eventType==='goal-reg'||eventType==='goal-65'||eventType==='goal-5m';
+  const isGoal  = eventType==='goal-reg'||eventType==='goal-65'||eventType==='goal-5m'||eventType==='goal-counter';
   const isMiss  = eventType==='miss';
   const isBlock = eventType==='goalie-block';
   return flow.filter(s=>{
@@ -1258,7 +1259,7 @@ function nextStep(field,val,label,playerId){
   else finalizeEvent();
 }
 
-const AUTO_PAUSE_TYPES = new Set(['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)','5M Foul']);
+const AUTO_PAUSE_TYPES = new Set(['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)','Goal (Counter)','5M Foul']);
 
 function autoPauseIfNeeded(eventLabel){
   if(!AUTO_PAUSE_TYPES.has(eventLabel)) return;
@@ -1454,14 +1455,44 @@ function showModalStep(step){
   }
   else if(step==='cap'){
     renderCapPicker(roster,isDk,`${isDk?dN:wN} — who?`,'cap');
-    // Remove any 5M toggle left over from a previous miss flow — it lives on
-    // the .modal element (not modal-body) so innerHTML replacement doesn't clear it.
+    // Remove any overlays left over from previous flows — they live on
+    // the .modal element (not modal-body) so innerHTML replacement doesn't clear them.
     const _modal=body.closest('.modal');
-    const _oldToggle=_modal?_modal.querySelector('#miss5m-toggle'):null;
-    if(_oldToggle&&_oldToggle.parentNode) _oldToggle.parentNode.remove();
-    // 5M toggle for missed shots only
+    if(_modal){
+      const _oldToggle=_modal.querySelector('#miss5m-toggle');
+      if(_oldToggle&&_oldToggle.parentNode) _oldToggle.parentNode.remove();
+      const _oldGoal=_modal.querySelector('#goal-subtype-panel');
+      if(_oldGoal) _oldGoal.remove();
+    }
     const et=state.flowCtx.eventType;
-    if(et==='miss'||et==='miss-5m'){
+    // Goal subtype radio pills: Even / Advantage / 5M / Counter
+    const GOAL_FLOW_TYPES=['goal-reg','goal-65','goal-5m','goal-counter'];
+    if(GOAL_FLOW_TYPES.includes(et)){
+      const goalOptions=[
+        {key:'goal-reg',     label:'Even'},
+        {key:'goal-65',      label:'Advantage'},
+        {key:'goal-5m',      label:'5M'},
+        {key:'goal-counter', label:'Counter'},
+      ];
+      const pillsHTML=goalOptions.map(opt=>{
+        const active=et===opt.key;
+        return `<label style="display:inline-flex;align-items:center;padding:4px 10px;border-radius:16px;`
+          +`font-size:12px;font-weight:700;cursor:pointer;`
+          +(active?'background:#0a3a5a;border:1.5px solid #0a84c8;color:#7abcdc;'
+                  :'background:#0a1e30;border:1.5px solid #1e3a5a;color:#5a7a9a;')+'>'
+          +`<input type="radio" name="goal-subtype" value="${opt.key}" ${active?'checked':''}`
+          +` onchange="setGoalSubtype('${opt.key}')" style="display:none;">`
+          +`${opt.label}</label>`;
+      }).join('');
+      const panel=document.createElement('div');
+      panel.id='goal-subtype-panel';
+      panel.style.cssText='display:flex;flex-wrap:wrap;justify-content:flex-end;gap:5px;margin-bottom:10px;';
+      panel.innerHTML=pillsHTML;
+      const mb=document.getElementById('modal-body');
+      mb.insertBefore(panel,mb.firstChild);
+    }
+    // 5M toggle for missed shots only
+    else if(et==='miss'||et==='miss-5m'){
       const is5m=et==='miss-5m';
       const body=document.getElementById('modal-body');
       const toggle=document.createElement('div');
@@ -1602,6 +1633,21 @@ function toggleMiss5m(){
   state.flowIdx=0;
   document.getElementById('modal-title').textContent=def.label;
   // Re-render the cap step so the toggle button updates
+  showModalStep('cap');
+}
+
+function setGoalSubtype(key){
+  const def=EVENT_DEFS[key];
+  if(!def) return;
+  state.flowCtx.eventType=key;
+  state.flowCtx.eventLabel=def.label;
+  // Rebuild flow for the selected goal type (5M has no zone step; others do)
+  const isDk=state.flowCtx.team==='dark';
+  const side=isDk?'dark':'white';
+  state.flow=applyPrefFilters([...def.flow],side,key);
+  state.flowIdx=0;
+  document.getElementById('modal-title').textContent=def.label;
+  // Re-render cap step so the active pill updates
   showModalStep('cap');
 }
 
@@ -1845,7 +1891,7 @@ function evtIcon(type){
   const redFrown   = `<svg width="13" height="13" viewBox="0 0 14 14" style="vertical-align:middle;margin-right:3px;flex-shrink:0;display:inline-block;"><circle cx="7" cy="7" r="6.5" fill="#ef4444" stroke="#b03030" stroke-width="0.6"/><circle cx="4.8" cy="5.5" r="0.9" fill="#fff"/><circle cx="9.2" cy="5.5" r="0.9" fill="#fff"/><path d="M4.2 10Q7 7.5 9.8 10" fill="none" stroke="#fff" stroke-width="1.1" stroke-linecap="round"/></svg>`;
   const greenSmile = `<svg width="13" height="13" viewBox="0 0 14 14" style="vertical-align:middle;margin-right:3px;flex-shrink:0;display:inline-block;"><circle cx="7" cy="7" r="6.5" fill="#22c55e" stroke="#16a34a" stroke-width="0.6"/><circle cx="4.8" cy="5.5" r="0.9" fill="#fff"/><circle cx="9.2" cy="5.5" r="0.9" fill="#fff"/><path d="M4.2 8.5Q7 11.5 9.8 8.5" fill="none" stroke="#fff" stroke-width="1.1" stroke-linecap="round"/></svg>`;
 
-  if(type==='goal-reg'||type==='goal-65'||type==='goal-5m') return wpBall('#f5c518','#c8960e');
+  if(type==='goal-reg'||type==='goal-65'||type==='goal-5m'||type==='goal-counter') return wpBall('#f5c518','#c8960e');
   if(type==='miss')                                          return wpBall('#ef4444','#b03030');
   if(type==='assist')                                        return '👍 ';
   if(type==='ejection'||type==='turnover')                   return redFrown;
@@ -1894,7 +1940,7 @@ function renderGameUI(){
   const dkCap=ag.dark, whCap=ag.white;
 
   function prefEnabled(prefs, type){
-    if(type==='goal-reg'||type==='goal-65'||type==='goal-5m') return prefs.goals !== false;
+    if(type==='goal-reg'||type==='goal-65'||type==='goal-5m'||type==='goal-counter') return prefs.goals !== false;
     if(type==='miss')                        return prefs.miss           !== false;
     if(type==='ejection')                    return prefs.ejection       !== false;
     if(type==='ejection-drawn')              return prefs.ejectionDrawn  !== false;
@@ -1930,7 +1976,7 @@ function renderGameUI(){
           btns+=`<button class="${cls}" style="${btnStyle}" onclick="startFlow('goalie-block','${side}')">${ico}Goalie Block</button>`;
         }
       } else {
-        btns+=`<button class="${cls}" style="${btnStyle}" onclick="startFlow('${t}','${side}')">${ico}${EVENT_DEFS[t].label}</button>`;
+        btns+=`<button class="${cls}" style="${btnStyle}" onclick="startFlow('${t}','${side}')">${ico}${EVENT_DEFS[t].btnLabel||EVENT_DEFS[t].label}</button>`;
       }
     });
     if(!btns) return '';
@@ -1939,7 +1985,7 @@ function renderGameUI(){
 
   // Row layout per team
   const ROWS = [
-    ['goal-reg','goal-65','goal-5m','assist'],
+    ['goal-reg','assist'],
     ['miss','steal','turnover'],
     ['ejection','ejection-drawn','5m-penalty','5m-drawn'],
     ['field-block','goalie-block','sprint-won'],
@@ -2079,7 +2125,7 @@ function editEvent(id){
   if(!ev) return;
   const g=state.game;
   const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
-  const isGoal=['Goal (Reg)','Goal (6-5)','Goal (5M)','5M Goal'].includes(ev.type);
+  const isGoal=['Goal (Reg)','Goal (6-5)','Goal (5M)','Goal (Counter)','5M Goal'].includes(ev.type);
   const hasZone=!!(ev.zone&&ev.zone.includes(','));
   const teamSide=ev.team===dN?'dark':'white';
   state._editId=id; state._editTeamSide=teamSide;
@@ -2281,7 +2327,7 @@ function showQuarterStats(){
   const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
   const quarters=['1','2','3','4','OT'];
   const cats=[
-    {label:'Goals',     types:['Goal (Reg)','Goal (6-5)','Goal (5M)']},
+    {label:'Goals',     types:['Goal (Reg)','Goal (6-5)','Goal (5M)','Goal (Counter)']},
     {label:'Assists',   types:['Assist']},
     {label:'Steals',    types:['Steal']},
     {label:'Turnovers', types:['Turnover']},
@@ -2722,7 +2768,7 @@ function showGameSummary(){
       .sort((a,b)=>b[1].g-a[1].g).slice(0,3)
       .map(([cap,d])=>d.name?`${d.name} ${d.g}G`:`#${cap} ${d.g}G`).join(', ');
     return {
-      goals:count(['Goal (Reg)','Goal (6-5)','Goal (5M)']),
+      goals:count(['Goal (Reg)','Goal (6-5)','Goal (5M)','Goal (Counter)']),
       assists:count(['Assist']),
       steals:count(['Steal']),
       turnovers:count(['Turnover']),
@@ -3732,7 +3778,7 @@ function updateStatChips() {
   state.events.forEach(ev => {
     const expanded = eventToRows({...ev, gameId:'', date:''});
     expanded.forEach(r => {
-      if (['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)'].includes(r.event)) goals++;
+      if (['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)','Goal (Counter)'].includes(r.event)) goals++;
       if (r.event === 'Assist') assists++;
       if (r.event === 'Steal') steals++;
       if (r.event === 'Turnover') tos++;
@@ -3854,7 +3900,7 @@ function showShotChart(side) {
   const {VBW, VBH, X, Y, W, H} = POOL;
   const L = POOL_LINES;
   const gCx = X + W/2, gW = W*0.15, gLeft = gCx - gW/2, gRight = gCx + gW/2;
-  const GOAL_TYPES = ['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)'];
+  const GOAL_TYPES = ['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)','Goal (Counter)'];
 
   const MISS_TYPES = ['Missed Shot','Missed Shot 5M'];
   // Goals and misses belong to the team that took the shot (this team).
@@ -3951,7 +3997,7 @@ function showShotChart(side) {
 
 function renderShotChartMarkers(filterCap) {
   const {X, Y, W, H} = POOL;
-  const GOAL_TYPES = ['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)'];
+  const GOAL_TYPES = ['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)','Goal (Counter)'];
   if (!_scData) return;
   const posCount = {};
   let html = '';
@@ -5087,7 +5133,7 @@ const FOLLOW_CHIPS = [
   {
     key: 'offense',
     label: 'Offense',
-    goalTypes:   ['Goal (Reg)', 'Goal (6-5)', 'Goal (5M)'],
+    goalTypes:   ['Goal (Reg)', 'Goal (6-5)', 'Goal (5M)', 'Goal (Counter)'],
     missTypes:   ['Missed Shot', 'Missed Shot 5M'],
     assistTypes: ['Assist'],
     toTypes:     ['Turnover'],
