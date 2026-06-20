@@ -1955,16 +1955,13 @@ function renderGameUI(){
     return true;
   }
 
-  // All buttons use the same fixed width (sized for 4-per-row with 6px gaps).
-  // Every row is centred so rows with fewer visible buttons stay tidy.
-  const BTN_W = 'calc(25% - 5px)';
-
+  // Buttons stretch to fill each row — rows with fewer buttons get wider buttons.
   function buildRow(types, side, prefs){
     const isDk = side==='dark';
     const cls  = isDk ? 'evt-dk' : 'evt-wh';
     const teamCap = isDk ? dkCap : whCap;
     const teamName = isDk ? dN : wN;
-    const btnStyle = `flex:0 0 ${BTN_W};min-width:0;`;
+    const btnStyle = `flex:1;min-width:0;`;
     let btns='';
     types.forEach(t=>{
       if(!prefEnabled(prefs,t)) return;
@@ -1980,7 +1977,7 @@ function renderGameUI(){
       }
     });
     if(!btns) return '';
-    return `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:5px;justify-content:center;">${btns}</div>`;
+    return `<div style="display:flex;gap:6px;margin-bottom:5px;">${btns}</div>`;
   }
 
   // Row layout per team
