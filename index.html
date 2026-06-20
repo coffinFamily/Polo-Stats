@@ -4219,12 +4219,17 @@ function showStatPopup(statTypes, title, opts) {
   _appendCopyBtn(txt.trim());
 }
 
-function showCriticalStats() {
+// eventsIn / wNIn / dNIn are optional — omit to use Game-tab state (default behaviour).
+// Pass them explicitly to reuse this popup from the Follow tab.
+function showCriticalStats(eventsIn, wNIn, dNIn) {
   const g = state.game;
-  const dN = g.darkTeam || 'Dark';
-  const wN = g.whiteTeam || 'White';
+  const dN = dNIn || g.darkTeam || 'Dark';
+  const wN = wNIn || g.whiteTeam || 'White';
 
-  const critical = state.events.filter(e => e.type === 'Ejection' || e.type === '5M Foul');
+  const events = eventsIn || state.events;
+  // Follow-tab events use e.event; Game-tab events use e.type
+  const getType = e => e.type || e.event || '';
+  const critical = events.filter(e => getType(e) === 'Ejection' || getType(e) === '5M Foul');
 
   // Group by team → cap → { name, ejections, fouls }
   const groups = {};
@@ -4236,8 +4241,8 @@ function showCriticalStats() {
       const displayName = (e.capName && !e.capName.includes('Placeholder')) ? e.capName : null;
       groups[team][key] = { name: displayName, ejections: 0, fouls: 0 };
     }
-    if (e.type === 'Ejection') groups[team][key].ejections++;
-    else                        groups[team][key].fouls++;
+    if (getType(e) === 'Ejection') groups[team][key].ejections++;
+    else                            groups[team][key].fouls++;
   });
 
   const teamOrder = [wN, dN, ...Object.keys(groups).filter(t => t !== dN && t !== wN)];
@@ -5195,13 +5200,18 @@ function showFollowChipPopup(key){
 
   if(key === 'by-quarter'){ showFollowQuarterStats(ev, game); return; }
 
+  // Fouls reuses the Game-tab showCriticalStats popup (same rich format)
+  if(key === 'fouls'){
+    const wN = (game && game.whiteTeam) || 'White';
+    const dN = (game && game.darkTeam)  || 'Dark';
+    showCriticalStats(ev, wN, dN);
+    return;
+  }
+
   const GOAL_TYPES_FC = ['Goal (Reg)','Goal (6-5)','Goal (5M)','Goal (Counter)'];
   const MISS_TYPES_FC = ['Missed Shot','Missed Shot 5M'];
 
   const configs = {
-    'fouls':   { types:['Ejection','5M Foul'],  title:'🟡 Fouls',
-                 opts:{typeLabels:{'Ejection':'Ej','5M Foul':'5M'},
-                       countLabel:'fouls', emptyMsg:'No fouls recorded yet.'} },
     'goals':   { types:GOAL_TYPES_FC,            title:wpBall()+' Goals',
                  opts:{missTypes:MISS_TYPES_FC, countLabel:'goals'} },
     'assists': { types:['Assist'],               title:'👍 Assists',
