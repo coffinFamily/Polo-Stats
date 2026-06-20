@@ -1476,13 +1476,12 @@ function showModalStep(step){
       ];
       const pillsHTML=goalOptions.map(opt=>{
         const active=et===opt.key;
-        return `<label style="display:inline-flex;align-items:center;padding:4px 10px;border-radius:16px;`
-          +`font-size:12px;font-weight:700;cursor:pointer;`
-          +(active?'background:#0a3a5a;border:1.5px solid #0a84c8;color:#7abcdc;'
-                  :'background:#0a1e30;border:1.5px solid #1e3a5a;color:#5a7a9a;')+'>'
-          +`<input type="radio" name="goal-subtype" value="${opt.key}" ${active?'checked':''}`
-          +` onchange="setGoalSubtype('${opt.key}')" style="display:none;">`
-          +`${opt.label}</label>`;
+        const s=active
+          ?'background:#0a3a5a;border:1.5px solid #0a84c8;color:#7abcdc;'
+          :'background:#0a1e30;border:1.5px solid #1e3a5a;color:#5a7a9a;';
+        return `<button onclick="setGoalSubtype('${opt.key}')" `
+          +`style="padding:5px 12px;border-radius:16px;font-size:12px;font-weight:700;cursor:pointer;${s}">`
+          +`${opt.label}</button>`;
       }).join('');
       const panel=document.createElement('div');
       panel.id='goal-subtype-panel';
