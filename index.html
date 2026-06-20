@@ -524,7 +524,7 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
     <div class="card" id="follow-score-card"></div>
 
     <!-- Two-column team stat panel (White left · Dark right) -->
-    <div id="follow-chips-card"></div>
+    <div id="follow-chips-card" style="margin-bottom:12px;"></div>
 
     <!-- View toggle -->
     <div style="display:flex;gap:5px;margin-bottom:8px;">
@@ -5146,9 +5146,9 @@ function renderFollowChips(ev, wN, dN){
   const el = document.getElementById('follow-chips-card');
   if(!el) return;
 
-  const base = 'flex:1;min-width:0;padding:9px 4px;border-radius:9px;font-size:11px;font-weight:700;'
-             + 'cursor:pointer;text-align:center;line-height:1.35;'
-             + 'background:#0a1440;border:1px solid #2a3a70;color:#a0c0e8;';
+  const base = 'flex:1;min-width:0;padding:8px 4px;border-radius:9px;font-size:11px;font-weight:700;'
+             + 'cursor:pointer;text-align:center;line-height:1.35;min-height:46px;'
+             + 'background:#253040;border:1px solid #3d5060;color:#9abccc;';
 
   const btn = (label, fn) =>
     `<button onclick="${fn}" style="${base}">${label}</button>`;
