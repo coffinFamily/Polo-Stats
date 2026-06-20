@@ -188,33 +188,20 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
   <div id="dark-btns"></div>
   <!-- Critical stats + Voice capture -->
   <div class="card" id="voice-card" style="display:none;padding:8px 10px;margin-top:10px;">
-    <!-- Row 1: stat chips (wrap freely) -->
-    <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:6px;">
-      <button class="btn-s" id="crit-stats-btn" onclick="showCriticalStats()"
-              style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;position:relative;">
-        ⚑ Fouls<span id="crit-badge" style="display:none;margin-left:5px;padding:1px 5px;border-radius:10px;font-size:10px;font-weight:700;background:#0a84c8;color:#fff;vertical-align:middle;"></span>
+    <!-- 2 rows × 4 chips at 25% each -->
+    <div style="display:flex;gap:5px;margin-bottom:5px;">
+      <button class="btn-s" style="flex:1;padding:9px 4px;font-size:11px;font-weight:700;text-align:center;line-height:1.35;" onclick="showQuarterStats()">By Quarter</button>
+      <button class="btn-s" id="crit-stats-btn" onclick="showCriticalStats()" style="flex:1;padding:9px 4px;font-size:11px;font-weight:700;text-align:center;line-height:1.35;position:relative;">
+        Fouls<span id="crit-badge" style="display:none;margin-left:5px;padding:1px 5px;border-radius:10px;font-size:10px;font-weight:700;background:#0a84c8;color:#fff;vertical-align:middle;"></span>
       </button>
-      <button class="btn-s" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showStatPopup(['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)','Goal (Counter)'],wpBall()+'Goals',{missTypes:['Missed Shot','Missed Shot 5M']})">
-        <svg width="13" height="13" viewBox="0 0 14 14" style="vertical-align:middle;margin-right:3px;flex-shrink:0;display:inline-block;"><circle cx="7" cy="7" r="6.5" fill="#f5c518" stroke="#c8960e" stroke-width="0.6"/><path d="M1.5 5Q7 1.5 12.5 5" fill="none" stroke="#c8960e" stroke-width="0.8"/><path d="M1.5 9Q7 12.5 12.5 9" fill="none" stroke="#c8960e" stroke-width="0.8"/><path d="M4.5 1Q2 7 4.5 13" fill="none" stroke="#c8960e" stroke-width="0.8"/><path d="M9.5 1Q12 7 9.5 13" fill="none" stroke="#c8960e" stroke-width="0.8"/></svg>Goals <span id="stat-goals" style="margin-left:4px;padding:1px 5px;border-radius:10px;font-size:10px;font-weight:700;background:#1a3a5a;color:#7abcdc;vertical-align:middle;">0</span>
-      </button>
-      <button class="btn-s" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showStatPopup(['Assist'],'🤝 Assists')">
-        🤝 Assists <span id="stat-assists" style="margin-left:4px;padding:1px 5px;border-radius:10px;font-size:10px;font-weight:700;background:#1a3a5a;color:#7abcdc;vertical-align:middle;">0</span>
-      </button>
-      <button class="btn-s" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showStatPopup(['Steal'],'✊ Steals')">
-        ✊ Steals <span id="stat-steals" style="margin-left:4px;padding:1px 5px;border-radius:10px;font-size:10px;font-weight:700;background:#1a3a5a;color:#7abcdc;vertical-align:middle;">0</span>
-      </button>
-      <button class="btn-s" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showStatPopup(['Turnover'],'🔄 Turnovers')">
-        🔄 TOs <span id="stat-tos" style="margin-left:4px;padding:1px 5px;border-radius:10px;font-size:10px;font-weight:700;background:#1a3a5a;color:#7abcdc;vertical-align:middle;">0</span>
-      </button>
-      <button class="btn-s" id="sc-dark-btn" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showShotChart('dark')">
-        📊 <span id="sc-dark-label">Dark</span>
-      </button>
-      <button class="btn-s" id="sc-white-btn" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showShotChart('white')">
-        📊 <span id="sc-white-label">White</span>
-      </button>
-      <button class="btn-s" style="flex:0 0 auto;padding:5px 9px;font-size:12px;white-space:nowrap;" onclick="showQuarterStats()">
-        📈 By Quarter
-      </button>
+      <button class="btn-s" id="sc-white-btn" onclick="showShotChart('white')" style="flex:1;padding:9px 4px;font-size:11px;font-weight:700;text-align:center;line-height:1.35;"><span id="sc-white-label">White</span><br>Shot Chart</button>
+      <button class="btn-s" id="sc-dark-btn"  onclick="showShotChart('dark')"  style="flex:1;padding:9px 4px;font-size:11px;font-weight:700;text-align:center;line-height:1.35;"><span id="sc-dark-label">Dark</span><br>Shot Chart</button>
+    </div>
+    <div style="display:flex;gap:5px;">
+      <button class="btn-s" style="flex:1;padding:9px 4px;font-size:11px;font-weight:700;text-align:center;line-height:1.35;" onclick="showStatPopup(['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)','Goal (Counter)'],wpBall()+'Goals',{missTypes:['Missed Shot','Missed Shot 5M']})">Goals<br><span id="stat-goals" style="font-size:10px;font-weight:700;color:#7abcdc;">0</span></button>
+      <button class="btn-s" style="flex:1;padding:9px 4px;font-size:11px;font-weight:700;text-align:center;line-height:1.35;" onclick="showStatPopup(['Assist'],'🤝 Assists')">Assists<br><span id="stat-assists" style="font-size:10px;font-weight:700;color:#7abcdc;">0</span></button>
+      <button class="btn-s" style="flex:1;padding:9px 4px;font-size:11px;font-weight:700;text-align:center;line-height:1.35;" onclick="showStatPopup(['Steal'],'✊ Steals')">Steals<br><span id="stat-steals" style="font-size:10px;font-weight:700;color:#7abcdc;">0</span></button>
+      <button class="btn-s" style="flex:1;padding:9px 4px;font-size:11px;font-weight:700;text-align:center;line-height:1.35;" onclick="showStatPopup(['Turnover'],'🔄 Turnovers')">TO's<br><span id="stat-tos" style="font-size:10px;font-weight:700;color:#7abcdc;">0</span></button>
     </div>
     <div class="voice-transcript" id="voice-transcript" style="margin-top:4px;"></div>
     <div id="voice-result"></div>
