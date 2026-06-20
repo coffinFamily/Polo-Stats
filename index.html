@@ -2358,7 +2358,7 @@ function showQuarterStats(){
   }
 
   let html='';
-  [dN,wN].forEach(team=>{
+  [wN,dN].forEach(team=>{
     const isDark=team===dN;
     const cls=isDark?'bdg-dk':'bdg-wh';
     const visibleCats=cats.filter(c=>activeQs.some(q=>data[team][c.label][q]));
@@ -2386,7 +2386,7 @@ function showQuarterStats(){
   // Plain-text for clipboard
   const qHead = activeQs.map(q=>q==='OT'?'OT ':'Q'+q+' ').join('  ');
   let txt = `📈 By Quarter\n`;
-  [dN,wN].forEach(team=>{
+  [wN,dN].forEach(team=>{
     const visC = cats.filter(c=>activeQs.some(q=>data[team][c.label][q]));
     if(!visC.length) return;
     txt += `\n${team}\n`;
@@ -4114,7 +4114,7 @@ function showStatPopup(statTypes, title, opts) {
     });
   }
 
-  const teamOrder = [dN, wN, ...Object.keys(groups).filter(t => t !== dN && t !== wN)];
+  const teamOrder = [wN, dN, ...Object.keys(groups).filter(t => t !== dN && t !== wN)];
   const grandTotal = Object.values(groups).reduce((s, caps) =>
     s + Object.values(caps).reduce((s2, p) => s2 + p.count, 0), 0);
 
@@ -4240,7 +4240,7 @@ function showCriticalStats() {
     else                        groups[team][key].fouls++;
   });
 
-  const teamOrder = [dN, wN, ...Object.keys(groups).filter(t => t !== dN && t !== wN)];
+  const teamOrder = [wN, dN, ...Object.keys(groups).filter(t => t !== dN && t !== wN)];
 
   let html = '';
 
@@ -5258,7 +5258,7 @@ function showFollowQuarterStats(ev, game){
   }
 
   let html = '';
-  [dN, wN].forEach(team => {
+  [wN, dN].forEach(team => {
     if(!data[team]) return;
     const cls = team===dN ? 'bdg-dk' : 'bdg-wh';
     const visCats = cats.filter(c => activeQs.some(q => data[team][c.label]&&data[team][c.label][q]));
