@@ -4087,10 +4087,15 @@ function showStatPopup(statTypes, title, opts) {
     `<td style="text-align:center;padding:5px 6px;${style||''}">${val}</td>`;
 
   const multiType = statTypes.length > 1;
+  // Optional: short labels for column headers (e.g. 'Goalie Block' → 'GK Blk')
+  const _tl = opts.typeLabels || {};
+  // Optional: override the "X goals" summary label and the empty-state message
+  const countLabel = opts.countLabel || 'goals';
+  const emptyMsg   = opts.emptyMsg   || 'No events recorded yet.';
 
   let html = '';
   if (grandTotal === 0) {
-    html = `<div style="color:#5a7a9a;font-size:13px;text-align:center;padding:20px 0;">No goals recorded yet.</div>`;
+    html = `<div style="color:#5a7a9a;font-size:13px;text-align:center;padding:20px 0;">${emptyMsg}</div>`;
   } else {
     teamOrder.forEach(team => {
       if (!groups[team]) return;
@@ -4105,14 +4110,14 @@ function showStatPopup(statTypes, title, opts) {
       html += `<div style="margin-bottom:16px;">
         <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
           <span class="bdg ${badgeCls}" style="font-size:12px;padding:3px 12px;">${team}</span>
-          <span style="font-size:12px;color:#5a7a9a;">${teamGoals} goals</span>
+          <span style="font-size:12px;color:#5a7a9a;">${teamGoals} ${countLabel}</span>
           ${hasMiss ? `<span style="font-size:12px;color:#e87070;">${teamMisses} miss</span>
           <span style="font-size:12px;color:#4ade80;font-weight:600;">${teamPct}</span>` : ''}
         </div>
         <table style="width:100%;border-collapse:collapse;font-size:13px;">
           <thead><tr>
             ${thL('Player')}
-            ${multiType ? statTypes.map(t => thC(t.replace('Goal ','').replace(/[()]/g,''))).join('') : ''}
+            ${multiType ? statTypes.map(t => thC(_tl[t] || t.replace('Goal ','').replace(/[()]/g,''))).join('') : ''}
             ${hasMiss ? thC('Miss','#e87070') : ''}
             ${thC('Total','#7abcdc')}
             ${hasMiss ? thC('%','#a0c870') : ''}
@@ -5087,15 +5092,60 @@ function renderFollowContent(){
   else if(_follow.view==='recap')    renderFollowRecap(ev, wN, dN);
 }
 
+// ── Follow tab summary chips (3 combined groups) ──────────────────────────
 const FOLLOW_CHIPS = [
-  {label:'Goals',  icon:wpBall(), types:['Goal (Reg)','Goal (6-5)','Goal (5M)'], missTypes:['Missed Shot','Missed Shot 5M']},
-  {label:'Assists',icon:'👍', types:['Assist']},
-  {label:'Steals', icon:'🏴‍☠️',types:['Steal']},
-  {label:'Ej',     icon:'🟡', types:['Ejection']},
-  {label:'5M',     icon:'⚡', types:['5M Penalty']},
-  {label:'Blocks', icon:'😄', types:['Goalie Block','Field Block']},
-  {label:'TOs',    icon:'🔄', types:['Turnover']},
+  {
+    key: 'offense',
+    label: 'Offense',
+    goalTypes:   ['Goal (Reg)', 'Goal (6-5)', 'Goal (5M)'],
+    missTypes:   ['Missed Shot', 'Missed Shot 5M'],
+    assistTypes: ['Assist'],
+    toTypes:     ['Turnover'],
+  },
+  {
+    key: 'defense',
+    label: 'Defense',
+    blockTypes: ['Goalie Block', 'Field Block'],
+    stealTypes: ['Steal'],
+  },
+  {
+    key: 'fouls',
+    label: 'Fouls',
+    ejTypes:    ['Ejection'],
+    fiveMTypes: ['5M Penalty'],
+  },
 ];
+
+// Builds the inner HTML of a single chip button for a given group + team
+function _followChipHTML(c, ev, teamName){
+  if(c.key === 'offense'){
+    const g  = ev.filter(e=>e.team===teamName && c.goalTypes.includes(e.event)).length;
+    const m  = ev.filter(e=>e.team===teamName && c.missTypes.includes(e.event)).length;
+    const a  = ev.filter(e=>e.team===teamName && c.assistTypes.includes(e.event)).length;
+    const to = ev.filter(e=>e.team===teamName && c.toTypes.includes(e.event)).length;
+    const pct = m > 0 ? Math.round(g/(g+m)*100)+'%' : null;
+    return wpBall()
+      + `<strong>${g}</strong>`
+      + (pct ? `<span style="font-size:11px;color:#4ade80;margin-left:2px;">${pct}</span>` : '')
+      + `<span style="margin-left:6px;font-size:11px;opacity:0.85;">A <b>${a}</b></span>`
+      + `<span style="margin-left:4px;font-size:11px;opacity:0.85;">TO <b>${to}</b></span>`;
+  }
+  if(c.key === 'defense'){
+    const blk = ev.filter(e=>e.team===teamName && c.blockTypes.includes(e.event)).length;
+    const stl = ev.filter(e=>e.team===teamName && c.stealTypes.includes(e.event)).length;
+    return `🛡️ <b>${c.label}</b>`
+      + `<span style="margin-left:6px;font-size:11px;opacity:0.85;">Blk <b>${blk}</b></span>`
+      + `<span style="margin-left:4px;font-size:11px;opacity:0.85;">Stl <b>${stl}</b></span>`;
+  }
+  if(c.key === 'fouls'){
+    const ej = ev.filter(e=>e.team===teamName && c.ejTypes.includes(e.event)).length;
+    const fm = ev.filter(e=>e.team===teamName && c.fiveMTypes.includes(e.event)).length;
+    return `🟡 <b>${c.label}</b>`
+      + `<span style="margin-left:6px;font-size:11px;opacity:0.85;">Ej <b>${ej}</b></span>`
+      + `<span style="margin-left:4px;font-size:11px;opacity:0.85;">5M <b>${fm}</b></span>`;
+  }
+  return '';
+}
 
 function renderFollowChips(ev, wN, dN){
   function teamRow(name, isDark){
@@ -5108,10 +5158,10 @@ function renderFollowChips(ev, wN, dN){
     const safeName = name.replace(/'/g,"\\'");
     let chips = '';
     FOLLOW_CHIPS.forEach((c,i)=>{
-      const n = ev.filter(e=>e.team===name&&c.types.includes(e.event)).length;
-      chips += '<button onclick="showFollowStatPopup('+i+',\''+safeName+'\')" '+
-        'style="display:inline-flex;align-items:center;gap:3px;padding:4px 9px;border-radius:12px;font-size:12px;font-weight:600;border:none;'+chipStyle+'">'+
-        c.icon+' '+c.label+' <strong style="margin-left:2px;">'+n+'</strong></button>';
+      chips += `<button onclick="showFollowStatPopup(${i},'${safeName}')" `
+        + `style="display:inline-flex;align-items:center;gap:2px;padding:4px 9px;border-radius:12px;font-size:12px;font-weight:600;border:none;${chipStyle}">`
+        + _followChipHTML(c, ev, name)
+        + `</button>`;
     });
     return '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:5px;padding:8px 10px;border-radius:8px;margin-bottom:6px;'+hdr+'">'+
       '<span style="font-size:11px;font-weight:700;white-space:nowrap;flex:0 0 auto;margin-right:4px;">'+name+'</span>'+chips+'</div>';
@@ -5120,13 +5170,65 @@ function renderFollowChips(ev, wN, dN){
   if(el) el.innerHTML = '<div class="card" style="padding:8px;margin-bottom:8px;">'+teamRow(wN,false)+teamRow(dN,true)+'</div>';
 }
 
-// Thin wrapper — reuses showStatPopup with pre-expanded Follow events
+// Opens the detail popup for each chip group
 function showFollowStatPopup(chipIdx, teamName){
   const chip = FOLLOW_CHIPS[chipIdx];
   const game = _follow.games.find(g=>g.gameId===_follow.gameId);
-  const allTypes = [...chip.types, ...(chip.missTypes||[])];
-  const rows = _follow.events.filter(e=>e.team===teamName && allTypes.includes(e.event));
-  showStatPopup(chip.types, chip.icon+' '+chip.label+' — '+teamName, {rows, game, missTypes: chip.missTypes||[]});
+  const ev   = _follow.events;
+
+  if(chip.key === 'offense'){
+    // Goals table (Reg | 6-5 | 5M | Miss | Total | %)
+    const goalMissRows = ev.filter(e=>e.team===teamName &&
+      [...chip.goalTypes, ...chip.missTypes].includes(e.event));
+    showStatPopup(chip.goalTypes, wpBall()+' Offense — '+teamName,
+      {rows:goalMissRows, game, missTypes:chip.missTypes, countLabel:'goals'});
+
+    // Append Assists + TOs per-player table below
+    const assists = ev.filter(e=>e.team===teamName && chip.assistTypes.includes(e.event));
+    const tos     = ev.filter(e=>e.team===teamName && chip.toTypes.includes(e.event));
+    if(assists.length || tos.length){
+      const body = document.getElementById('modal-body');
+      if(body){
+        const byPlayer = {};
+        assists.forEach(e=>{ const k=e.cap||'?'; if(!byPlayer[k]) byPlayer[k]={cap:k,a:0,to:0}; byPlayer[k].a++; });
+        tos.forEach(e=>{     const k=e.cap||'?'; if(!byPlayer[k]) byPlayer[k]={cap:k,a:0,to:0}; byPlayer[k].to++; });
+        const pRows = Object.values(byPlayer).sort((a,b)=>Number(a.cap)-Number(b.cap));
+        let extra = `<div style="margin-top:12px;border-top:1px solid #1e3a5a;padding-top:10px;">
+          <div style="font-size:11px;font-weight:600;color:#5a7a9a;letter-spacing:0.05em;margin-bottom:6px;">ASSISTS &amp; TURNOVERS</div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead><tr>
+              <th style="text-align:left;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">Player</th>
+              <th style="text-align:center;padding:4px 6px;font-weight:500;border-bottom:1px solid #1e3a5a;color:#7abcdc;">Ast</th>
+              <th style="text-align:center;padding:4px 6px;font-weight:500;border-bottom:1px solid #1e3a5a;color:#f87171;">TO</th>
+            </tr></thead><tbody>`;
+        pRows.forEach(p=>{
+          extra += `<tr style="border-bottom:1px solid #0e1e2e;">
+            <td style="padding:5px 6px;font-weight:600;">#${p.cap}</td>
+            <td style="text-align:center;padding:5px 6px;">${p.a  ||'<span style="color:#2a3a4a;">—</span>'}</td>
+            <td style="text-align:center;padding:5px 6px;">${p.to ||'<span style="color:#2a3a4a;">—</span>'}</td>
+          </tr>`;
+        });
+        extra += `</tbody></table></div>`;
+        body.innerHTML += extra;
+      }
+    }
+
+  } else if(chip.key === 'defense'){
+    const allTypes = [...chip.blockTypes, ...chip.stealTypes];
+    const rows = ev.filter(e=>e.team===teamName && allTypes.includes(e.event));
+    showStatPopup(allTypes, '🛡️ Defense — '+teamName,
+      {rows, game,
+       typeLabels:{'Goalie Block':'GK Blk','Field Block':'Fld Blk','Steal':'Stl'},
+       countLabel:'plays', emptyMsg:'No defensive plays recorded yet.'});
+
+  } else if(chip.key === 'fouls'){
+    const allTypes = [...chip.ejTypes, ...chip.fiveMTypes];
+    const rows = ev.filter(e=>e.team===teamName && allTypes.includes(e.event));
+    showStatPopup(allTypes, '🟡 Fouls — '+teamName,
+      {rows, game,
+       typeLabels:{'Ejection':'Ej','5M Penalty':'5M'},
+       countLabel:'fouls', emptyMsg:'No fouls recorded yet.'});
+  }
 }
 
 function renderFollowPlayers(ev, wN, dN){
