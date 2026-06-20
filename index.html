@@ -5112,7 +5112,7 @@ const FOLLOW_CHIPS = [
     key: 'fouls',
     label: 'Fouls',
     ejTypes:    ['Ejection'],
-    fiveMTypes: ['5M Penalty'],
+    fiveMTypes: ['5M Foul'],
   },
 ];
 
@@ -5226,7 +5226,7 @@ function showFollowStatPopup(chipIdx, teamName){
     const rows = ev.filter(e=>e.team===teamName && allTypes.includes(e.event));
     showStatPopup(allTypes, '🟡 Fouls — '+teamName,
       {rows, game,
-       typeLabels:{'Ejection':'Ej','5M Penalty':'5M'},
+       typeLabels:{'Ejection':'Ej','5M Foul':'5M'},
        countLabel:'fouls', emptyMsg:'No fouls recorded yet.'});
   }
 }
@@ -5237,7 +5237,7 @@ function renderFollowPlayers(ev, wN, dN){
     {label:'A',    fn:e=>e.event==='Assist'},
     {label:'Stl',  fn:e=>e.event==='Steal'},
     {label:'Ej',   fn:e=>e.event==='Ejection'},
-    {label:'5M',   fn:e=>e.event==='5M Penalty'},
+    {label:'5M',   fn:e=>e.event==='5M Foul'},
     {label:'Blk',  fn:e=>/block/i.test(e.event||'')},
     {label:'TO',   fn:e=>e.event==='Turnover'},
     {label:'Sprt', fn:e=>e.event==='Sprint Won'},
