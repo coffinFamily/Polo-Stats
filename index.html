@@ -1454,7 +1454,12 @@ function showModalStep(step){
   }
   else if(step==='cap'){
     renderCapPicker(roster,isDk,`${isDk?dN:wN} — who?`,'cap');
-    // 5M toggle for missed shots
+    // Remove any 5M toggle left over from a previous miss flow — it lives on
+    // the .modal element (not modal-body) so innerHTML replacement doesn't clear it.
+    const _modal=body.closest('.modal');
+    const _oldToggle=_modal?_modal.querySelector('#miss5m-toggle'):null;
+    if(_oldToggle&&_oldToggle.parentNode) _oldToggle.parentNode.remove();
+    // 5M toggle for missed shots only
     const et=state.flowCtx.eventType;
     if(et==='miss'||et==='miss-5m'){
       const is5m=et==='miss-5m';
