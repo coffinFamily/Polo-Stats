@@ -527,11 +527,22 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
     <div id="follow-chips-card" style="margin-bottom:12px;"></div>
 
     <!-- View toggle -->
-    <div style="display:flex;gap:5px;margin-bottom:8px;">
+    <div style="display:flex;gap:5px;margin-bottom:6px;">
       <button id="follow-btn-players"  class="btn-p" style="flex:1;padding:7px 2px;font-size:11px;" onclick="followSetView('players')">👤 Players</button>
       <button id="follow-btn-timeline" class="btn-s" style="flex:1;padding:7px 2px;font-size:11px;" onclick="followSetView('timeline')">📋 Timeline</button>
       <button id="follow-btn-flow"     class="btn-s" style="flex:1;padding:7px 2px;font-size:11px;" onclick="followSetView('flow')">📈 Flow</button>
       <button id="follow-btn-recap"    class="btn-s" style="flex:1;padding:7px 2px;font-size:11px;" onclick="followSetView('recap')">📊 Recap</button>
+    </div>
+    <!-- Shot chart pair — 50/50 -->
+    <div style="display:flex;gap:5px;margin-bottom:8px;">
+      <button class="btn-s" id="follow-sc-white-btn" onclick="showFollowShotChart('white')"
+              style="flex:1;padding:8px 4px;font-size:11px;font-weight:700;text-align:center;line-height:1.35;">
+        📊 <span id="follow-sc-white-label">White</span> Shot Chart
+      </button>
+      <button class="btn-s" id="follow-sc-dark-btn" onclick="showFollowShotChart('dark')"
+              style="flex:1;padding:8px 4px;font-size:11px;font-weight:700;text-align:center;line-height:1.35;">
+        📊 <span id="follow-sc-dark-label">Dark</span> Shot Chart
+      </button>
     </div>
 
     <div id="follow-players-view"></div>
@@ -5101,8 +5112,13 @@ function renderFollowContent(){
     '</div>'+
     '<div style="text-align:center;font-size:11px;color:#3a5a7a;padding-top:4px;">'+fmtDate(game.date)+'</div>';
 
-  // ── Stat chips (two-column panel) ───────────────────────────
+  // ── Stat chips ──────────────────────────────────────────────
   renderFollowChips(ev, wN, dN);
+  // Keep shot-chart button labels in sync with team names
+  const fscW = document.getElementById('follow-sc-white-label');
+  const fscD = document.getElementById('follow-sc-dark-label');
+  if(fscW) fscW.textContent = wN;
+  if(fscD) fscD.textContent = dN;
 
   // ── Active view ──────────────────────────────────────
   if(_follow.view==='players')       renderFollowPlayers(ev, wN, dN);
@@ -5154,10 +5170,8 @@ function renderFollowChips(ev, wN, dN){
     `<button onclick="${fn}" style="${base}">${label}</button>`;
 
   const row1 = `<div style="display:flex;gap:5px;margin-bottom:5px;">
-    ${btn('By Quarter',                   "showFollowChipPopup('by-quarter')")}
-    ${btn('Fouls',                         "showFollowChipPopup('fouls')")}
-    ${btn(wN+'<br>Shot Chart',            "showFollowShotChart('white')")}
-    ${btn(dN+'<br>Shot Chart',            "showFollowShotChart('dark')")}
+    ${btn('By Quarter', "showFollowChipPopup('by-quarter')")}
+    ${btn('Fouls',       "showFollowChipPopup('fouls')")}
   </div>`;
 
   const row2 = `<div style="display:flex;gap:5px;">
