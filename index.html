@@ -536,7 +536,7 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
     <!-- Score -->
     <div class="card" id="follow-score-card"></div>
 
-    <!-- Team stat chips -->
+    <!-- Two-column team stat panel (White left · Dark right) -->
     <div id="follow-chips-card"></div>
 
     <!-- View toggle -->
@@ -545,15 +545,6 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
       <button id="follow-btn-timeline" class="btn-s" style="flex:1;padding:7px 2px;font-size:11px;" onclick="followSetView('timeline')">📋 Timeline</button>
       <button id="follow-btn-flow"     class="btn-s" style="flex:1;padding:7px 2px;font-size:11px;" onclick="followSetView('flow')">📈 Flow</button>
       <button id="follow-btn-recap"    class="btn-s" style="flex:1;padding:7px 2px;font-size:11px;" onclick="followSetView('recap')">📊 Recap</button>
-    </div>
-    <!-- Shot chart buttons -->
-    <div style="display:flex;gap:6px;margin-bottom:10px;">
-      <button class="btn-s" style="flex:1;padding:9px;font-size:13px;white-space:nowrap;" onclick="showFollowShotChart('dark')">
-        📊 <span id="follow-sc-dark-label">Dark</span>
-      </button>
-      <button class="btn-s" style="flex:1;padding:9px;font-size:13px;white-space:nowrap;" onclick="showFollowShotChart('white')">
-        📊 <span id="follow-sc-white-label">White</span>
-      </button>
     </div>
 
     <div id="follow-players-view"></div>
@@ -5076,14 +5067,8 @@ function renderFollowContent(){
     '</div>'+
     '<div style="text-align:center;font-size:11px;color:#3a5a7a;padding-top:4px;">'+fmtDate(game.date)+'</div>';
 
-  // ── Stat chips ───────────────────────────────────────
+  // ── Stat chips (two-column panel) ───────────────────────────
   renderFollowChips(ev, wN, dN);
-
-  // ── Shot chart button labels ──────────────────────────
-  const fscD = document.getElementById('follow-sc-dark-label');
-  const fscW = document.getElementById('follow-sc-white-label');
-  if(fscD) fscD.textContent = dN;
-  if(fscW) fscW.textContent = wN;
 
   // ── Active view ──────────────────────────────────────
   if(_follow.view==='players')       renderFollowPlayers(ev, wN, dN);
@@ -5148,26 +5133,57 @@ function _followChipHTML(c, ev, teamName){
 }
 
 function renderFollowChips(ev, wN, dN){
-  function teamRow(name, isDark){
-    const hdr = isDark
-      ? 'background:#0e1d56;border:1px solid #4060b0;color:#fff;'
-      : 'background:#dde8f0;border:1px solid #aac0d0;color:#1a2a3a;';
-    const chipStyle = isDark
-      ? 'background:#0a1440;border:1px solid #2a3a70;color:#a0c0e8;cursor:pointer;'
-      : 'background:#c0d0e0;border:1px solid #8ab0cc;color:#1a2a3a;cursor:pointer;';
+  // Build one team's column panel
+  function teamCol(name, isDark, side){
+    const colBg    = isDark ? '#090f2a' : '#d0dce8';
+    const border   = isDark ? '1px solid #2a3a70' : '1px solid #9ab8cc';
+    const hdrColor = isDark ? '#7abcdc' : '#1a3a5a';
     const safeName = name.replace(/'/g,"\\'");
-    let chips = '';
-    FOLLOW_CHIPS.forEach((c,i)=>{
-      chips += `<button onclick="showFollowStatPopup(${i},'${safeName}')" `
-        + `style="display:inline-flex;align-items:center;gap:2px;padding:4px 9px;border-radius:12px;font-size:12px;font-weight:600;border:none;${chipStyle}">`
-        + _followChipHTML(c, ev, name)
-        + `</button>`;
-    });
-    return '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:5px;padding:8px 10px;border-radius:8px;margin-bottom:6px;'+hdr+'">'+
-      '<span style="font-size:11px;font-weight:700;white-space:nowrap;flex:0 0 auto;margin-right:4px;">'+name+'</span>'+chips+'</div>';
+
+    // Chip style
+    const cs = isDark
+      ? 'background:#0a1440;border:1px solid #2a3a70;color:#a0c0e8;'
+      : 'background:#b8ccd8;border:1px solid #7aa0b8;color:#1a2a3a;';
+    const chipBtn = (idx) =>
+      `<button onclick="showFollowStatPopup(${idx},'${safeName}')" `
+      + `style="display:inline-flex;align-items:center;gap:2px;padding:4px 7px;border-radius:10px;`
+      + `font-size:11px;font-weight:600;border:none;cursor:pointer;white-space:nowrap;${cs}">`
+      + _followChipHTML(FOLLOW_CHIPS[idx], ev, name)
+      + `</button>`;
+
+    // Shot chart button
+    const scBg = isDark ? '#0a1e38' : '#b0c8dc';
+    const scFg = isDark ? '#5bc8f0' : '#1a4a6a';
+    const scBtn =
+      `<button onclick="showFollowShotChart('${side}')" `
+      + `style="display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:10px;`
+      + `font-size:11px;font-weight:600;border:1px solid ${isDark?'#1a4a6a':'#8ab0c8'};`
+      + `background:${scBg};color:${scFg};cursor:pointer;white-space:nowrap;">`
+      + `📊 Shot Chart</button>`;
+
+    // FOLLOW_CHIPS indices: 0=Offense 1=Defense 2=Fouls
+    const offIdx=0, defIdx=1, foulIdx=2;
+
+    return `<div style="flex:1;min-width:0;background:${colBg};border:${border};border-radius:10px;padding:8px 7px;">
+      <div style="font-size:11px;font-weight:700;color:${hdrColor};margin-bottom:6px;
+                  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:5px;">
+        ${chipBtn(offIdx)}
+        ${scBtn}
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;">
+        ${chipBtn(foulIdx)}
+        ${chipBtn(defIdx)}
+      </div>
+    </div>`;
   }
+
   const el = document.getElementById('follow-chips-card');
-  if(el) el.innerHTML = '<div class="card" style="padding:8px;margin-bottom:8px;">'+teamRow(wN,false)+teamRow(dN,true)+'</div>';
+  if(el) el.innerHTML =
+    `<div style="display:flex;gap:6px;margin-bottom:8px;">
+      ${teamCol(wN, false, 'white')}
+      ${teamCol(dN, true,  'dark')}
+    </div>`;
 }
 
 // Opens the detail popup for each chip group
