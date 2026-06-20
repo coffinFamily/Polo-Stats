@@ -4916,10 +4916,8 @@ async function initFollowTab(){
 
   // Restore last-selected game + view from localStorage (survives page refresh)
   const savedId   = localStorage.getItem('follow-last-gameId');
-  const savedView = localStorage.getItem('follow-last-view');
-  if(savedView && ['players','timeline','flow','recap'].includes(savedView)){
-    _follow.view = savedView;
-  }
+  // Always default to Players view on load
+  _follow.view = 'players';
 
   await followLoadGames();
 
@@ -5078,9 +5076,9 @@ function followSetView(v){
   _follow.view = v;
   localStorage.setItem('follow-last-view', v);
   const btnBase = 'flex:1;padding:7px 2px;font-size:11px;';
-  [['players','btn-p'],['timeline','btn-s'],['flow','btn-s'],['recap','btn-s']].forEach(([k,def])=>{
+  ['players','timeline','flow','recap'].forEach(k=>{
     const b=document.getElementById('follow-btn-'+k);
-    if(b){ b.className=v===k?'btn-p':def; b.style.cssText=btnBase; }
+    if(b){ b.className=v===k?'btn-p':'btn-s'; b.style.cssText=btnBase; }
   });
   ['players','timeline','flow','recap'].forEach(k=>{
     const el=document.getElementById('follow-'+k+'-view');
@@ -5100,6 +5098,15 @@ function renderFollowContent(){
   if(!game) return;
   const wN = game.whiteTeam||'White', dN = game.darkTeam||'Dark';
   const ev = _follow.events;
+
+  // ── Sync sub-nav button states + view visibility to _follow.view ──────────
+  const _btnBase = 'flex:1;padding:7px 2px;font-size:11px;';
+  ['players','timeline','flow','recap'].forEach(k=>{
+    const b = document.getElementById('follow-btn-'+k);
+    if(b){ b.className = _follow.view===k ? 'btn-p' : 'btn-s'; b.style.cssText = _btnBase; }
+    const el = document.getElementById('follow-'+k+'-view');
+    if(el) el.style.display = _follow.view===k ? 'block' : 'none';
+  });
 
   // ── Score ────────────────────────────────────────────
   const wG = ev.filter(e=>e.event&&/^Goal \(/i.test(e.event)&&e.team===wN).length;
@@ -5656,17 +5663,18 @@ function renderFollowRecap(ev, wN, dN){
   // ── Render ────────────────────────────────────────────────────────────
   // Quarter breakdown cells — White left, Dark right (matches scoreboard above)
   const qCells=[1,2,3,4].map(i=>{
-    const tie=Q[i].our===Q[i].opp;
     const qw = isOurDark ? Q[i].opp : Q[i].our;  // white goals this quarter
     const qd = isOurDark ? Q[i].our : Q[i].opp;  // dark goals this quarter
     const wW = qw > qd;
-    return `<div style="text-align:center;padding:6px 2px;">
-      <div style="font-size:9px;color:#2a5a7a;font-weight:700;letter-spacing:.5px;margin-bottom:3px;">Q${i}</div>
-      <div style="font-size:13px;line-height:1;">
-        <span style="font-weight:${wW?700:400};color:${wW?'#c0d8f0':tie?'#3a5a7a':'#3a5a7a'}">${qw}</span>
-        <span style="color:#1a3a5a;font-size:10px;"> – </span>
-        <span style="font-weight:${!wW&&!tie?700:400};color:${!wW&&!tie?'#7abcdc':tie?'#3a5a7a':'#3a5a7a'}">${qd}</span>
-      </div>
+    const dW = qd > qw;
+    // White always light, Dark always teal — winner bright+bold, loser dimmed
+    const wClrQ = wW ? '#d0e8f8' : '#6a8aaa';
+    const dClrQ = dW ? '#7abcdc' : '#3a6a8a';
+    const sep = i < 4 ? 'border-right:1px solid #0d1e2e;' : '';
+    return `<div style="text-align:center;padding:6px 4px;${sep}">
+      <div style="font-size:9px;color:#4a7a9a;font-weight:700;letter-spacing:.5px;margin-bottom:5px;">Q${i}</div>
+      <div style="font-size:16px;font-weight:${wW?700:400};color:${wClrQ};line-height:1.15;">${qw}</div>
+      <div style="font-size:16px;font-weight:${dW?700:400};color:${dClrQ};line-height:1.15;">${qd}</div>
     </div>`;
   }).join('');
 
@@ -5689,11 +5697,11 @@ function renderFollowRecap(ev, wN, dN){
     const dBetter = r.good==='high' ? (dv!==null&&(wv===null||dv>wv)) : (dv!==null&&(wv===null||dv<wv));
     const wBetter = r.good==='high' ? (wv!==null&&(dv===null||wv>dv)) : (wv!==null&&(dv===null||wv<dv));
     const fmt = r.fmt || (v=>v!==null?v:'—');
-    const dClr = dv===null?'#2a4a6a':dBetter?'#4ade80':dv===(wv??dv)?'#7abcdc':'#ef4444';
-    const wClr = wv===null?'#2a4a6a':wBetter?'#4ade80':wv===(dv??wv)?'#c0d8f0':'#ef4444';
+    const dClr = dv===null?'#5a7a90':dBetter?'#4ade80':dv===(wv??dv)?'#7abcdc':'#ef4444';
+    const wClr = wv===null?'#5a7a90':wBetter?'#4ade80':wv===(dv??wv)?'#c0d8f0':'#ef4444';
     return `<div style="display:flex;align-items:center;padding:5px 0;border-bottom:1px solid #0a1820;">
       <div style="flex:1;text-align:center;font-size:14px;font-weight:700;color:${wClr};">${fmt(wv)}</div>
-      <div style="flex:2;text-align:center;font-size:10px;color:#2a4a6a;letter-spacing:.5px;padding:0 4px;">${r.label}</div>
+      <div style="flex:2;text-align:center;font-size:11px;color:#a0bfd8;letter-spacing:.5px;padding:0 4px;">${r.label}</div>
       <div style="flex:1;text-align:center;font-size:14px;font-weight:700;color:${dClr};">${fmt(dv)}</div>
     </div>`;
   }).join('');
@@ -5720,10 +5728,16 @@ function renderFollowRecap(ev, wN, dN){
   el.innerHTML=`
     <!-- Quarter scores (compact — full score is in scoreboard above) -->
     <div class="card" style="padding:10px 12px;margin-bottom:8px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-        <span style="font-size:10px;color:#5a9abc;font-weight:700;">${wN}</span>
-        <span style="font-size:9px;color:#2a4a6a;letter-spacing:.5px;">BY QUARTER</span>
-        <span style="font-size:10px;color:#5a9abc;font-weight:700;">${dN}</span>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+        <span style="font-size:9px;color:#5a80a0;font-weight:700;letter-spacing:.5px;flex:0 0 auto;">BY QUARTER</span>
+        <span style="display:flex;align-items:center;gap:4px;">
+          <span style="width:8px;height:8px;border-radius:2px;background:#d0e8f8;display:inline-block;"></span>
+          <span style="font-size:9px;color:#8aacc0;font-weight:700;">${wN}</span>
+        </span>
+        <span style="display:flex;align-items:center;gap:4px;">
+          <span style="width:8px;height:8px;border-radius:2px;background:#5aaccc;display:inline-block;"></span>
+          <span style="font-size:9px;color:#5aaccc;font-weight:700;">${dN}</span>
+        </span>
       </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);">
         ${qCells}
@@ -5733,9 +5747,9 @@ function renderFollowRecap(ev, wN, dN){
     <!-- Stat comparison — White left, Dark right -->
     <div class="card" style="padding:10px 12px;margin-bottom:8px;">
       <div style="display:flex;margin-bottom:6px;">
-        <div style="flex:1;text-align:center;font-size:10px;color:#3a6a8a;font-weight:700;letter-spacing:.5px;">${wN}</div>
+        <div style="flex:1;text-align:center;font-size:10px;color:#90b8cc;font-weight:700;letter-spacing:.5px;">${wN}</div>
         <div style="flex:2;"></div>
-        <div style="flex:1;text-align:center;font-size:10px;color:#3a6a8a;font-weight:700;letter-spacing:.5px;">${dN}</div>
+        <div style="flex:1;text-align:center;font-size:10px;color:#90b8cc;font-weight:700;letter-spacing:.5px;">${dN}</div>
       </div>
       ${statRows||'<p style="font-size:12px;color:#3a5a7a;margin:0;">No stats yet.</p>'}
     </div>
