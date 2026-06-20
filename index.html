@@ -5140,38 +5140,40 @@ function renderFollowChips(ev, wN, dN){
     const hdrColor = isDark ? '#7abcdc' : '#1a3a5a';
     const safeName = name.replace(/'/g,"\\'");
 
-    // Chip style
+    // Shared button base — flex:1 makes each button fill its half of the row
+    const btnBase = 'flex:1;min-width:0;display:flex;align-items:center;justify-content:center;'
+                  + 'gap:3px;padding:5px 4px;border-radius:9px;font-size:11px;font-weight:600;cursor:pointer;';
+
+    // Stat chip (tappable, opens popup)
     const cs = isDark
       ? 'background:#0a1440;border:1px solid #2a3a70;color:#a0c0e8;'
       : 'background:#b8ccd8;border:1px solid #7aa0b8;color:#1a2a3a;';
     const chipBtn = (idx) =>
       `<button onclick="showFollowStatPopup(${idx},'${safeName}')" `
-      + `style="display:inline-flex;align-items:center;gap:2px;padding:4px 7px;border-radius:10px;`
-      + `font-size:11px;font-weight:600;border:none;cursor:pointer;white-space:nowrap;${cs}">`
+      + `style="${btnBase}${cs}">`
       + _followChipHTML(FOLLOW_CHIPS[idx], ev, name)
       + `</button>`;
 
-    // Shot chart button
+    // Shot chart button (same height/flex as chips)
     const scBg = isDark ? '#0a1e38' : '#b0c8dc';
     const scFg = isDark ? '#5bc8f0' : '#1a4a6a';
+    const scBorder = isDark ? '#1a4a6a' : '#8ab0c8';
     const scBtn =
       `<button onclick="showFollowShotChart('${side}')" `
-      + `style="display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:10px;`
-      + `font-size:11px;font-weight:600;border:1px solid ${isDark?'#1a4a6a':'#8ab0c8'};`
-      + `background:${scBg};color:${scFg};cursor:pointer;white-space:nowrap;">`
+      + `style="${btnBase}background:${scBg};border:1px solid ${scBorder};color:${scFg};">`
       + `📊 Shot Chart</button>`;
 
-    // FOLLOW_CHIPS indices: 0=Offense 1=Defense 2=Fouls
+    // FOLLOW_CHIPS indices: 0=Offense  1=Defense  2=Fouls
     const offIdx=0, defIdx=1, foulIdx=2;
 
-    return `<div style="flex:1;min-width:0;background:${colBg};border:${border};border-radius:10px;padding:8px 7px;">
-      <div style="font-size:11px;font-weight:700;color:${hdrColor};margin-bottom:6px;
-                  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name}</div>
-      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:5px;">
+    return `<div style="flex:1;min-width:0;background:${colBg};border:${border};border-radius:10px;padding:7px 6px;">
+      <div style="font-size:11px;font-weight:700;color:${hdrColor};text-align:center;
+                  margin-bottom:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${name}</div>
+      <div style="display:flex;gap:4px;margin-bottom:4px;">
         ${chipBtn(offIdx)}
         ${scBtn}
       </div>
-      <div style="display:flex;flex-wrap:wrap;gap:4px;">
+      <div style="display:flex;gap:4px;">
         ${chipBtn(foulIdx)}
         ${chipBtn(defIdx)}
       </div>
