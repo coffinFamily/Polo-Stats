@@ -5156,57 +5156,130 @@ function _followChipHTML(c){
 }
 
 function renderFollowChips(ev, wN, dN){
-  // Build one team's column panel
-  function teamCol(name, isDark, side){
-    const colBg    = isDark ? '#090f2a' : '#d0dce8';
-    const border   = isDark ? '1px solid #2a3a70' : '1px solid #9ab8cc';
-    const hdrColor = isDark ? '#7abcdc' : '#1a3a5a';
-    const safeName = name.replace(/'/g,"\\'");
+  const el = document.getElementById('follow-chips-card');
+  if(!el) return;
 
-    // Shared button base — flex:1 makes each button fill its half of the row
-    const btnBase = 'flex:1;min-width:0;display:flex;align-items:center;justify-content:center;'
-                  + 'gap:3px;padding:5px 4px;border-radius:9px;font-size:11px;font-weight:600;cursor:pointer;';
+  const base = 'flex:1;min-width:0;padding:9px 4px;border-radius:9px;font-size:11px;font-weight:700;'
+             + 'cursor:pointer;text-align:center;line-height:1.35;'
+             + 'background:#0a1440;border:1px solid #2a3a70;color:#a0c0e8;';
 
-    // Stat chip (tappable, opens popup)
-    const cs = isDark
-      ? 'background:#0a1440;border:1px solid #2a3a70;color:#a0c0e8;'
-      : 'background:#b8ccd8;border:1px solid #7aa0b8;color:#1a2a3a;';
-    const chipBtn = (idx) =>
-      `<button onclick="showFollowStatPopup(${idx},'${safeName}')" `
-      + `style="${btnBase}${cs}">`
-      + _followChipHTML(FOLLOW_CHIPS[idx])
-      + `</button>`;
+  const btn = (label, fn) =>
+    `<button onclick="${fn}" style="${base}">${label}</button>`;
 
-    // Shot chart button (same height/flex as chips)
-    const scBg = isDark ? '#0a1e38' : '#b0c8dc';
-    const scFg = isDark ? '#5bc8f0' : '#1a4a6a';
-    const scBorder = isDark ? '#1a4a6a' : '#8ab0c8';
-    const scBtn =
-      `<button onclick="showFollowShotChart('${side}')" `
-      + `style="${btnBase}background:${scBg};border:1px solid ${scBorder};color:${scFg};">`
-      + `📊 Shot Chart</button>`;
+  const row1 = `<div style="display:flex;gap:5px;margin-bottom:5px;">
+    ${btn('By Quarter',                   "showFollowChipPopup('by-quarter')")}
+    ${btn('Fouls',                         "showFollowChipPopup('fouls')")}
+    ${btn(wN+'<br>Shot Chart',            "showFollowShotChart('white')")}
+    ${btn(dN+'<br>Shot Chart',            "showFollowShotChart('dark')")}
+  </div>`;
 
-    // FOLLOW_CHIPS indices: 0=Offense  1=Defense  2=Fouls
-    const offIdx=0, defIdx=1, foulIdx=2;
+  const row2 = `<div style="display:flex;gap:5px;">
+    ${btn('Goals',   "showFollowChipPopup('goals')")}
+    ${btn('Assists', "showFollowChipPopup('assists')")}
+    ${btn('Steals',  "showFollowChipPopup('steals')")}
+    ${btn("TO's",    "showFollowChipPopup('tos')")}
+  </div>`;
 
-    return `<div style="flex:1;min-width:0;background:${colBg};border:${border};border-radius:10px;padding:7px 6px;">
-      <div style="display:flex;gap:4px;margin-bottom:4px;">
-        ${chipBtn(offIdx)}
-        ${scBtn}
-      </div>
-      <div style="display:flex;gap:4px;">
-        ${chipBtn(foulIdx)}
-        ${chipBtn(defIdx)}
-      </div>
-    </div>`;
+  el.innerHTML = row1 + row2;
+}
+
+// Dispatches stat-popup for each Follow chip key (both teams shown together)
+function showFollowChipPopup(key){
+  const game = _follow.games && _follow.games.find(g => g.gameId === _follow.gameId);
+  const ev   = _follow.events || [];
+
+  if(key === 'by-quarter'){ showFollowQuarterStats(ev, game); return; }
+
+  const GOAL_TYPES_FC = ['Goal (Reg)','Goal (6-5)','Goal (5M)','Goal (Counter)'];
+  const MISS_TYPES_FC = ['Missed Shot','Missed Shot 5M'];
+
+  const configs = {
+    'fouls':   { types:['Ejection','5M Foul'],  title:'🟡 Fouls',
+                 opts:{typeLabels:{'Ejection':'Ej','5M Foul':'5M'},
+                       countLabel:'fouls', emptyMsg:'No fouls recorded yet.'} },
+    'goals':   { types:GOAL_TYPES_FC,            title:wpBall()+' Goals',
+                 opts:{missTypes:MISS_TYPES_FC, countLabel:'goals'} },
+    'assists': { types:['Assist'],               title:'👍 Assists',
+                 opts:{countLabel:'assists',  emptyMsg:'No assists recorded yet.'} },
+    'steals':  { types:['Steal'],                title:'🏴‍☠️ Steals',
+                 opts:{countLabel:'steals',   emptyMsg:'No steals recorded yet.'} },
+    'tos':     { types:['Turnover'],             title:"TO's",
+                 opts:{countLabel:'turnovers', emptyMsg:'No turnovers recorded yet.'} },
+  };
+
+  const cfg = configs[key];
+  if(!cfg) return;
+  const allTypes = [...cfg.types, ...(cfg.opts.missTypes || [])];
+  const rows = ev.filter(e => allTypes.includes(e.event));
+  showStatPopup(cfg.types, cfg.title, {...cfg.opts, rows, game});
+}
+
+// Quarter breakdown for the Follow tab (uses _follow.events, not state.events)
+function showFollowQuarterStats(ev, game){
+  const dN = (game && (game.darkTeam  || game.dark))  || 'Dark';
+  const wN = (game && (game.whiteTeam || game.white)) || 'White';
+  const quarters = ['1','2','3','4','OT'];
+  const cats = [
+    {label:'Goals',     types:['Goal (Reg)','Goal (6-5)','Goal (5M)','Goal (Counter)']},
+    {label:'Assists',   types:['Assist']},
+    {label:'Steals',    types:['Steal']},
+    {label:'Turnovers', types:['Turnover']},
+    {label:'Ejections', types:['Ejection']},
+    {label:'Blocks',    types:['Goalie Block','Field Block']},
+  ];
+
+  const data = {};
+  [dN, wN].forEach(t => { data[t] = {}; cats.forEach(c => { data[t][c.label] = {}; }); });
+  (ev||[]).forEach(r => {
+    const team = r.team || r.Team || '';
+    const q    = String(r.q || r.Q || '?');
+    const evt  = r.event || r.Event || r.type || '';
+    if(!data[team]) return;
+    cats.forEach(c => {
+      if(c.types.includes(evt)) data[team][c.label][q] = (data[team][c.label][q]||0) + 1;
+    });
+  });
+
+  const activeQs = quarters.filter(q =>
+    [dN,wN].some(t => cats.some(c => data[t]&&data[t][c.label]&&data[t][c.label][q]))
+  );
+
+  document.getElementById('modal-title').textContent = '📈 By Quarter';
+  if(!activeQs.length){
+    document.getElementById('modal-body').innerHTML =
+      '<div style="color:#5a7a9a;text-align:center;padding:24px 0;">No events recorded yet.</div>';
+    document.getElementById('modal-overlay').style.display = 'flex';
+    return;
   }
 
-  const el = document.getElementById('follow-chips-card');
-  if(el) el.innerHTML =
-    `<div style="display:flex;gap:6px;margin-bottom:8px;">
-      ${teamCol(wN, false, 'white')}
-      ${teamCol(dN, true,  'dark')}
-    </div>`;
+  let html = '';
+  [dN, wN].forEach(team => {
+    if(!data[team]) return;
+    const cls = team===dN ? 'bdg-dk' : 'bdg-wh';
+    const visCats = cats.filter(c => activeQs.some(q => data[team][c.label]&&data[team][c.label][q]));
+    if(!visCats.length) return;
+    html += `<div style="margin-bottom:18px;">
+      <div style="margin-bottom:8px;"><span class="bdg ${cls}" style="font-size:12px;padding:3px 12px;">${team}</span></div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr>
+          <th style="text-align:left;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">Stat</th>
+          ${activeQs.map(q=>`<th style="text-align:center;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">${q==='OT'?'OT':'Q'+q}</th>`).join('')}
+          <th style="text-align:center;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">Tot</th>
+        </tr></thead><tbody>`;
+    visCats.forEach(c => {
+      const vals = activeQs.map(q => data[team][c.label][q]||0);
+      const tot  = vals.reduce((s,v)=>s+v,0);
+      html += `<tr>
+        <td style="padding:5px 6px;color:#c0d8f0;">${c.label}</td>
+        ${vals.map(v=>`<td style="text-align:center;padding:5px 6px;color:${v?'#7abcdc':'#2a4a6a'};">${v||'—'}</td>`).join('')}
+        <td style="text-align:center;padding:5px 6px;font-weight:700;color:#7abcdc;">${tot}</td>
+      </tr>`;
+    });
+    html += `</tbody></table></div>`;
+  });
+
+  document.getElementById('modal-body').innerHTML = html;
+  document.getElementById('modal-overlay').style.display = 'flex';
 }
 
 // Opens the detail popup for each chip group
