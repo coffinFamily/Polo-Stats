@@ -5804,14 +5804,12 @@ function renderFollowRecap(ev, wN, dN){
     const qd = isOurDark ? Q[i].our : Q[i].opp;  // dark goals this quarter
     const wW = qw > qd;
     const dW = qd > qw;
-    // White always light, Dark always teal — winner bright+bold, loser dimmed
-    const wClrQ = wW ? '#d0e8f8' : '#6a8aaa';
-    const dClrQ = dW ? '#7abcdc' : '#3a6a8a';
+    // Team identity colors are fixed — bold = winner, normal = loser
     const sep = i < 4 ? 'border-right:1px solid #0d1e2e;' : '';
     return `<div style="text-align:center;padding:6px 4px;${sep}">
       <div style="font-size:9px;color:#4a7a9a;font-weight:700;letter-spacing:.5px;margin-bottom:5px;">Q${i}</div>
-      <div style="font-size:16px;font-weight:${wW?700:400};color:${wClrQ};line-height:1.15;">${qw}</div>
-      <div style="font-size:16px;font-weight:${dW?700:400};color:${dClrQ};line-height:1.15;">${qd}</div>
+      <div style="font-size:16px;font-weight:${wW?700:400};color:#c0d8f0;line-height:1.15;">${qw}</div>
+      <div style="font-size:16px;font-weight:${dW?700:400};color:#7abcdc;line-height:1.15;">${qd}</div>
     </div>`;
   }).join('');
 
