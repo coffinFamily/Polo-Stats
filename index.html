@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>🤽 Water Polo Stats (Voice)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:system-ui,-apple-system,sans-serif;background:#0d1b2a;color:#e8edf2;font-size:14px;min-height:100vh;}
@@ -2833,18 +2834,60 @@ function _appendCopyBtn(text){
 }
 
 function copySummary(btn){
-  const txt=window._summaryText||'';
-  if(navigator.clipboard&&navigator.clipboard.writeText){
-    navigator.clipboard.writeText(txt).then(()=>{
-      btn.textContent='✓ Copied!'; setTimeout(()=>btn.textContent='📋 Copy to clipboard',2000);
-    }).catch(()=>_fallbackCopy(txt,btn));
-  } else { _fallbackCopy(txt,btn); }
+  const modal = document.querySelector('.modal');
+  if(!modal || typeof html2canvas === 'undefined'){
+    // html2canvas not loaded yet — plain-text fallback
+    _fallbackCopyText(btn); return;
+  }
+  const origLabel = btn.textContent;
+  btn.textContent = '⏳ Capturing…';
+  btn.disabled = true;
+
+  // Hide the copy button itself so it doesn't appear in the snapshot
+  btn.style.visibility = 'hidden';
+
+  html2canvas(modal, {
+    backgroundColor: '#0a1828',
+    scale: 2,
+    useCORS: true,
+    logging: false
+  }).then(canvas => {
+    btn.style.visibility = '';
+    btn.disabled = false;
+    canvas.toBlob(blob => {
+      if(!blob){ btn.textContent='⚠ Failed'; setTimeout(()=>btn.textContent=origLabel,2000); return; }
+      if(navigator.clipboard && window.ClipboardItem){
+        navigator.clipboard.write([new ClipboardItem({'image/png': blob})])
+          .then(()=>{ btn.textContent='✓ Copied!'; setTimeout(()=>btn.textContent=origLabel,2000); })
+          .catch(()=>{ _downloadPng(canvas, btn, origLabel); });
+      } else {
+        _downloadPng(canvas, btn, origLabel);
+      }
+    }, 'image/png');
+  }).catch(()=>{
+    btn.style.visibility = '';
+    btn.disabled = false;
+    _fallbackCopyText(btn);
+  });
 }
-function _fallbackCopy(txt,btn){
+
+function _downloadPng(canvas, btn, origLabel){
+  // Clipboard image API not available — download as PNG file instead
+  const a = document.createElement('a');
+  a.download = 'polo-stats-' + Date.now() + '.png';
+  a.href = canvas.toDataURL('image/png');
+  a.click();
+  btn.textContent = '✓ Saved as PNG!';
+  setTimeout(()=>btn.textContent = origLabel, 2500);
+}
+
+function _fallbackCopyText(btn){
+  const txt = window._summaryText || '';
+  const origLabel = btn.textContent;
   const ta=document.createElement('textarea');
   ta.value=txt; ta.style.cssText='position:fixed;opacity:0;top:0;left:0;';
   document.body.appendChild(ta); ta.focus(); ta.select();
-  try{ document.execCommand('copy'); btn.textContent='✓ Copied!'; setTimeout(()=>btn.textContent='📋 Copy to clipboard',2000); }
+  try{ document.execCommand('copy'); btn.textContent='✓ Copied!'; setTimeout(()=>btn.textContent=origLabel,2000); }
   catch(e){ btn.textContent='⚠ Copy failed'; }
   ta.remove();
 }
