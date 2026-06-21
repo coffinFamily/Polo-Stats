@@ -6348,14 +6348,15 @@ function renderTeamPage(){
   const minGoalPG = Math.min(...qGoalPG);
   const maxGoalPG = Math.max(...qGoalPG);
 
-  // Fouls per quarter
-  const qEjQ = {}, q5mQ = {};
+  // Fouls per quarter — combined Ej+5M for team and opponents
+  const qTF = {}, qOF = {};
   QS_ALL.forEach(q=>{
-    qEjQ[q]  = tev.filter(e=>isEjComm(e)&&String(e.q)===q).length;
-    q5mQ[q]  = tev.filter(e=>is5mComm(e)&&String(e.q)===q).length;
+    qTF[q] = tev.filter(e=>(isEjComm(e)||is5mComm(e))&&String(e.q)===q).length;
+    qOF[q] = allTeamGameEvs.filter(e=>(isEjComm(e)||is5mComm(e))&&e.team!==teamName&&String(e.q)===q).length;
   });
-  const qFoulTotal = q => (qEjQ[q]||0)+(q5mQ[q]||0);
-  const foulPGs = QS_BASE.map(q=>qFoulTotal(q)/qDiv(q));
+  const totalTF = QS_ALL.reduce((s,q)=>s+qTF[q],0);
+  const totalOF = QS_ALL.reduce((s,q)=>s+qOF[q],0);
+  const foulPGs = QS_BASE.map(q=>qTF[q]/qDiv(q));
   const maxFoulPG = Math.max(...foulPGs);
   const minFoulPG = Math.min(...foulPGs);
 
@@ -6419,57 +6420,60 @@ function renderTeamPage(){
 
   qGoalHTML += `</div>`;
 
-  // ── Fouls by Quarter table ──────────────────────────────
+  // ── Fouls by Quarter table — mirrors Goals table structure ─
   let qFoulHTML = `<div style="display:grid;grid-template-columns:${qColsFr};gap:0;">`;
+  // Header
   qFoulHTML += hdrCell('');
   QS_ALL.forEach(q=>{ qFoulHTML += hdrCell(q==='OT'?'OT':'Q'+q); });
   qFoulHTML += hdrCell('TTL');
   qFoulHTML += divRow();
 
-  // Ejections row
-  const totalEjQ = QS_ALL.reduce((s,q)=>s+qEjQ[q],0);
-  qFoulHTML += lblCell('Ejections');
-  QS_ALL.forEach(q=>{ qFoulHTML += numCell(qEjQ[q], qEjQ[q]>0?'#f0a050':'#3a5a7a'); });
-  qFoulHTML += numCell(totalEjQ,'#f0a050');
-
-  // 5M row
-  const total5mQ = QS_ALL.reduce((s,q)=>s+q5mQ[q],0);
-  qFoulHTML += lblCell('5M Fouls');
-  QS_ALL.forEach(q=>{ qFoulHTML += numCell(q5mQ[q], q5mQ[q]>0?'#ef7070':'#3a5a7a'); });
-  qFoulHTML += numCell(total5mQ,'#ef7070');
-
-  qFoulHTML += divRow();
-  // Total row
-  const totalFoulsQ = QS_ALL.reduce((s,q)=>s+qFoulTotal(q),0);
-  qFoulHTML += lblCell('Total','font-size:9px;');
+  // Team fouls row (combined Ej + 5M) — worst quarter red, best green
+  qFoulHTML += lblCell(teamName.substring(0,14));
   QS_ALL.forEach(q=>{
-    const ft=qFoulTotal(q);
-    const pg=ft/qDiv(q);
+    const pg = qTF[q]/qDiv(q);
     const isWorst = q!=='OT' && pg===maxFoulPG && maxFoulPG>minFoulPG;
     const isBest  = q!=='OT' && pg===minFoulPG && maxFoulPG>minFoulPG;
     const bg  = isWorst?'#1e0808':isBest?'#001e0e':'';
-    const clr = isWorst?'#ef4444':isBest?'#4ade80':ft>0?'#e0e8f0':'#3a5a7a';
-    qFoulHTML += numCell(ft, clr, bg);
+    const clr = isWorst?'#ef4444':isBest?'#4ade80':'#c0d8f0';
+    qFoulHTML += numCell(qTF[q], clr, bg);
   });
-  qFoulHTML += numCell(totalFoulsQ, totalFoulsQ>0?'#e0e8f0':'#3a5a7a');
+  qFoulHTML += numCell(totalTF,'#7abcdc');
+
+  // Opponent fouls row
+  qFoulHTML += lblCell('Opponents');
+  QS_ALL.forEach(q=>{ qFoulHTML += numCell(qOF[q],'#5a80a0'); });
+  qFoulHTML += numCell(totalOF,'#4a6a80');
+
+  qFoulHTML += divRow();
+  // Foul ± row  (positive = opponent committed more = disciplinary advantage)
+  qFoulHTML += lblCell('Foul ±','font-size:9px;');
+  QS_ALL.forEach(q=>{
+    const pm = qOF[q]-qTF[q];
+    const clr = pm>0?'#4ade80':pm<0?'#ef4444':'#5a80a0';
+    qFoulHTML += pgCell(pm>0?'+'+pm:pm, clr);
+  });
+  const totalFoulPM = totalOF-totalTF;
+  qFoulHTML += pgCell(totalFoulPM>0?'+'+totalFoulPM:totalFoulPM,
+    totalFoulPM>0?'#4ade80':totalFoulPM<0?'#ef4444':'#5a80a0');
 
   // Per-game row
   qFoulHTML += lblCell('/Game','font-size:9px;color:#3a5a7a;');
   QS_ALL.forEach(q=>{
-    const pg=(qFoulTotal(q)/qDiv(q)).toFixed(1);
+    const pg=(qTF[q]/qDiv(q)).toFixed(1);
     const isWorst = q!=='OT' && Number(pg)===maxFoulPG && maxFoulPG>minFoulPG;
     const isBest  = q!=='OT' && Number(pg)===minFoulPG && maxFoulPG>minFoulPG;
     const clr = isWorst?'#ef4444':isBest?'#4ade80':'#3a5a7a';
     qFoulHTML += pgCell(pg, clr);
   });
-  qFoulHTML += pgCell((totalFoulsQ/games.length).toFixed(1),'#3a5a7a');
+  qFoulHTML += pgCell((totalTF/games.length).toFixed(1),'#3a5a7a');
 
   qFoulHTML += `</div>`;
 
   const quarterAnalysisHTML = `
     <div style="font-size:10px;font-weight:700;color:#4a7a9a;letter-spacing:.5px;margin-bottom:6px;">GOALS BY QUARTER</div>
     <div class="card" style="padding:10px 10px 6px;margin-bottom:8px;">${qGoalHTML}</div>
-    <div style="font-size:10px;font-weight:700;color:#4a7a9a;letter-spacing:.5px;margin-bottom:6px;margin-top:12px;">FOULS BY QUARTER <span style="font-size:9px;color:#3a5a7a;font-weight:400;">(committed)</span></div>
+    <div style="font-size:10px;font-weight:700;color:#4a7a9a;letter-spacing:.5px;margin-bottom:6px;margin-top:12px;">FOULS BY QUARTER</div>
     <div class="card" style="padding:10px 10px 6px;margin-bottom:8px;">${qFoulHTML}</div>
   `;
 
