@@ -6120,7 +6120,8 @@ function renderTeamPage(){
     const fc  = gtv.filter(e=>isEjComm(e)||is5mComm(e)).length;
     const fpm = fd - fc;
     const date= (g.date||'').replace(/^(\d{1,2})\/(\d{1,2})\/(?:\d{2})?(\d{2})$/,'$1/$2');
-    return {tG, oG, fpm, date};
+    const abbr= opp.replace(/^(the\s+)/i,'').trim().substring(0,3).toUpperCase();
+    return {tG, oG, fpm, date, abbr};
   });
   const tn = trendData.length;
   // SVG layout constants
@@ -6171,7 +6172,7 @@ function renderTeamPage(){
       dots+=`<text x="${x.toFixed(1)}" y="${lblY.toFixed(1)}" text-anchor="middle" fill="${fpm>0?'#4ade80':'#ef6060'}" font-size="7" font-weight="700">${fpm>0?'+'+fpm:fpm}</text>`;
     }
     // Date label
-    dots+=`<text x="${x.toFixed(1)}" y="${dateY.toFixed(1)}" text-anchor="middle" fill="#2a4560" font-size="6.5">${d.date||'G'+(i+1)}</text>`;
+    dots+=`<text x="${x.toFixed(1)}" y="${dateY.toFixed(1)}" text-anchor="middle" fill="#4a7a9a" font-size="7.5" font-weight="700">${d.abbr||'G'+(i+1)}</text>`;
   });
   const trendHTML=`
     <div style="font-size:10px;font-weight:700;color:#4a7a9a;letter-spacing:.5px;margin-bottom:7px;">SCORING TREND${tn<games.length?' — LAST '+tn+' GAMES':' — ALL GAMES'}</div>
