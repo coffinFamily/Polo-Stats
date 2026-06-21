@@ -5127,14 +5127,14 @@ function renderFollowContent(){
   // Team page buttons — only for teams with real (non-placeholder) rosters
   const wQual = teamHasRealRoster(wN, ev);
   const dQual = teamHasRealRoster(dN, ev);
-  const _teamBtn = (tn) => {
+  const _mkBtn = (tn, extraStyle) => {
     const esc = tn.replace(/'/g,"\\'");
-    return `<button onclick="showTeamPage('${esc}')" style="flex:1;padding:7px 4px;border-radius:7px;background:#0a3a5a;border:1px solid #1a7aaa;color:#7abcdc;font-size:11px;font-weight:700;cursor:pointer;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📊 ${tn}</button>`;
+    return `<button onclick="showTeamPage('${esc}')" style="width:calc(50% - 3px);padding:7px 4px;border-radius:7px;background:#0a3a5a;border:1px solid #1a7aaa;color:#7abcdc;font-size:11px;font-weight:700;cursor:pointer;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${extraStyle}">📊 ${tn}</button>`;
   };
   const teamBtnRow = (wQual||dQual)
-    ? '<div style="display:flex;gap:6px;margin-top:8px;">'
-        +(wQual?_teamBtn(wN):'')
-        +(dQual?_teamBtn(dN):'')
+    ? '<div style="display:flex;margin-top:8px;">'
+        +(wQual ? _mkBtn(wN,'') : '')
+        +(dQual ? _mkBtn(dN,'margin-left:auto;') : '')
       +'</div>'
     : '';
   if(sc) sc.innerHTML =
