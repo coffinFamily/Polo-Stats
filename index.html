@@ -6000,6 +6000,10 @@ function renderTeamPage(){
   const tev = events.filter(e=>e.team===teamName);
   const isGoal = e=>/^Goal \(/i.test(e.event||'');
   const isMiss = e=>/^Missed Shot/i.test(e.event||'');
+  const isEjDrawn  = e=>e.event==='Ejection Drawn';
+  const is5mDrawn  = e=>e.event==='5M Drawn'||e.event==='5m Drawn';
+  const isEjComm   = e=>e.event==='Ejection';
+  const is5mComm   = e=>e.event==='5M Foul';
 
   // ── Record ────────────────────────────────────────────────
   let wins=0, losses=0, ties=0;
@@ -6014,36 +6018,55 @@ function renderTeamPage(){
     `${wins}W – ${losses}L${ties?' – '+ties+'T':''} · ${games.length} game${games.length!==1?'s':''}`;
 
   // ── Season totals ─────────────────────────────────────────
-  const totalGoals   = tev.filter(isGoal).length;
-  const totalMisses  = tev.filter(isMiss).length;
-  const totalAssists = tev.filter(e=>e.event==='Assist').length;
-  const totalSteals  = tev.filter(e=>e.event==='Steal').length;
-  const totalTOs     = tev.filter(e=>e.event==='Turnover').length;
-  const totalEj      = tev.filter(e=>e.event==='Ejection').length;
-  const total5m      = tev.filter(e=>e.event==='5M Foul').length;
-  const shootPct     = (totalGoals+totalMisses)>0 ? Math.round(totalGoals/(totalGoals+totalMisses)*100) : null;
+  const totalGoals      = tev.filter(isGoal).length;
+  const totalMisses     = tev.filter(isMiss).length;
+  const totalAssists    = tev.filter(e=>e.event==='Assist').length;
+  const totalSteals     = tev.filter(e=>e.event==='Steal').length;
+  const totalTOs        = tev.filter(e=>e.event==='Turnover').length;
+  const totalEj         = tev.filter(isEjComm).length;
+  const totalEjDrawn    = tev.filter(isEjDrawn).length;
+  const total5m         = tev.filter(is5mComm).length;
+  const total5mDrawn    = tev.filter(is5mDrawn).length;
+  const totalFoulsDrawn = totalEjDrawn + total5mDrawn;
+  const totalFoulsComm  = totalEj + total5m;
+  const seasonFoulPM    = totalFoulsDrawn - totalFoulsComm;
+  const shootPct        = (totalGoals+totalMisses)>0 ? Math.round(totalGoals/(totalGoals+totalMisses)*100) : null;
 
-  const sBox = (v,lbl) =>
+  const sBox = (v, lbl, clr) =>
     `<div style="text-align:center;background:#111d2c;border:1px solid #1e3a5a;border-radius:8px;padding:8px 2px;">
-      <div style="font-size:20px;font-weight:700;color:#c0d8f0;">${v??'—'}</div>
+      <div style="font-size:20px;font-weight:700;color:${clr||'#c0d8f0'};">${v??'—'}</div>
       <div style="font-size:9px;color:#5a80a0;font-weight:700;letter-spacing:.5px;margin-top:2px;">${lbl}</div>
     </div>`;
+
+  const fpmClr = seasonFoulPM>0?'#4ade80':seasonFoulPM<0?'#ef4444':'#7abcdc';
+  const fpmStr = seasonFoulPM>0?'+'+seasonFoulPM:String(seasonFoulPM);
 
   const summaryHTML =
     `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px;">
       ${sBox(totalGoals,'GOALS')}${sBox(shootPct!==null?shootPct+'%':'—','SHOOT%')}${sBox(totalAssists,'ASSISTS')}${sBox(totalSteals,'STEALS')}
     </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:14px;">
-      ${sBox(totalTOs,"TO'S")}${sBox(totalEj,'EJECTIONS')}${sBox(total5m,'5M FOULS')}
-    </div>`;
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px;">
+      ${sBox(totalTOs,"TO'S")}${sBox(totalEj,'EJECTIONS')}${sBox(totalFoulsDrawn,'FOULS DRAWN','#4ade80')}${sBox(total5m,'5M FOULS')}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:6px;">
+      <div style="text-align:center;background:#111d2c;border:1px solid #1e3a5a;border-radius:8px;padding:8px 6px;">
+        <div style="font-size:20px;font-weight:700;color:${fpmClr};">${fpmStr}</div>
+        <div style="font-size:9px;color:#5a80a0;font-weight:700;letter-spacing:.5px;margin-top:2px;">SEASON FOUL ±</div>
+        <div style="font-size:9px;color:#3a5a7a;margin-top:2px;">Drew ${totalFoulsDrawn} · Committed ${totalFoulsComm}</div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:center;">
+        <button onclick="showTeamShotChart()" style="width:100%;height:100%;min-height:56px;border-radius:8px;background:#1e3a5a;border:1px solid #2a5a7a;color:#7abcdc;font-size:13px;font-weight:700;cursor:pointer;">📊 Shot Chart</button>
+      </div>
+    </div>
+    <div style="margin-bottom:14px;"></div>`;
 
   // ── Player stats table ────────────────────────────────────
   const PCOLS = [
     {label:'G',   fn:isGoal},
     {label:'A',   fn:e=>e.event==='Assist'},
     {label:'Stl', fn:e=>e.event==='Steal'},
-    {label:'Ej',  fn:e=>e.event==='Ejection'},
-    {label:'5M',  fn:e=>e.event==='5M Foul'},
+    {label:'Ej',  fn:isEjComm},
+    {label:'5M',  fn:is5mComm},
     {label:'Blk', fn:e=>/block/i.test(e.event||'')},
     {label:'TO',  fn:e=>e.event==='Turnover'},
     {label:'GP',  fn:null},
@@ -6084,6 +6107,46 @@ function renderTeamPage(){
         </table></div>`
     : '<div style="font-size:12px;color:#3a5a7a;padding:6px 0;">No player stats recorded yet.</div>';
 
+  // ── Per-game scoring trend ────────────────────────────────
+  const trendData = [...games].map(g=>{
+    const opp = g.whiteTeam===teamName ? g.darkTeam : g.whiteTeam;
+    const gev = events.filter(e=>e._game.gameId===g.gameId);
+    const tG  = gev.filter(e=>e.team===teamName&&isGoal(e)).length;
+    const oG  = gev.filter(e=>e.team===opp&&isGoal(e)).length;
+    const date = (g.date||'').replace(/^(\d{1,2})\/(\d{1,2})\/\d{2}(\d{2})$/,'$1/$2');
+    return {tG, oG, opp, date};
+  });
+  const maxG = Math.max(...trendData.map(d=>Math.max(d.tG,d.oG)), 1);
+  const n = trendData.length;
+  const VW=300, chartH=72, totalVH=chartH+30;
+  const bW = Math.min(16, Math.max(6, (VW-24)/(n*2.8)));
+  const gap = bW*0.35;
+  const grpW = bW*2+gap+5;
+  const sx = (VW - n*grpW)/2;
+  let bars='';
+  trendData.forEach((d,i)=>{
+    const x = sx + i*grpW;
+    const tH = Math.max(2, d.tG/maxG*chartH);
+    const oH = Math.max(2, d.oG/maxG*chartH);
+    const won=d.tG>d.oG, lost=d.oG>d.tG;
+    bars+=`<rect x="${x.toFixed(1)}" y="${(chartH-tH).toFixed(1)}" width="${bW}" height="${tH.toFixed(1)}" rx="2" fill="${won?'#4ade80':'#3a7a9a'}"/>`;
+    bars+=`<rect x="${(x+bW+gap).toFixed(1)}" y="${(chartH-oH).toFixed(1)}" width="${bW}" height="${oH.toFixed(1)}" rx="2" fill="${lost?'#ef4444':'#c0803a'}"/>`;
+    if(d.tG>0) bars+=`<text x="${(x+bW/2).toFixed(1)}" y="${(chartH-tH-2).toFixed(1)}" text-anchor="middle" fill="#c0d8f0" font-size="7" font-weight="700">${d.tG}</text>`;
+    if(d.oG>0) bars+=`<text x="${(x+bW+gap+bW/2).toFixed(1)}" y="${(chartH-oH-2).toFixed(1)}" text-anchor="middle" fill="#e8d5a3" font-size="7" font-weight="700">${d.oG}</text>`;
+    bars+=`<text x="${(x+bW+gap/2).toFixed(1)}" y="${(chartH+10).toFixed(1)}" text-anchor="middle" fill="#3a5a7a" font-size="6.5">${d.date||'G'+(i+1)}</text>`;
+  });
+  const trendHTML=`
+    <div style="font-size:10px;font-weight:700;color:#4a7a9a;letter-spacing:.5px;margin-bottom:6px;">SCORING BY GAME</div>
+    <div style="display:flex;gap:14px;margin-bottom:6px;">
+      <span style="display:flex;align-items:center;gap:4px;font-size:9px;color:#8abccc;"><span style="width:8px;height:8px;background:#3a7a9a;border-radius:1px;display:inline-block;"></span>${teamName}</span>
+      <span style="display:flex;align-items:center;gap:4px;font-size:9px;color:#c09060;"><span style="width:8px;height:8px;background:#c0803a;border-radius:1px;display:inline-block;"></span>Opponent</span>
+      <span style="font-size:9px;color:#3a5a7a;margin-left:auto;">bright = winner</span>
+    </div>
+    <svg viewBox="0 0 ${VW} ${totalVH}" style="width:100%;min-width:${Math.max(160,n*38)}px;display:block;overflow:visible;">
+      <line x1="0" y1="${chartH}" x2="${VW}" y2="${chartH}" stroke="#1e3a5a" stroke-width="0.8"/>
+      ${bars}
+    </svg>`;
+
   // ── Fouls by player (visual bar chart) ───────────────────
   const foulMap={};
   tev.filter(e=>['Ejection','5M Foul'].includes(e.event)&&e.cap).forEach(e=>{
@@ -6110,24 +6173,39 @@ function renderTeamPage(){
         </span>
       </div>
       <div style="background:#0d1e2e;border-radius:4px;height:9px;overflow:hidden;">
-        <div style="height:100%;width:${w}%;background:linear-gradient(to right,#e8a040,#ef4444);border-radius:4px;transition:width .3s;"></div>
+        <div style="height:100%;width:${w}%;background:linear-gradient(to right,#e8a040,#ef4444);border-radius:4px;"></div>
       </div>
     </div>`;
   }).join('') : '<div style="font-size:12px;color:#3a5a7a;">No fouls recorded.</div>';
 
-  // ── Game history ──────────────────────────────────────────
+  // ── Game history with foul ± ─────────────────────────────
   const histHTML=[...games].reverse().map(g=>{
-    const opp=g.whiteTeam===teamName?g.darkTeam:g.whiteTeam;
-    const gev=events.filter(e=>e._game.gameId===g.gameId);
-    const tG=gev.filter(e=>e.team===teamName&&isGoal(e)).length;
-    const oG=gev.filter(e=>e.team===opp&&isGoal(e)).length;
-    const result=tG>oG?'W':oG>tG?'L':'T';
-    const rc=result==='W'?'#4ade80':result==='L'?'#ef4444':'#7abcdc';
-    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #0a1820;">
-      <span style="font-size:14px;font-weight:700;color:${rc};width:16px;flex:0 0 auto;">${result}</span>
-      <span style="font-size:14px;font-weight:700;color:#c0d8f0;min-width:44px;">${tG}–${oG}</span>
-      <span style="font-size:11px;color:#5a80a0;">vs ${opp}</span>
-      <span style="font-size:10px;color:#3a5a7a;margin-left:auto;">${fmtDate(g.date||'')}</span>
+    const opp = g.whiteTeam===teamName ? g.darkTeam : g.whiteTeam;
+    const gev = events.filter(e=>e._game.gameId===g.gameId);
+    const gtev = gev.filter(e=>e.team===teamName);
+    const goev = gev.filter(e=>e.team===opp);
+    const tG  = gtev.filter(isGoal).length;
+    const oG  = goev.filter(isGoal).length;
+    const tFD = gtev.filter(e=>isEjDrawn(e)||is5mDrawn(e)).length;
+    const tFC = gtev.filter(e=>isEjComm(e)||is5mComm(e)).length;
+    const oFC = goev.filter(e=>isEjComm(e)||is5mComm(e)).length;
+    const fpm = tFD - tFC;
+    const fpmS= fpm>0?'+'+fpm:String(fpm);
+    const fpmC= fpm>0?'#4ade80':fpm<0?'#ef4444':'#7abcdc';
+    const result = tG>oG?'W':oG>tG?'L':'T';
+    const rc = result==='W'?'#4ade80':result==='L'?'#ef4444':'#7abcdc';
+    return `<div style="padding:8px 0;border-bottom:1px solid #0a1820;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:14px;font-weight:700;color:${rc};width:16px;flex:0 0 auto;">${result}</span>
+        <span style="font-size:14px;font-weight:700;color:#c0d8f0;min-width:44px;">${tG}–${oG}</span>
+        <span style="font-size:11px;color:#5a80a0;flex:1;">vs ${opp}</span>
+        <span style="font-size:10px;color:#3a5a7a;">${fmtDate(g.date||'')}</span>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:3px;padding-left:24px;flex-wrap:wrap;">
+        <span style="font-size:10px;color:#5a7a9a;">Foul <span style="font-size:9px;vertical-align:middle;">±</span> <span style="font-weight:700;color:${fpmC};">${fpmS}</span></span>
+        <span style="font-size:10px;color:#3a5a7a;">Drew ${tFD} · Committed ${tFC}</span>
+        ${oFC?`<span style="font-size:10px;color:#3a5a7a;">Opp committed ${oFC}</span>`:''}
+      </div>
     </div>`;
   }).join('');
 
@@ -6136,11 +6214,39 @@ function renderTeamPage(){
     ${summaryHTML}
     <div class="stitle" style="margin-bottom:6px;">PLAYER STATS — ALL GAMES</div>
     <div class="card" style="padding:10px 12px;margin-bottom:12px;">${playerTableHTML}</div>
+    <div class="card" style="padding:10px 12px;margin-bottom:12px;">${trendHTML}</div>
     <div class="stitle" style="margin-bottom:6px;">FOULS COMMITTED BY PLAYER</div>
     <div class="card" style="padding:12px;margin-bottom:12px;">${foulsHTML}</div>
     <div class="stitle" style="margin-bottom:6px;">GAME HISTORY</div>
     <div class="card" style="padding:4px 12px;margin-bottom:12px;">${histHTML||'<div style="font-size:12px;color:#3a5a7a;padding:8px 0;">No games yet.</div>'}</div>
   `;
+}
+
+function showTeamShotChart(){
+  const { teamName, events } = _teamPage;
+  const COUNTERPART = {'Shot On Goal':1,'Ejection Drawn':1,'5m Drawn':1,'5M Drawn':1};
+  function gf(r,lo,hi){ const v=r[lo]; return (v!==undefined&&v!==null&&v!=='') ? v : (r[hi]||''); }
+  const groups = {};
+  events.filter(e=>e.team===teamName).forEach(function(r,idx){
+    const gid = r.groupId||r.groupID||r.GroupID||'';
+    const key = gid ? String(gid) : ('_tp'+idx);
+    const evType = r.event||r.type||'';
+    const zone = gf(r,'zone','Zone');
+    if(!groups[key]){
+      groups[key]={id:Date.now()+idx, q:gf(r,'q','Q'), time:gf(r,'time','Time'),
+        type:evType, team:teamName, cap:gf(r,'cap','Cap'), zone};
+    } else {
+      const storedCp=COUNTERPART[groups[key].type], thisCp=COUNTERPART[evType];
+      if(storedCp&&!thisCp){ groups[key].type=evType; groups[key].cap=gf(r,'cap','Cap')||groups[key].cap; if(zone) groups[key].zone=zone; }
+      else if(!groups[key].zone&&zone) groups[key].zone=zone;
+    }
+  });
+  const mapped = Object.values(groups).filter(e=>!COUNTERPART[e.type]);
+  const prevGame=state.game, prevEvents=state.events;
+  state.game={...state.game, whiteTeam:teamName, darkTeam:'Opponent'};
+  state.events=mapped;
+  showShotChart('white');
+  state.game=prevGame; state.events=prevEvents;
 }
 
 // ═══════════════════════════════════════════════════════════
