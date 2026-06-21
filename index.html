@@ -6107,44 +6107,86 @@ function renderTeamPage(){
         </table></div>`
     : '<div style="font-size:12px;color:#3a5a7a;padding:6px 0;">No player stats recorded yet.</div>';
 
-  // ── Per-game scoring trend ────────────────────────────────
-  const trendData = [...games].map(g=>{
+  // ── Combined trend + foul ± chart (last 8 games) ─────────
+  const trendGames = [...games].slice(-8);
+  const trendData  = trendGames.map(g=>{
     const opp = g.whiteTeam===teamName ? g.darkTeam : g.whiteTeam;
     const gev = events.filter(e=>e._game.gameId===g.gameId);
-    const tG  = gev.filter(e=>e.team===teamName&&isGoal(e)).length;
-    const oG  = gev.filter(e=>e.team===opp&&isGoal(e)).length;
-    const date = (g.date||'').replace(/^(\d{1,2})\/(\d{1,2})\/\d{2}(\d{2})$/,'$1/$2');
-    return {tG, oG, opp, date};
+    const gtv = gev.filter(e=>e.team===teamName);
+    const gov = gev.filter(e=>e.team===opp);
+    const tG  = gtv.filter(isGoal).length;
+    const oG  = gov.filter(isGoal).length;
+    const fd  = gtv.filter(e=>isEjDrawn(e)||is5mDrawn(e)).length;
+    const fc  = gtv.filter(e=>isEjComm(e)||is5mComm(e)).length;
+    const fpm = fd - fc;
+    const date= (g.date||'').replace(/^(\d{1,2})\/(\d{1,2})\/(?:\d{2})?(\d{2})$/,'$1/$2');
+    return {tG, oG, fpm, date};
   });
-  const maxG = Math.max(...trendData.map(d=>Math.max(d.tG,d.oG)), 1);
-  const n = trendData.length;
-  const VW=300, chartH=72, totalVH=chartH+30;
-  const bW = Math.min(16, Math.max(6, (VW-24)/(n*2.8)));
-  const gap = bW*0.35;
-  const grpW = bW*2+gap+5;
-  const sx = (VW - n*grpW)/2;
-  let bars='';
+  const tn = trendData.length;
+  // SVG layout constants
+  const VW=300, lM=22, rM=6, cW=VW-lM-rM;
+  const goalsY0=10, goalsH=68;               // goals line section
+  const foulZeroY=goalsY0+goalsH+18;         // zero line for foul ±
+  const foulBandH=26;                         // max bar reach above/below zero
+  const dateY=foulZeroY+foulBandH+13;        // date label row
+  const totalVH=dateY+6;
+  const maxG = Math.max(...trendData.map(d=>Math.max(d.tG,d.oG)),1);
+  const maxFPM = Math.max(...trendData.map(d=>Math.abs(d.fpm)),1);
+  const xPos = i => lM + (tn<2 ? cW/2 : i*(cW/(tn-1)));
+  const yGoal= v => goalsY0 + goalsH - (v/maxG)*goalsH;
+  const yFoul= v => foulZeroY - (v/maxFPM)*foulBandH;
+  // Y-axis grid lines (goals section)
+  const yGridVals=[0, Math.round(maxG/2), maxG];
+  const goalGrid=yGridVals.map(v=>{
+    const y=yGoal(v).toFixed(1);
+    return `<line x1="${lM}" y1="${y}" x2="${VW-rM}" y2="${y}" stroke="#142535" stroke-width="0.5" stroke-dasharray="3,5"/>
+            <text x="${lM-3}" y="${(parseFloat(y)+3).toFixed(1)}" text-anchor="end" fill="#2a4560" font-size="7">${v}</text>`;
+  }).join('');
+  // Polylines
+  const teamPts = trendData.map((d,i)=>`${xPos(i).toFixed(1)},${yGoal(d.tG).toFixed(1)}`).join(' ');
+  const oppPts  = trendData.map((d,i)=>`${xPos(i).toFixed(1)},${yGoal(d.oG).toFixed(1)}`).join(' ');
+  const lineTeam = tn>1 ? `<polyline points="${teamPts}" fill="none" stroke="#3a9abf" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` : '';
+  const lineOpp  = tn>1 ? `<polyline points="${oppPts}"  fill="none" stroke="#c07830" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` : '';
+  // Per-game dots, labels, foul bars
+  const foulBarW = Math.min(18, Math.max(6, cW/tn*0.55));
+  let dots='';
   trendData.forEach((d,i)=>{
-    const x = sx + i*grpW;
-    const tH = Math.max(2, d.tG/maxG*chartH);
-    const oH = Math.max(2, d.oG/maxG*chartH);
-    const won=d.tG>d.oG, lost=d.oG>d.tG;
-    bars+=`<rect x="${x.toFixed(1)}" y="${(chartH-tH).toFixed(1)}" width="${bW}" height="${tH.toFixed(1)}" rx="2" fill="${won?'#4ade80':'#3a7a9a'}"/>`;
-    bars+=`<rect x="${(x+bW+gap).toFixed(1)}" y="${(chartH-oH).toFixed(1)}" width="${bW}" height="${oH.toFixed(1)}" rx="2" fill="${lost?'#ef4444':'#c0803a'}"/>`;
-    if(d.tG>0) bars+=`<text x="${(x+bW/2).toFixed(1)}" y="${(chartH-tH-2).toFixed(1)}" text-anchor="middle" fill="#c0d8f0" font-size="7" font-weight="700">${d.tG}</text>`;
-    if(d.oG>0) bars+=`<text x="${(x+bW+gap+bW/2).toFixed(1)}" y="${(chartH-oH-2).toFixed(1)}" text-anchor="middle" fill="#e8d5a3" font-size="7" font-weight="700">${d.oG}</text>`;
-    bars+=`<text x="${(x+bW+gap/2).toFixed(1)}" y="${(chartH+10).toFixed(1)}" text-anchor="middle" fill="#3a5a7a" font-size="6.5">${d.date||'G'+(i+1)}</text>`;
+    const x=xPos(i), won=d.tG>d.oG, lost=d.oG>d.tG;
+    const yt=yGoal(d.tG), yo=yGoal(d.oG);
+    // Goal dots
+    dots+=`<circle cx="${x.toFixed(1)}" cy="${yt.toFixed(1)}" r="3.5" fill="${won?'#4ade80':'#3a9abf'}" stroke="#08141e" stroke-width="1"/>`;
+    dots+=`<circle cx="${x.toFixed(1)}" cy="${yo.toFixed(1)}" r="3.5" fill="${lost?'#ef4444':'#c07830'}" stroke="#08141e" stroke-width="1"/>`;
+    // Score labels — team above dot, opp below (unless they're close, then offset)
+    const samePx = Math.abs(yt-yo)<11;
+    dots+=`<text x="${x.toFixed(1)}" y="${(yt-(samePx?6:5)).toFixed(1)}" text-anchor="middle" fill="${won?'#4ade80':'#7abcdc'}" font-size="8" font-weight="700">${d.tG}</text>`;
+    dots+=`<text x="${x.toFixed(1)}" y="${(yo+(samePx?13:12)).toFixed(1)}" text-anchor="middle" fill="${lost?'#f07070':'#c09060'}" font-size="8" font-weight="700">${d.oG}</text>`;
+    // Foul ± bar
+    const fpm=d.fpm;
+    const bh=Math.max(2, Math.abs(fpm)/maxFPM*foulBandH);
+    const by=fpm>=0 ? foulZeroY-bh : foulZeroY;
+    const bx=x-foulBarW/2;
+    dots+=`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${foulBarW.toFixed(1)}" height="${bh.toFixed(1)}" rx="2" fill="${fpm>0?'#2a8a4a':fpm<0?'#8a2a2a':'#2a4a6a'}" opacity="0.85"/>`;
+    if(fpm!==0){
+      const lblY=fpm>0 ? by-2 : by+bh+8;
+      dots+=`<text x="${x.toFixed(1)}" y="${lblY.toFixed(1)}" text-anchor="middle" fill="${fpm>0?'#4ade80':'#ef6060'}" font-size="7" font-weight="700">${fpm>0?'+'+fpm:fpm}</text>`;
+    }
+    // Date label
+    dots+=`<text x="${x.toFixed(1)}" y="${dateY.toFixed(1)}" text-anchor="middle" fill="#2a4560" font-size="6.5">${d.date||'G'+(i+1)}</text>`;
   });
   const trendHTML=`
-    <div style="font-size:10px;font-weight:700;color:#4a7a9a;letter-spacing:.5px;margin-bottom:6px;">SCORING BY GAME</div>
-    <div style="display:flex;gap:14px;margin-bottom:6px;">
-      <span style="display:flex;align-items:center;gap:4px;font-size:9px;color:#8abccc;"><span style="width:8px;height:8px;background:#3a7a9a;border-radius:1px;display:inline-block;"></span>${teamName}</span>
-      <span style="display:flex;align-items:center;gap:4px;font-size:9px;color:#c09060;"><span style="width:8px;height:8px;background:#c0803a;border-radius:1px;display:inline-block;"></span>Opponent</span>
-      <span style="font-size:9px;color:#3a5a7a;margin-left:auto;">bright = winner</span>
+    <div style="font-size:10px;font-weight:700;color:#4a7a9a;letter-spacing:.5px;margin-bottom:7px;">SCORING TREND${tn<games.length?' — LAST '+tn+' GAMES':' — ALL GAMES'}</div>
+    <div style="display:flex;gap:14px;margin-bottom:7px;flex-wrap:wrap;">
+      <span style="display:flex;align-items:center;gap:5px;font-size:9px;color:#7abcdc;"><span style="width:18px;height:2px;background:#3a9abf;border-radius:1px;display:inline-block;"></span>${teamName}</span>
+      <span style="display:flex;align-items:center;gap:5px;font-size:9px;color:#c09060;"><span style="width:18px;height:2px;background:#c07830;border-radius:1px;display:inline-block;"></span>Opponents</span>
+      <span style="display:flex;align-items:center;gap:5px;font-size:9px;"><span style="width:8px;height:8px;background:#2a8a4a;border-radius:1px;display:inline-block;opacity:.85;"></span><span style="color:#4ade80;">+</span><span style="color:#5a7a9a;"> / </span><span style="background:#8a2a2a;width:8px;height:8px;border-radius:1px;display:inline-block;opacity:.85;"></span><span style="color:#ef6060;">−</span><span style="color:#5a7a9a;"> Foul ±</span></span>
     </div>
-    <svg viewBox="0 0 ${VW} ${totalVH}" style="width:100%;min-width:${Math.max(160,n*38)}px;display:block;overflow:visible;">
-      <line x1="0" y1="${chartH}" x2="${VW}" y2="${chartH}" stroke="#1e3a5a" stroke-width="0.8"/>
-      ${bars}
+    <svg viewBox="0 0 ${VW} ${totalVH}" style="width:100%;overflow:visible;display:block;">
+      ${goalGrid}
+      <line x1="${lM}" y1="${goalsY0}" x2="${lM}" y2="${goalsY0+goalsH}" stroke="#1e3a5a" stroke-width="0.8"/>
+      ${lineTeam}${lineOpp}
+      <line x1="${lM}" y1="${foulZeroY}" x2="${VW-rM}" y2="${foulZeroY}" stroke="#2a5070" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="${lM-3}" y="${foulZeroY+3}" text-anchor="end" fill="#2a4560" font-size="7">0</text>
+      ${dots}
     </svg>`;
 
   // ── Fouls by player (visual bar chart) ───────────────────
@@ -6215,10 +6257,10 @@ function renderTeamPage(){
     <div class="stitle" style="margin-bottom:6px;">PLAYER STATS — ALL GAMES</div>
     <div class="card" style="padding:10px 12px;margin-bottom:12px;">${playerTableHTML}</div>
     <div class="card" style="padding:10px 12px;margin-bottom:12px;">${trendHTML}</div>
-    <div class="stitle" style="margin-bottom:6px;">FOULS COMMITTED BY PLAYER</div>
-    <div class="card" style="padding:12px;margin-bottom:12px;">${foulsHTML}</div>
     <div class="stitle" style="margin-bottom:6px;">GAME HISTORY</div>
     <div class="card" style="padding:4px 12px;margin-bottom:12px;">${histHTML||'<div style="font-size:12px;color:#3a5a7a;padding:8px 0;">No games yet.</div>'}</div>
+    <div class="stitle" style="margin-bottom:6px;">FOULS COMMITTED BY PLAYER</div>
+    <div class="card" style="padding:12px;margin-bottom:12px;">${foulsHTML}</div>
   `;
 }
 
