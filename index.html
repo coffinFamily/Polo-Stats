@@ -557,6 +557,18 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
   </div>
 </div>
 
+<!-- ═══ TEAM PAGE OVERLAY ════════════════════════════════════════════════ -->
+<div id="team-page-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9998;background:#08141e;overflow-y:auto;">
+  <div style="padding:12px 14px 8px;display:flex;align-items:center;gap:10px;background:#08141e;position:sticky;top:0;z-index:1;border-bottom:1px solid #1e3a5a;">
+    <button onclick="closeTeamPage()" style="flex:0 0 auto;width:36px;height:36px;border-radius:50%;background:#1e3a5a;border:2px solid #2a5a7a;color:#90c8e8;font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1;">✕</button>
+    <div>
+      <div id="team-page-title" style="font-size:17px;font-weight:700;color:#e0f0ff;"></div>
+      <div id="team-page-subtitle" style="font-size:11px;color:#4a7a9a;margin-top:2px;"></div>
+    </div>
+  </div>
+  <div id="team-page-content" style="padding:10px 14px 80px;"></div>
+</div>
+
 <!-- ═══ SHOT CHART OVERLAY (top-level so it works from any tab) ════════ -->
 <div id="shot-chart-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:#08141e;overflow-y:auto;">
   <div style="padding:12px 14px 6px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
@@ -5111,17 +5123,25 @@ function renderFollowContent(){
   // ── Score ────────────────────────────────────────────
   const wG = ev.filter(e=>e.event&&/^Goal \(/i.test(e.event)&&e.team===wN).length;
   const dG = ev.filter(e=>e.event&&/^Goal \(/i.test(e.event)&&e.team===dN).length;
+  // Team name — clickable link when team has real (non-placeholder) roster players
+  const _mkTeamLabel = (tn, clr) => {
+    if(teamHasRealRoster(tn, ev)){
+      const esc = tn.replace(/'/g,"\\'");
+      return `<span onclick="showTeamPage('${esc}')" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;color:${clr};">${tn} <span style="font-size:9px;opacity:.7;">↗</span></span>`;
+    }
+    return `<span style="color:${clr};">${tn}</span>`;
+  };
   const sc = document.getElementById('follow-score-card');
   if(sc) sc.innerHTML =
     '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0 2px;">'+
       '<div style="text-align:center;flex:1;">'+
-        '<div style="font-size:11px;font-weight:600;color:#c0d8f0;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+wN+'</div>'+
+        '<div style="font-size:11px;font-weight:600;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+_mkTeamLabel(wN,'#c0d8f0')+'</div>'+
         '<div style="font-size:52px;font-weight:700;color:#fff;line-height:1;">'+wG+'</div>'+
         '<div style="font-size:10px;color:#5a7a9a;margin-top:2px;">White</div>'+
       '</div>'+
       '<div style="font-size:32px;color:#2a4a6a;font-weight:200;padding:0 10px;">–</div>'+
       '<div style="text-align:center;flex:1;">'+
-        '<div style="font-size:11px;font-weight:600;color:#7abcdc;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+dN+'</div>'+
+        '<div style="font-size:11px;font-weight:600;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+_mkTeamLabel(dN,'#7abcdc')+'</div>'+
         '<div style="font-size:52px;font-weight:700;color:#e8d5a3;line-height:1;">'+dG+'</div>'+
         '<div style="font-size:10px;color:#5a7a9a;margin-top:2px;">Dark</div>'+
       '</div>'+
@@ -5904,6 +5924,223 @@ function renderFollowFlow(ev, wN, dN){
 
   html += `</div></div>`;
   el.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  TEAM PAGE
+// ═══════════════════════════════════════════════════════════
+let _teamPage = { teamName:null, events:[], games:[] };
+
+// A team is "linkable" if ≥2 of its capped players resolve to real (non-placeholder) roster entries
+function teamHasRealRoster(teamName, events){
+  const pids = [...new Set(
+    events.filter(e=>e.team===teamName && e.playerId).map(e=>String(e.playerId))
+  )];
+  const realCount = pids.filter(pid=>{
+    const p = state.players.find(p=>String(p.id)===pid);
+    if(!p) return false;
+    const name = ((p.first||'')+' '+(p.last||'')).trim();
+    return name && !/placeholder/i.test(name);
+  }).length;
+  return realCount >= 2;
+}
+
+async function showTeamPage(teamName){
+  _teamPage.teamName = teamName;
+  const overlay = document.getElementById('team-page-overlay');
+  overlay.style.display = 'block';
+  overlay.scrollTop = 0;
+  document.getElementById('team-page-title').textContent = teamName;
+  document.getElementById('team-page-subtitle').textContent = 'Loading…';
+  document.getElementById('team-page-content').innerHTML =
+    '<div style="text-align:center;padding:40px 0;color:#4a7a9a;font-size:13px;">⟳ Loading season data…</div>';
+
+  const url = state.game.sheetUrl;
+  if(!url){
+    document.getElementById('team-page-content').innerHTML =
+      '<div class="card" style="color:#ef4444;font-size:12px;">No sheet URL configured.</div>';
+    return;
+  }
+
+  const allGames = _follow.games.filter(g=>g.whiteTeam===teamName||g.darkTeam===teamName);
+  if(!allGames.length){
+    document.getElementById('team-page-subtitle').textContent = '0 games found';
+    document.getElementById('team-page-content').innerHTML =
+      '<div class="card" style="color:#4a7a9a;font-size:12px;">No games found for this team.</div>';
+    return;
+  }
+
+  // Fetch all games' events in parallel
+  let allEvents = [];
+  try {
+    const fetches = allGames.map(g=>
+      fetch(url+'?action=events&gameId='+encodeURIComponent(g.gameId),{cache:'no-store'})
+        .then(r=>r.json())
+        .then(d=>(d.events||[]).map(e=>({...e,_game:g})))
+        .catch(()=>[])
+    );
+    (await Promise.all(fetches)).forEach(evs=>allEvents.push(...evs));
+  } catch(e){
+    document.getElementById('team-page-content').innerHTML =
+      '<div class="card" style="color:#ef4444;font-size:12px;">Failed to load event data.</div>';
+    return;
+  }
+
+  _teamPage.events = allEvents;
+  _teamPage.games  = allGames;
+  renderTeamPage();
+}
+
+function closeTeamPage(){
+  document.getElementById('team-page-overlay').style.display = 'none';
+}
+
+function renderTeamPage(){
+  const { teamName, events, games } = _teamPage;
+  const tev = events.filter(e=>e.team===teamName);
+  const isGoal = e=>/^Goal \(/i.test(e.event||'');
+  const isMiss = e=>/^Missed Shot/i.test(e.event||'');
+
+  // ── Record ────────────────────────────────────────────────
+  let wins=0, losses=0, ties=0;
+  games.forEach(g=>{
+    const opp = g.whiteTeam===teamName ? g.darkTeam : g.whiteTeam;
+    const gev = events.filter(e=>e._game.gameId===g.gameId);
+    const tG = gev.filter(e=>e.team===teamName&&isGoal(e)).length;
+    const oG = gev.filter(e=>e.team===opp&&isGoal(e)).length;
+    if(tG>oG) wins++; else if(oG>tG) losses++; else ties++;
+  });
+  document.getElementById('team-page-subtitle').textContent =
+    `${wins}W – ${losses}L${ties?' – '+ties+'T':''} · ${games.length} game${games.length!==1?'s':''}`;
+
+  // ── Season totals ─────────────────────────────────────────
+  const totalGoals   = tev.filter(isGoal).length;
+  const totalMisses  = tev.filter(isMiss).length;
+  const totalAssists = tev.filter(e=>e.event==='Assist').length;
+  const totalSteals  = tev.filter(e=>e.event==='Steal').length;
+  const totalTOs     = tev.filter(e=>e.event==='Turnover').length;
+  const totalEj      = tev.filter(e=>e.event==='Ejection').length;
+  const total5m      = tev.filter(e=>e.event==='5M Foul').length;
+  const shootPct     = (totalGoals+totalMisses)>0 ? Math.round(totalGoals/(totalGoals+totalMisses)*100) : null;
+
+  const sBox = (v,lbl) =>
+    `<div style="text-align:center;background:#111d2c;border:1px solid #1e3a5a;border-radius:8px;padding:8px 2px;">
+      <div style="font-size:20px;font-weight:700;color:#c0d8f0;">${v??'—'}</div>
+      <div style="font-size:9px;color:#5a80a0;font-weight:700;letter-spacing:.5px;margin-top:2px;">${lbl}</div>
+    </div>`;
+
+  const summaryHTML =
+    `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px;">
+      ${sBox(totalGoals,'GOALS')}${sBox(shootPct!==null?shootPct+'%':'—','SHOOT%')}${sBox(totalAssists,'ASSISTS')}${sBox(totalSteals,'STEALS')}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:14px;">
+      ${sBox(totalTOs,"TO'S")}${sBox(totalEj,'EJECTIONS')}${sBox(total5m,'5M FOULS')}
+    </div>`;
+
+  // ── Player stats table ────────────────────────────────────
+  const PCOLS = [
+    {label:'G',   fn:isGoal},
+    {label:'A',   fn:e=>e.event==='Assist'},
+    {label:'Stl', fn:e=>e.event==='Steal'},
+    {label:'Ej',  fn:e=>e.event==='Ejection'},
+    {label:'5M',  fn:e=>e.event==='5M Foul'},
+    {label:'Blk', fn:e=>/block/i.test(e.event||'')},
+    {label:'TO',  fn:e=>e.event==='Turnover'},
+    {label:'GP',  fn:null},
+  ];
+  const playerMap = {};
+  tev.filter(e=>e.cap).forEach(e=>{
+    if(!playerMap[e.cap]){
+      let name='';
+      if(e.playerId){
+        const p=state.players.find(p=>String(p.id)===String(e.playerId));
+        if(p) name=fmtName(((p.first||'')+' '+(p.last||'')).trim())||'';
+      }
+      playerMap[e.cap]={cap:e.cap,name,gameIds:new Set()};
+    }
+    if(e._game) playerMap[e.cap].gameIds.add(e._game.gameId);
+  });
+  const sortedPlayers = Object.values(playerMap).sort((a,b)=>Number(a.cap)-Number(b.cap));
+  const hc = 'color:#4a7a9a;';
+  const colHdrs = PCOLS.map(c=>`<th style="text-align:center;padding:4px;font-size:10px;font-weight:600;${hc}">${c.label}</th>`).join('');
+  let tableRows='';
+  sortedPlayers.forEach(p=>{
+    const pev=tev.filter(e=>e.cap===p.cap);
+    const tots=PCOLS.map(c=>c.label==='GP'?p.gameIds.size:pev.filter(c.fn).length);
+    if(tots.slice(0,-1).every(n=>n===0)) return;
+    const cells=tots.map(n=>`<td style="text-align:center;padding:5px 4px;font-size:12px;">${n>0?n:'<span style="color:#2a3a4a;">–</span>'}</td>`).join('');
+    tableRows+=`<tr style="border-bottom:1px solid #0e1e2e;">
+      <td style="padding:5px 6px;white-space:nowrap;">
+        <span style="font-weight:700;color:#4a7a9a;margin-right:4px;">#${p.cap}</span>
+        ${p.name?`<span style="font-size:12px;color:#c0d8f0;">${p.name}</span>`:''}
+      </td>${cells}</tr>`;
+  });
+  const playerTableHTML = tableRows
+    ? `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+        <table class="tbl" style="min-width:340px;">
+          <thead><tr style="border-bottom:1px solid #1e3a5a;">
+            <th style="text-align:left;padding:4px 6px;font-size:10px;font-weight:600;${hc}">Player</th>${colHdrs}
+          </tr></thead><tbody>${tableRows}</tbody>
+        </table></div>`
+    : '<div style="font-size:12px;color:#3a5a7a;padding:6px 0;">No player stats recorded yet.</div>';
+
+  // ── Fouls by player (visual bar chart) ───────────────────
+  const foulMap={};
+  tev.filter(e=>['Ejection','5M Foul'].includes(e.event)&&e.cap).forEach(e=>{
+    if(!foulMap[e.cap]){
+      let name='';
+      if(e.playerId){const p=state.players.find(p=>String(p.id)===String(e.playerId));if(p)name=fmtName(((p.first||'')+' '+(p.last||'')).trim())||'';}
+      foulMap[e.cap]={cap:e.cap,name,ej:0,fm:0};
+    }
+    if(e.event==='Ejection') foulMap[e.cap].ej++;
+    else foulMap[e.cap].fm++;
+  });
+  const foulList=Object.values(foulMap).map(p=>({...p,total:p.ej+p.fm})).sort((a,b)=>b.total-a.total);
+  const maxF=foulList.length?foulList[0].total:1;
+  const foulsHTML=foulList.length ? foulList.map(p=>{
+    const w=Math.round(p.total/maxF*100);
+    return `<div style="margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px;">
+        <span style="font-size:12px;color:#c0d8f0;"><span style="font-weight:700;color:#4a7a9a;margin-right:4px;">#${p.cap}</span>${p.name||''}</span>
+        <span style="font-size:11px;white-space:nowrap;">
+          ${p.ej?`<span style="color:#f0a050;">${p.ej} Ej</span>`:''}
+          ${p.ej&&p.fm?' + ':''}
+          ${p.fm?`<span style="color:#ef7070;">${p.fm} 5M</span>`:''}
+          <span style="font-weight:700;color:#e0e8f0;margin-left:5px;">${p.total}</span>
+        </span>
+      </div>
+      <div style="background:#0d1e2e;border-radius:4px;height:9px;overflow:hidden;">
+        <div style="height:100%;width:${w}%;background:linear-gradient(to right,#e8a040,#ef4444);border-radius:4px;transition:width .3s;"></div>
+      </div>
+    </div>`;
+  }).join('') : '<div style="font-size:12px;color:#3a5a7a;">No fouls recorded.</div>';
+
+  // ── Game history ──────────────────────────────────────────
+  const histHTML=[...games].reverse().map(g=>{
+    const opp=g.whiteTeam===teamName?g.darkTeam:g.whiteTeam;
+    const gev=events.filter(e=>e._game.gameId===g.gameId);
+    const tG=gev.filter(e=>e.team===teamName&&isGoal(e)).length;
+    const oG=gev.filter(e=>e.team===opp&&isGoal(e)).length;
+    const result=tG>oG?'W':oG>tG?'L':'T';
+    const rc=result==='W'?'#4ade80':result==='L'?'#ef4444':'#7abcdc';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #0a1820;">
+      <span style="font-size:14px;font-weight:700;color:${rc};width:16px;flex:0 0 auto;">${result}</span>
+      <span style="font-size:14px;font-weight:700;color:#c0d8f0;min-width:44px;">${tG}–${oG}</span>
+      <span style="font-size:11px;color:#5a80a0;">vs ${opp}</span>
+      <span style="font-size:10px;color:#3a5a7a;margin-left:auto;">${fmtDate(g.date||'')}</span>
+    </div>`;
+  }).join('');
+
+  // ── Assemble ──────────────────────────────────────────────
+  document.getElementById('team-page-content').innerHTML = `
+    ${summaryHTML}
+    <div class="stitle" style="margin-bottom:6px;">PLAYER STATS — ALL GAMES</div>
+    <div class="card" style="padding:10px 12px;margin-bottom:12px;">${playerTableHTML}</div>
+    <div class="stitle" style="margin-bottom:6px;">FOULS COMMITTED BY PLAYER</div>
+    <div class="card" style="padding:12px;margin-bottom:12px;">${foulsHTML}</div>
+    <div class="stitle" style="margin-bottom:6px;">GAME HISTORY</div>
+    <div class="card" style="padding:4px 12px;margin-bottom:12px;">${histHTML||'<div style="font-size:12px;color:#3a5a7a;padding:8px 0;">No games yet.</div>'}</div>
+  `;
 }
 
 // ═══════════════════════════════════════════════════════════
