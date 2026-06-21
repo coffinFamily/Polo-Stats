@@ -5618,10 +5618,23 @@ function renderFollowRecap(ev, wN, dN){
   const dTO=cnt(dN,isTO),   wTO=cnt(wN,isTO);
   const dStl=cnt(dN,isSteal),wStl=cnt(wN,isSteal);
 
-  // Shooting % — only valid when misses are actually tracked for that team
-  const dShots = dG + dM, wShots = wG + wM;
-  const dPct = dM > 0 ? Math.round(dG / dShots * 100) : null;
-  const wPct = wM > 0 ? Math.round(wG / wShots * 100) : null;
+  // Old-style Goalie Blocks have no companion Miss (Blocked) record.
+  // New-style blocks (shooter captured) produce a Shot On Goal sheet row with the
+  // same groupId as the Goalie Block — use that as a sentinel so we don't double-count
+  // blocks that are already counted via Miss (Blocked) in isMiss.
+  const newStyleGids = new Set(ev.filter(e=>e.event==='Shot On Goal').map(e=>e.groupId));
+  const isBlkOld = e => isBlk(e) && !newStyleGids.has(e.groupId);
+  // dBlkOld = old-style blocks by DARK goalie  → shots blocked AGAINST white
+  // wBlkOld = old-style blocks by WHITE goalie → shots blocked AGAINST dark
+  const dBlkOld=cnt(dN,isBlkOld), wBlkOld=cnt(wN,isBlkOld);
+
+  // Shooting % — goals / (goals + misses + goalie blocks against)
+  // dShots = dark team's attempts: dark goals + dark misses + white old-style blocks against dark
+  // wShots = white team's attempts: white goals + white misses + dark old-style blocks against white
+  const dShots = dG + dM + wBlkOld;
+  const wShots = wG + wM + dBlkOld;
+  const dPct = (dM > 0 || wBlkOld > 0) ? Math.round(dG / dShots * 100) : null;
+  const wPct = (wM > 0 || dBlkOld > 0) ? Math.round(wG / wShots * 100) : null;
 
   // Detect "our team" — the team being closely tracked by the stats-taker.
   // Heuristic: whichever side has shot-attempt data (misses) or more
@@ -5648,9 +5661,10 @@ function renderFollowRecap(ev, wN, dN){
   const ourTO = isOurDark ? dTO : wTO,  oppTO = isOurDark ? wTO : dTO;
   const ourStl= isOurDark ? dStl: wStl, oppStl= isOurDark ? wStl: dStl;
   const ourBlk= isOurDark ? dBlk: wBlk, oppBlk= isOurDark ? wBlk: dBlk;
+  const ourBlkOld = isOurDark ? wBlkOld : dBlkOld; // old-style blocks AGAINST our team
   const ourPct = isOurDark ? dPct : wPct;
   const oppPct = isOurDark ? wPct : dPct;
-  const ourShots = ourG + ourM;
+  const ourShots = ourG + ourM + ourBlkOld;
 
   // Quarter goal counts
   const qg = q=>({
@@ -6128,7 +6142,7 @@ function renderTeamPage(){
 
   // ── Season totals ─────────────────────────────────────────
   const totalGoals      = tev.filter(isGoal).length;
-  const totalMisses     = tev.filter(isMiss).length;
+  const totalMisses     = tev.filter(isMiss).length;  // includes Miss (Blocked) companions (new-style)
   const totalAssists    = tev.filter(e=>e.event==='Assist').length;
   const totalSteals     = tev.filter(e=>e.event==='Steal').length;
   const totalTOs        = tev.filter(e=>e.event==='Turnover').length;
@@ -6139,7 +6153,20 @@ function renderTeamPage(){
   const totalFoulsDrawn = totalEjDrawn + total5mDrawn;
   const totalFoulsComm  = totalEj + total5m;
   const seasonFoulPM    = totalFoulsDrawn - totalFoulsComm;
-  const shootPct        = (totalGoals+totalMisses)>0 ? Math.round(totalGoals/(totalGoals+totalMisses)*100) : null;
+
+  // Old-style Goalie Blocks (no companion Miss record) — blocked shots AGAINST this team.
+  // They're on the OPPONENT's team rows so not in tev. New-style blocks already appear
+  // in tev as Miss (Blocked) via isMiss, so exclude them using the Shot On Goal sentinel.
+  const newStyleGidsTP = new Set(events.filter(e=>e.event==='Shot On Goal').map(e=>e.groupId));
+  const totalBlkOld = events.filter(e =>
+    e.event==='Goalie Block' &&
+    e.team!==teamName &&
+    (e._game && (e._game.whiteTeam===teamName || e._game.darkTeam===teamName)) &&
+    !newStyleGidsTP.has(e.groupId)
+  ).length;
+
+  const totalAttempts = totalGoals + totalMisses + totalBlkOld;
+  const shootPct      = totalAttempts > 0 ? Math.round(totalGoals / totalAttempts * 100) : null;
 
   const sBox = (v, lbl, clr) =>
     `<div style="text-align:center;background:#111d2c;border:1px solid #1e3a5a;border-radius:8px;padding:8px 2px;">
