@@ -198,7 +198,7 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
     </div>
     <!-- Row 2: Goals / Assists / Steals / TOs (25% each) -->
     <div style="display:flex;gap:5px;margin-bottom:5px;">
-      <button class="btn-s" style="flex:1;padding:9px 4px;font-size:11px;font-weight:700;text-align:center;line-height:1.35;" onclick="showStatPopup(['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)','Goal (Counter)'],wpBall()+'Goals',{missTypes:['Missed Shot','Missed Shot 5M']})">Goals<br><span id="stat-goals" style="font-size:10px;font-weight:700;color:#7abcdc;">0</span></button>
+      <button class="btn-s" style="flex:1;padding:9px 4px;font-size:11px;font-weight:700;text-align:center;line-height:1.35;" onclick="showStatPopup(['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)','Goal (Counter)'],wpBall()+'Goals',{missTypes:['Missed Shot','Missed Shot 5M','Miss (Blocked)']})">Goals<br><span id="stat-goals" style="font-size:10px;font-weight:700;color:#7abcdc;">0</span></button>
       <button class="btn-s" style="flex:1;padding:9px 4px;font-size:11px;font-weight:700;text-align:center;line-height:1.35;" onclick="showStatPopup(['Assist'],'🤝 Assists')">Assists<br><span id="stat-assists" style="font-size:10px;font-weight:700;color:#7abcdc;">0</span></button>
       <button class="btn-s" style="flex:1;padding:9px 4px;font-size:11px;font-weight:700;text-align:center;line-height:1.35;" onclick="showStatPopup(['Steal'],'✊ Steals')">Steals<br><span id="stat-steals" style="font-size:10px;font-weight:700;color:#7abcdc;">0</span></button>
       <button class="btn-s" style="flex:1;padding:9px 4px;font-size:11px;font-weight:700;text-align:center;line-height:1.35;" onclick="showStatPopup(['Turnover'],'🔄 Turnovers')">TO's<br><span id="stat-tos" style="font-size:10px;font-weight:700;color:#7abcdc;">0</span></button>
@@ -701,7 +701,7 @@ const EVENT_DEFS = {
   'assist':         {label:'Assist',            flow:['cap']},
   'ejection-drawn': {label:'Ejection Drawn',    flow:['cap']},
   '5m-drawn':       {label:'5M Drawn',          flow:['cap']},
-  'goalie-block':   {label:'Goalie Block',      flow:['goalie-team','goalie-cap','zone']},
+  'goalie-block':   {label:'Goalie Block',      flow:['goalie-team','goalie-cap','zone','shooter-cap']},
   'field-block':    {label:'Field Block',       flow:['cap']},
   'sprint-won':     {label:'Sprint Won',        flow:['cap']},
 };
@@ -1289,6 +1289,8 @@ function autoPauseIfNeeded(eventLabel){
 function finalizeEvent(){
   // 5M Penalty has its own multi-event finalization
   if(state.flowCtx.eventType==='5m-penalty'){ finalize5mPenalty(); return; }
+  // Goalie Block creates two records — block + optional shooter companion
+  if(state.flowCtx.eventType==='goalie-block'){ finalizeGoalieBlock(); return; }
 
   const d=state.pendingData;
   // 5M events have a fixed known origin — auto-inject if not already set
@@ -1345,46 +1347,94 @@ function finalize5mPenalty(){
   pushToSheet({action:'events', rows:eventToRows({...foulRow,gameId,date})});
 }
 
-function quickGoalieBlock(team, cap){
-  const prefs=(state.prefs||{})[team]||{};
-  if(prefs.blockZone!==false){
-    // Block Zone capture is ON — show zone picker then save
-    const g=state.game;
-    const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
-    const teamName=team==='dark'?dN:wN;
-    const roster=team==='dark'?(g.darkRoster||[]):(g.whiteRoster||[]);
-    const player=roster.find(p=>p.cap===cap);
-    state.flow=['zone']; state.flowIdx=0;
-    state.flowCtx={eventType:'goalie-block',eventLabel:'Goalie Block',team,goalieTeam:team};
-    state.pendingData={
-      teamLabel:teamName, goalieTeamLabel:teamName,
-      goalieCap:cap, goalieCapName:player?player.name:'#'+cap,
-      goaliePlayerId:player?player.playerId:null
-    };
-    showModalStep('zone');
-    return;
-  }
-  // Block Zone OFF — save immediately without zone
-  const g=state.game;
-  const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
-  const teamName=team==='dark'?dN:wN;
-  const roster=team==='dark'?(g.darkRoster||[]):(g.whiteRoster||[]);
-  const player=roster.find(p=>p.cap===cap);
-  const row={
-    id:Date.now(), q:state.q, time:fmt(state.timerSecs),
-    type:'Goalie Block',
-    team:teamName,
-    cap, capName:player?player.name:'#'+cap,
-    playerId:player?player.playerId:null,
-    zone:'', gm:'', assist:'',
-    drawnBy:'', drawnByName:'', drawnPlayerId:null,
-    turnoverBy:'', shooterCap:'',
+function finalizeGoalieBlock(){
+  const d = state.pendingData;
+  const ctx = state.flowCtx;
+  const g = state.game;
+  const dN = g.darkTeam||'Dark', wN = g.whiteTeam||'White';
+  const now = Date.now();
+  const gameId = g.gameId||'';
+  const date = g.date||'';
+
+  const goalieTeamName = d.goalieTeamLabel || d.teamLabel || '';
+  const atkSide = ctx.goalieTeam === 'dark' ? 'white' : 'dark';
+  const atkTeamName = atkSide === 'dark' ? dN : wN;
+  const atkRoster = atkSide === 'dark' ? (g.darkRoster||[]) : (g.whiteRoster||[]);
+  const shooterKnown = d.shooterCap && d.shooterCap !== '?';
+
+  // Record 1: Goalie Block — on defending/goalie team.
+  // Store shooterCap to flag that a companion Miss (Blocked) record exists.
+  const blockRow = {
+    id: now, q: state.q, time: fmt(state.timerSecs),
+    type: 'Goalie Block',
+    team: goalieTeamName,
+    cap: d.goalieCap||'', capName: d.goalieCapName||'',
+    playerId: d.goaliePlayerId||null,
+    zone: d.zone||'', gm: d.gm||'',
+    assist: '', assistName: '', assistPlayerId: null,
+    drawnBy: '', drawnByName: '', drawnPlayerId: null,
+    turnoverBy: '', turnoverPlayerId: null,
+    stolenBy: '', stolenByName: '', stolenPlayerId: null,
+    shooterCap: shooterKnown ? '#'+d.shooterCap : '',
+    shooterPlayerId: shooterKnown ? (d.shooterPlayerId||null) : null,
   };
-  state.events.push(row);
-  ss('wp-events',state.events); syncGameEvents();
-  renderEventLog(); updateScores();
-  showEventToast('✓ Goalie Block', teamName+(cap?' · #'+cap:''), '#0a84c8');
-  pushToSheet({action:'events', rows:eventToRows({...row, gameId:g.gameId||'', date:g.date||''})});
+  state.events.push(blockRow);
+
+  // Record 2: Miss (Blocked) — on attacking/shooter team, only when shooter was identified.
+  // This is the companion record that lets shot-% calculations attribute the blocked
+  // attempt to the right player without double-counting the Goalie Block.
+  if(shooterKnown){
+    const sp = atkRoster.find(p => p.cap === d.shooterCap);
+    const missRow = {
+      id: now+1, q: state.q, time: fmt(state.timerSecs),
+      type: 'Miss (Blocked)',
+      team: atkTeamName,
+      cap: d.shooterCap,
+      capName: d.shooterCapName || (sp ? sp.name : '#'+d.shooterCap),
+      playerId: d.shooterPlayerId || (sp ? sp.playerId : null),
+      zone: d.zone||'', gm: '',
+      assist: '', assistName: '', assistPlayerId: null,
+      drawnBy: '', drawnByName: '', drawnPlayerId: null,
+      turnoverBy: '', turnoverPlayerId: null,
+      stolenBy: '', stolenByName: '', stolenPlayerId: null,
+      shooterCap: '', shooterPlayerId: null,
+    };
+    state.events.push(missRow);
+    pushToSheet({action:'events', rows:eventToRows({...missRow, gameId, date})});
+  }
+
+  ss('wp-events', state.events); syncGameEvents();
+  closeModal(); renderEventLog(); updateScores();
+  const toast = shooterKnown
+    ? `✓ Goalie Block + Miss (${d.shooterCap})`
+    : `✓ Goalie Block`;
+  showEventToast(toast, goalieTeamName+(d.goalieCap?' · #'+d.goalieCap:''), '#0a84c8');
+  pushToSheet({action:'events', rows:eventToRows({...blockRow, gameId, date})});
+}
+
+function quickGoalieBlock(team, cap){
+  const prefs = (state.prefs||{})[team]||{};
+  const g = state.game;
+  const dN = g.darkTeam||'Dark', wN = g.whiteTeam||'White';
+  const teamName = team==='dark' ? dN : wN;
+  const roster = team==='dark' ? (g.darkRoster||[]) : (g.whiteRoster||[]);
+  const player = roster.find(p => p.cap === cap);
+  state.flowCtx = {
+    eventType: 'goalie-block', eventLabel: 'Goalie Block',
+    team: team, goalieTeam: team
+  };
+  state.pendingData = {
+    teamLabel: teamName, goalieTeamLabel: teamName,
+    goalieCap: cap, goalieCapName: player ? player.name : '#'+cap,
+    goaliePlayerId: player ? player.playerId : null
+  };
+  // Zone capture if enabled, then always ask for shooter cap
+  const flow = [];
+  if(prefs.blockZone !== false) flow.push('zone');
+  flow.push('shooter-cap');
+  state.flow = flow;
+  state.flowIdx = 0;
+  showModalStep(flow[0]);
 }
 
 function selectActiveGoalie(team, cap){
@@ -1554,6 +1604,14 @@ function showModalStep(step){
   else if(step==='goalie-cap'){
     const gtIsDk=state.flowCtx.goalieTeam==='dark';
     renderCapPicker(gtIsDk?g.darkRoster:g.whiteRoster,gtIsDk,'Goalie cap #','goalieCap');
+  }
+  else if(step==='shooter-cap'){
+    // Shooter is from the ATTACKING team — opposite of the goalie's team
+    const gtIsDk = state.flowCtx.goalieTeam === 'dark';
+    const atkIsDk = !gtIsDk;
+    const atkRoster = atkIsDk ? (g.darkRoster||[]) : (g.whiteRoster||[]);
+    const atkName   = atkIsDk ? dN : wN;
+    renderCapPicker(atkRoster, atkIsDk, `Shooter — ${atkName}`, 'shooterCap', true);
   }
   else if(step==='drawn'){
     renderCapPicker(oppRoster,!isDk,`Drawn by — ${isDk?wN:dN}`,'drawn');
@@ -3955,19 +4013,21 @@ function showShotChart(side) {
   const gCx = X + W/2, gW = W*0.15, gLeft = gCx - gW/2, gRight = gCx + gW/2;
   const GOAL_TYPES = ['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)','Goal (Counter)'];
 
-  const MISS_TYPES = ['Missed Shot','Missed Shot 5M'];
-  // Goals and misses belong to the team that took the shot (this team).
-  // Goalie Block is recorded on the DEFENDING team, so it represents a shot
-  // attempt by the OPPOSING team — flip to opponent's team for shot attribution.
+  const MISS_TYPES = ['Missed Shot','Missed Shot 5M','Miss (Blocked)'];
+  // Goals and misses (including Miss (Blocked) companions) belong to the team that shot.
+  // Old-style Goalie Blocks (no shooterCap = no companion record) are counted via the
+  // opposing team's perspective for backward compatibility. New-style blocks already have
+  // a companion Miss (Blocked) on the attacking team, so skip the Goalie Block opp-count
+  // to avoid double-counting.
   const shots = state.events.filter(e =>
     (GOAL_TYPES.includes(e.type) || MISS_TYPES.includes(e.type)) ? isThisTeam(e) :
-    e.type === 'Goalie Block' ? isOppTeam(e) : false);
+    e.type === 'Goalie Block' && !e.shooterCap ? isOppTeam(e) : false);
   const withZone  = shots.filter(e => e.zone && e.zone.includes(','));
   const noZone    = shots.filter(e => !e.zone || !e.zone.includes(','));
   const goalCount  = shots.filter(e => GOAL_TYPES.includes(e.type)).length;
   const missCount  = shots.filter(e => MISS_TYPES.includes(e.type)).length;
   const blockCount = shots.filter(e => e.type === 'Goalie Block').length;
-  const pct = (goalCount + missCount) > 0 ? Math.round(goalCount/(goalCount+missCount)*100) : 0;
+  const pct = shots.length > 0 ? Math.round(goalCount / shots.length * 100) : 0;
 
   _scData = { teamName, withZone, goalCount, missCount, blockCount };
 
@@ -4069,8 +4129,8 @@ function renderShotChartMarkers(filterCap) {
     const cx = Math.max(X+4, Math.min(X+W-4, svgX+jX));
     const cy = Math.max(Y+4, Math.min(Y+H-4, svgY+jY));
     const isGoal  = GOAL_TYPES.includes(e.type);
-    const isBlock = e.type === 'Goalie Block';
-    const MISS_TYPES = ['Missed Shot','Missed Shot 5M'];
+    const isBlock = e.type === 'Goalie Block' || e.type === 'Miss (Blocked)';
+    const MISS_TYPES = ['Missed Shot','Missed Shot 5M','Miss (Blocked)'];
     const op = active ? '0.95' : '0.18';
     if (isGoal) {
       html += `<circle cx="${cx}" cy="${cy}" r="4" fill="#16a34a" stroke="#ffffff" stroke-width="1" opacity="${op}"/>`;
@@ -5285,7 +5345,7 @@ function showFollowChipPopup(key){
   }
 
   const GOAL_TYPES_FC = ['Goal (Reg)','Goal (6-5)','Goal (5M)','Goal (Counter)'];
-  const MISS_TYPES_FC = ['Missed Shot','Missed Shot 5M'];
+  const MISS_TYPES_FC = ['Missed Shot','Missed Shot 5M','Miss (Blocked)'];
 
   const configs = {
     'goals':   { types:GOAL_TYPES_FC,            title:wpBall()+' Goals',
@@ -5540,7 +5600,7 @@ function renderFollowRecap(ev, wN, dN){
   const isGoal  = e => /^Goal \(/i.test(e.event||'');
   const is65    = e => e.event==='Goal (6-5)';
   const is5mG   = e => e.event==='Goal (5M)' || e.event==='5M Goal';
-  const isMiss  = e => /^Missed Shot/i.test(e.event||'');
+  const isMiss  = e => /^Missed Shot/i.test(e.event||'') || e.event==='Miss (Blocked)';
   const isBlk   = e => e.event==='Goalie Block';
   const isEj    = e => e.event==='Ejection';
   const is5mF   = e => e.event==='5M Foul';
@@ -6048,7 +6108,7 @@ function renderTeamPage(){
   const { teamName, events, games } = _teamPage;
   const tev = events.filter(e=>e.team===teamName);
   const isGoal = e=>/^Goal \(/i.test(e.event||'');
-  const isMiss = e=>/^Missed Shot/i.test(e.event||'');
+  const isMiss = e=>/^Missed Shot/i.test(e.event||'') || e.event==='Miss (Blocked)';
   const isEjDrawn  = e=>e.event==='Ejection Drawn';
   const is5mDrawn  = e=>e.event==='5M Drawn'||e.event==='5m Drawn';
   const isEjComm   = e=>e.event==='Ejection';
