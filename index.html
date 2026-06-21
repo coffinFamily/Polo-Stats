@@ -6316,6 +6316,163 @@ function renderTeamPage(){
       ${dots}
     </svg>`;
 
+  // ── Quarter analysis — Goals & Fouls ─────────────────────
+  const QS_BASE = ['1','2','3','4'];
+  const hasOT = events.some(e =>
+    String(e.q)==='OT' &&
+    e._game && (e._game.whiteTeam===teamName || e._game.darkTeam===teamName));
+  const QS_ALL = hasOT ? [...QS_BASE,'OT'] : QS_BASE;
+
+  // Games that went to OT (for per-game divisor)
+  const otGameIds = hasOT ? new Set(
+    events.filter(e=>String(e.q)==='OT'&&
+      e._game&&(e._game.whiteTeam===teamName||e._game.darkTeam===teamName))
+      .map(e=>e._game.gameId)) : new Set();
+  const qDiv = q => q==='OT' ? (otGameIds.size||1) : (games.length||1);
+
+  // Events that belong to games the team played in (for opponent data)
+  const teamGameIds = new Set(games.map(g=>g.gameId));
+  const allTeamGameEvs = events.filter(e=>e._game&&teamGameIds.has(e._game.gameId));
+
+  // Goals per quarter
+  const qTG  = {}, qOG = {};
+  QS_ALL.forEach(q=>{
+    qTG[q] = tev.filter(e=>isGoal(e)&&String(e.q)===q).length;
+    qOG[q] = allTeamGameEvs.filter(e=>isGoal(e)&&e.team!==teamName&&String(e.q)===q).length;
+  });
+  const totalTG  = QS_ALL.reduce((s,q)=>s+qTG[q],0);
+  const totalOG  = QS_ALL.reduce((s,q)=>s+qOG[q],0);
+
+  // Find lull (min goals/game) and surge (max) quarters among Q1-Q4 only
+  const qGoalPG  = QS_BASE.map(q=>qTG[q]/qDiv(q));
+  const minGoalPG = Math.min(...qGoalPG);
+  const maxGoalPG = Math.max(...qGoalPG);
+
+  // Fouls per quarter
+  const qEjQ = {}, q5mQ = {};
+  QS_ALL.forEach(q=>{
+    qEjQ[q]  = tev.filter(e=>isEjComm(e)&&String(e.q)===q).length;
+    q5mQ[q]  = tev.filter(e=>is5mComm(e)&&String(e.q)===q).length;
+  });
+  const qFoulTotal = q => (qEjQ[q]||0)+(q5mQ[q]||0);
+  const foulPGs = QS_BASE.map(q=>qFoulTotal(q)/qDiv(q));
+  const maxFoulPG = Math.max(...foulPGs);
+  const minFoulPG = Math.min(...foulPGs);
+
+  // Table builder — shared styles
+  const nCols   = QS_ALL.length + 2; // label + quarters + total
+  const qColsFr = `auto ${QS_ALL.map(()=>'1fr').join(' ')} auto`;
+  const hdrCell  = (t,s='') => `<div style="text-align:center;font-size:9px;font-weight:700;color:#3a6a8a;letter-spacing:.5px;padding:4px 2px;${s}">${t}</div>`;
+  const lblCell  = (t,s='') => `<div style="font-size:10px;color:#5a80a0;padding:4px 6px 4px 0;white-space:nowrap;${s}">${t}</div>`;
+  const numCell  = (v,clr,bg='',s='') =>
+    `<div style="text-align:center;font-size:13px;font-weight:700;color:${clr};padding:5px 2px;border-radius:4px;background:${bg};${s}">${v}</div>`;
+  const pgCell   = (v,clr,bg='') =>
+    `<div style="text-align:center;font-size:10px;color:${clr};padding:2px 2px 5px;border-radius:4px;background:${bg};">${v}</div>`;
+  const divRow   = () => `<div style="grid-column:1/-1;height:1px;background:#0d1e2e;"></div>`;
+
+  // ── Goals by Quarter table ──────────────────────────────
+  let qGoalHTML = `<div style="display:grid;grid-template-columns:${qColsFr};gap:0;">`;
+  // Header row
+  qGoalHTML += hdrCell('');
+  QS_ALL.forEach(q=>{ qGoalHTML += hdrCell(q==='OT'?'OT':'Q'+q); });
+  qGoalHTML += hdrCell('TTL');
+  qGoalHTML += divRow();
+
+  // Team goals row
+  qGoalHTML += lblCell(teamName.substring(0,14));
+  QS_ALL.forEach(q=>{
+    const pg = qTG[q]/qDiv(q);
+    const isLull   = q!=='OT' && pg===minGoalPG && minGoalPG<maxGoalPG;
+    const isSurge  = q!=='OT' && pg===maxGoalPG && minGoalPG<maxGoalPG;
+    const bg  = isLull?'#1e0e00':isSurge?'#001e0e':'';
+    const clr = isLull?'#c08040':isSurge?'#4ade80':'#c0d8f0';
+    qGoalHTML += numCell(qTG[q], clr, bg);
+  });
+  qGoalHTML += numCell(totalTG,'#7abcdc');
+
+  // Opp goals row
+  qGoalHTML += lblCell('Opponents');
+  QS_ALL.forEach(q=>{ qGoalHTML += numCell(qOG[q],'#5a80a0'); });
+  qGoalHTML += numCell(totalOG,'#4a6a80');
+
+  qGoalHTML += divRow();
+  // Goal ± row
+  qGoalHTML += lblCell('Goal ±','font-size:9px;');
+  QS_ALL.forEach(q=>{
+    const pm=qTG[q]-qOG[q];
+    const clr=pm>0?'#4ade80':pm<0?'#ef4444':'#5a80a0';
+    qGoalHTML += pgCell(pm>0?'+'+pm:pm, clr);
+  });
+  const totalPM = totalTG-totalOG;
+  qGoalHTML += pgCell(totalPM>0?'+'+totalPM:totalPM, totalPM>0?'#4ade80':totalPM<0?'#ef4444':'#5a80a0');
+
+  // Per-game row
+  qGoalHTML += lblCell('/Game','font-size:9px;color:#3a5a7a;');
+  QS_ALL.forEach(q=>{
+    const pg=(qTG[q]/qDiv(q)).toFixed(1);
+    const isLull  = q!=='OT' && Number(pg)===minGoalPG && minGoalPG<maxGoalPG;
+    const isSurge = q!=='OT' && Number(pg)===maxGoalPG && minGoalPG<maxGoalPG;
+    const clr = isLull?'#c08040':isSurge?'#4ade80':'#3a5a7a';
+    qGoalHTML += pgCell(pg, clr);
+  });
+  qGoalHTML += pgCell((totalTG/games.length).toFixed(1),'#3a5a7a');
+
+  qGoalHTML += `</div>`;
+
+  // ── Fouls by Quarter table ──────────────────────────────
+  let qFoulHTML = `<div style="display:grid;grid-template-columns:${qColsFr};gap:0;">`;
+  qFoulHTML += hdrCell('');
+  QS_ALL.forEach(q=>{ qFoulHTML += hdrCell(q==='OT'?'OT':'Q'+q); });
+  qFoulHTML += hdrCell('TTL');
+  qFoulHTML += divRow();
+
+  // Ejections row
+  const totalEjQ = QS_ALL.reduce((s,q)=>s+qEjQ[q],0);
+  qFoulHTML += lblCell('Ejections');
+  QS_ALL.forEach(q=>{ qFoulHTML += numCell(qEjQ[q], qEjQ[q]>0?'#f0a050':'#3a5a7a'); });
+  qFoulHTML += numCell(totalEjQ,'#f0a050');
+
+  // 5M row
+  const total5mQ = QS_ALL.reduce((s,q)=>s+q5mQ[q],0);
+  qFoulHTML += lblCell('5M Fouls');
+  QS_ALL.forEach(q=>{ qFoulHTML += numCell(q5mQ[q], q5mQ[q]>0?'#ef7070':'#3a5a7a'); });
+  qFoulHTML += numCell(total5mQ,'#ef7070');
+
+  qFoulHTML += divRow();
+  // Total row
+  const totalFoulsQ = QS_ALL.reduce((s,q)=>s+qFoulTotal(q),0);
+  qFoulHTML += lblCell('Total','font-size:9px;');
+  QS_ALL.forEach(q=>{
+    const ft=qFoulTotal(q);
+    const pg=ft/qDiv(q);
+    const isWorst = q!=='OT' && pg===maxFoulPG && maxFoulPG>minFoulPG;
+    const isBest  = q!=='OT' && pg===minFoulPG && maxFoulPG>minFoulPG;
+    const bg  = isWorst?'#1e0808':isBest?'#001e0e':'';
+    const clr = isWorst?'#ef4444':isBest?'#4ade80':ft>0?'#e0e8f0':'#3a5a7a';
+    qFoulHTML += numCell(ft, clr, bg);
+  });
+  qFoulHTML += numCell(totalFoulsQ, totalFoulsQ>0?'#e0e8f0':'#3a5a7a');
+
+  // Per-game row
+  qFoulHTML += lblCell('/Game','font-size:9px;color:#3a5a7a;');
+  QS_ALL.forEach(q=>{
+    const pg=(qFoulTotal(q)/qDiv(q)).toFixed(1);
+    const isWorst = q!=='OT' && Number(pg)===maxFoulPG && maxFoulPG>minFoulPG;
+    const isBest  = q!=='OT' && Number(pg)===minFoulPG && maxFoulPG>minFoulPG;
+    const clr = isWorst?'#ef4444':isBest?'#4ade80':'#3a5a7a';
+    qFoulHTML += pgCell(pg, clr);
+  });
+  qFoulHTML += pgCell((totalFoulsQ/games.length).toFixed(1),'#3a5a7a');
+
+  qFoulHTML += `</div>`;
+
+  const quarterAnalysisHTML = `
+    <div style="font-size:10px;font-weight:700;color:#4a7a9a;letter-spacing:.5px;margin-bottom:6px;">GOALS BY QUARTER</div>
+    <div class="card" style="padding:10px 10px 6px;margin-bottom:8px;">${qGoalHTML}</div>
+    <div style="font-size:10px;font-weight:700;color:#4a7a9a;letter-spacing:.5px;margin-bottom:6px;margin-top:12px;">FOULS BY QUARTER <span style="font-size:9px;color:#3a5a7a;font-weight:400;">(committed)</span></div>
+    <div class="card" style="padding:10px 10px 6px;margin-bottom:8px;">${qFoulHTML}</div>
+  `;
+
   // ── Fouls by player (visual bar chart) ───────────────────
   const foulMap={};
   tev.filter(e=>['Ejection','5M Foul'].includes(e.event)&&e.cap).forEach(e=>{
@@ -6384,6 +6541,8 @@ function renderTeamPage(){
     <div class="stitle" style="margin-bottom:6px;">PLAYER STATS — ALL GAMES</div>
     <div class="card" style="padding:10px 12px;margin-bottom:12px;">${playerTableHTML}</div>
     <div class="card" style="padding:10px 12px;margin-bottom:12px;">${trendHTML}</div>
+    <div class="stitle" style="margin-bottom:6px;">QUARTER ANALYSIS</div>
+    <div style="margin-bottom:12px;">${quarterAnalysisHTML}</div>
     <div class="stitle" style="margin-bottom:6px;">GAME HISTORY</div>
     <div class="card" style="padding:4px 12px;margin-bottom:12px;">${histHTML||'<div style="font-size:12px;color:#3a5a7a;padding:8px 0;">No games yet.</div>'}</div>
     <div class="stitle" style="margin-bottom:6px;">FOULS COMMITTED BY PLAYER</div>
