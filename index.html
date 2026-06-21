@@ -5123,30 +5123,36 @@ function renderFollowContent(){
   // ── Score ────────────────────────────────────────────
   const wG = ev.filter(e=>e.event&&/^Goal \(/i.test(e.event)&&e.team===wN).length;
   const dG = ev.filter(e=>e.event&&/^Goal \(/i.test(e.event)&&e.team===dN).length;
-  // Team name — clickable link when team has real (non-placeholder) roster players
-  const _mkTeamLabel = (tn, clr) => {
-    if(teamHasRealRoster(tn, ev)){
-      const esc = tn.replace(/'/g,"\\'");
-      return `<span onclick="showTeamPage('${esc}')" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;color:${clr};">${tn} <span style="font-size:9px;opacity:.7;">↗</span></span>`;
-    }
-    return `<span style="color:${clr};">${tn}</span>`;
-  };
   const sc = document.getElementById('follow-score-card');
+  // Team page buttons — only for teams with real (non-placeholder) rosters
+  const wQual = teamHasRealRoster(wN, ev);
+  const dQual = teamHasRealRoster(dN, ev);
+  const _teamBtn = (tn) => {
+    const esc = tn.replace(/'/g,"\\'");
+    return `<button onclick="showTeamPage('${esc}')" style="flex:1;padding:7px 4px;border-radius:7px;background:#0a3a5a;border:1px solid #1a7aaa;color:#7abcdc;font-size:11px;font-weight:700;cursor:pointer;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📊 ${tn}</button>`;
+  };
+  const teamBtnRow = (wQual||dQual)
+    ? '<div style="display:flex;gap:6px;margin-top:8px;">'
+        +(wQual?_teamBtn(wN):'')
+        +(dQual?_teamBtn(dN):'')
+      +'</div>'
+    : '';
   if(sc) sc.innerHTML =
     '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0 2px;">'+
       '<div style="text-align:center;flex:1;">'+
-        '<div style="font-size:11px;font-weight:600;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+_mkTeamLabel(wN,'#c0d8f0')+'</div>'+
+        '<div style="font-size:11px;font-weight:600;color:#c0d8f0;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+wN+'</div>'+
         '<div style="font-size:52px;font-weight:700;color:#fff;line-height:1;">'+wG+'</div>'+
         '<div style="font-size:10px;color:#5a7a9a;margin-top:2px;">White</div>'+
       '</div>'+
       '<div style="font-size:32px;color:#2a4a6a;font-weight:200;padding:0 10px;">–</div>'+
       '<div style="text-align:center;flex:1;">'+
-        '<div style="font-size:11px;font-weight:600;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+_mkTeamLabel(dN,'#7abcdc')+'</div>'+
+        '<div style="font-size:11px;font-weight:600;color:#7abcdc;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+dN+'</div>'+
         '<div style="font-size:52px;font-weight:700;color:#e8d5a3;line-height:1;">'+dG+'</div>'+
         '<div style="font-size:10px;color:#5a7a9a;margin-top:2px;">Dark</div>'+
       '</div>'+
     '</div>'+
-    '<div style="text-align:center;font-size:11px;color:#3a5a7a;padding-top:4px;">'+fmtDate(game.date)+'</div>';
+    '<div style="text-align:center;font-size:11px;color:#3a5a7a;padding-top:4px;">'+fmtDate(game.date)+'</div>'+
+    teamBtnRow;
 
   // ── Stat chips ──────────────────────────────────────────────
   renderFollowChips(ev, wN, dN);
