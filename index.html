@@ -5914,56 +5914,23 @@ function renderFollowFlow(ev, wN, dN){
 
   const FLOW_TYPES = [
     { key:'goals',
-      label:'Goals', icon:wpBall(),
-      filter: e => /^Goal \(/i.test(e.event||'') || /^5M Goal/i.test(e.event||'') },
+      label:'GOALS', icon:wpBall(),
+      filter: e => /^Goal \(/i.test(e.event||'') || /^5M Goal/i.test(e.event||''),
+      isGoals: true },
     { key:'ejections',
-      label:'Ejections', icon:'🟥',
+      label:'EJECTIONS', icon:'🟥',
       filter: e => e.event==='Ejection' },
     { key:'5m',
-      label:'5M Fouls', icon:'⚡',
+      label:'5M FOULS', icon:'⚡',
       filter: e => e.event==='5M Foul' },
   ];
 
-  const activeKey  = _follow.flowType || 'goals';
-  const activeType = FLOW_TYPES.find(t=>t.key===activeKey) || FLOW_TYPES[0];
-  const filtered   = ev.filter(activeType.filter);
-
-  // Group by quarter — sort each group chronologically (countdown timer: bigger = earlier)
-  const QS = ['1','2','3','4','OT'];
-  const byQ = {};
-  QS.forEach(q => byQ[q] = []);
-  filtered.forEach(e => {
-    const q = String(e.q||'1');
-    (byQ[q] || byQ['OT']).push(e);
-  });
-  // Sort by recording id (numeric timestamp) if present; otherwise keep sheet-row order.
-  QS.forEach(q => { if(byQ[q].length>1 && byQ[q][0]?.id) byQ[q].sort((a,b)=>Number(a.id)-Number(b.id)); });
-
-  const showQs = ['1','2','3','4'];
-  if(byQ['OT'].length) showQs.push('OT');
-
   // Team colours
-  const DARK_CLR  = '#4a7ae0';   // vivid blue  — dark caps
-  const WHITE_CLR = '#e8eef4';   // near-white  — white caps
+  const DARK_CLR  = '#4a7ae0';
+  const WHITE_CLR = '#e8eef4';
 
-  // Segmented button control — 3 equal-width buttons in a locked row, no wrapping
-  let html = `<div style="display:flex;border:1px solid #1e3a5a;border-radius:8px;overflow:hidden;margin-bottom:12px;">`;
-  FLOW_TYPES.forEach((t, i) => {
-    const active = t.key === activeKey;
-    const borderL = i > 0 ? 'border-left:1px solid #1e3a5a;' : '';
-    html += `<button onclick="_follow.flowType='${t.key}';renderFollowFlowActive()"
-      style="flex:1;padding:8px 4px;font-size:12px;border:none;${borderL}
-             background:${active?'#0a3a5a':'transparent'};
-             color:${active?'#7abcdc':'#3a5a7a'};
-             font-weight:${active?'700':'400'};cursor:pointer;
-             white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-      ${t.icon} ${t.label}
-    </button>`;
-  });
-  html += `</div>`;
-
-  // Legend
-  html += `<div style="display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap;">
+  // One-time legend at the top
+  let html = `<div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap;">
     <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#c0d8f0;">
       <div style="width:5px;height:22px;background:${DARK_CLR};border-radius:2px;flex:0 0 auto;"></div>
       ${dN}
@@ -5975,69 +5942,100 @@ function renderFollowFlow(ev, wN, dN){
     </div>
   </div>`;
 
-  // Quarter grid — variable column widths proportional to event count;
-  // empty quarters get 0.4fr so they stay visible but clearly narrower.
-  const qWeights = showQs.map(q => {
-    const n = (byQ[q]||[]).length;
-    return n === 0 ? 0.4 : n;
-  });
-  const gridCols = qWeights.map(w => `${w}fr`).join(' ');
+  // Helper: render one quarter-grid section for a given event filter
+  function renderSection(type){
+    const filtered = ev.filter(type.filter);
 
-  let cumD = 0, cumW = 0;
-  html += `<div class="card" style="padding:10px 6px;">
-    <div style="display:grid;grid-template-columns:${gridCols};gap:0;">`;
-
-  showQs.forEach((q, qi) => {
-    const events = byQ[q] || [];
-    const qD = events.filter(e=>e.team===dN).length;
-    const qW = events.filter(e=>e.team===wN).length;
-    const borderL = qi > 0 ? 'border-left:1px solid #1a3050;' : '';
-
-    // Build pipe markers
-    let pipes = '';
-    events.forEach(e => {
-      const isDark = e.team === dN;
-      const clr    = isDark ? DARK_CLR : WHITE_CLR;
-      const border = isDark ? '' : 'border:1px solid #4a6a80;';
-      const tip    = `${e.cap?'#'+e.cap+' ':''}${e.event||''}`;
-      pipes += `<div style="width:5px;height:30px;background:${clr};border-radius:2px;
-                            flex:0 0 auto;${border}" title="${tip}"></div>`;
+    const QS = ['1','2','3','4','OT'];
+    const byQ = {};
+    QS.forEach(q => byQ[q] = []);
+    filtered.forEach(e => {
+      const q = String(e.q||'1');
+      (byQ[q] || (byQ['OT'])).push(e);
+    });
+    QS.forEach(q => {
+      if(byQ[q].length > 1 && byQ[q][0]?.id)
+        byQ[q].sort((a,b) => Number(a.id) - Number(b.id));
     });
 
-    // Score line
-    let scoreLine = '';
-    if(activeKey === 'goals'){
-      cumD += qD; cumW += qW;
-      scoreLine = `<div style="margin-top:5px;text-align:center;line-height:1.5;">
-        <div style="font-size:11px;">
-          <span style="color:${DARK_CLR};font-weight:700;">${qD}</span>
-          <span style="color:#2a4a5a;"> – </span>
-          <span style="color:${WHITE_CLR};font-weight:700;">${qW}</span>
+    const showQs = ['1','2','3','4'];
+    if(byQ['OT'].length) showQs.push('OT');
+
+    const qWeights = showQs.map(q => {
+      const n = (byQ[q]||[]).length;
+      return n === 0 ? 0.4 : n;
+    });
+    const gridCols = qWeights.map(w => `${w}fr`).join(' ');
+
+    let cumD = 0, cumW = 0;
+    let inner = `<div style="display:grid;grid-template-columns:${gridCols};gap:0;">`;
+
+    showQs.forEach((q, qi) => {
+      const qevs = byQ[q] || [];
+      const qD = qevs.filter(e=>e.team===dN).length;
+      const qW = qevs.filter(e=>e.team===wN).length;
+      const borderL = qi > 0 ? 'border-left:1px solid #1a3050;' : '';
+
+      let pipes = '';
+      qevs.forEach(e => {
+        const isDark = e.team === dN;
+        const clr    = isDark ? DARK_CLR : WHITE_CLR;
+        const border = isDark ? '' : 'border:1px solid #4a6a80;';
+        const tip    = `${e.cap?'#'+e.cap+' ':''}${e.event||''}`;
+        pipes += `<div style="width:5px;height:30px;background:${clr};border-radius:2px;
+                              flex:0 0 auto;${border}" title="${tip}"></div>`;
+      });
+
+      let scoreLine = '';
+      if(type.isGoals){
+        cumD += qD; cumW += qW;
+        scoreLine = `<div style="margin-top:5px;text-align:center;line-height:1.5;">
+          <div style="font-size:11px;">
+            <span style="color:${WHITE_CLR};font-weight:700;">${qW}</span>
+            <span style="color:#2a4a5a;"> – </span>
+            <span style="color:${DARK_CLR};font-weight:700;">${qD}</span>
+          </div>
+          <div style="font-size:9px;color:#2a4a6a;letter-spacing:0.3px;">${cumW}–${cumD}</div>
+        </div>`;
+      } else {
+        cumD += qD; cumW += qW;
+        scoreLine = `<div style="margin-top:5px;text-align:center;font-size:11px;">
+          <span style="color:${WHITE_CLR};">${qW}</span>
+          <span style="color:#2a4a5a;"> / </span>
+          <span style="color:${DARK_CLR};">${qD}</span>
+        </div>`;
+      }
+
+      inner += `<div style="padding:4px 6px;${borderL}">
+        <div style="font-size:10px;font-weight:700;color:#2a5a8a;letter-spacing:1px;
+                    text-align:center;margin-bottom:6px;">Q${q}</div>
+        <div style="display:flex;gap:3px;flex-wrap:wrap;align-items:flex-start;
+                    min-height:44px;padding:5px 4px;background:#05101a;border-radius:6px;">
+          ${pipes || '<div style="flex:1;"></div>'}
         </div>
-        <div style="font-size:9px;color:#2a4a6a;letter-spacing:0.3px;">${cumD}–${cumW}</div>
+        ${scoreLine}
       </div>`;
-    } else {
-      cumD += qD; cumW += qW;
-      scoreLine = `<div style="margin-top:5px;text-align:center;font-size:11px;">
-        <span style="color:${DARK_CLR};">${qD}</span>
-        <span style="color:#2a4a5a;"> / </span>
-        <span style="color:${WHITE_CLR};">${qW}</span>
-      </div>`;
-    }
+    });
 
-    html += `<div style="padding:4px 6px;${borderL}">
-      <div style="font-size:10px;font-weight:700;color:#2a5a8a;letter-spacing:1px;
-                  text-align:center;margin-bottom:6px;">Q${q}</div>
-      <div style="display:flex;gap:3px;flex-wrap:wrap;align-items:flex-start;
-                  min-height:44px;padding:5px 4px;background:#05101a;
-                  border-radius:6px;">
-        ${pipes || '<div style="flex:1;"></div>'}
+    inner += `</div>`;
+
+    const totD = filtered.filter(e=>e.team===dN).length;
+    const totW = filtered.filter(e=>e.team===wN).length;
+    const totLabel = type.isGoals
+      ? `<span style="color:#c0d8f0;font-size:11px;font-weight:700;">${totW}–${totD}</span>`
+      : `<span style="color:#7abcdc;font-size:11px;">${totW+totD} total</span>`;
+
+    return `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;margin-top:14px;">
+        <span style="font-size:13px;">${type.icon}</span>
+        <span style="font-size:11px;font-weight:700;color:#4a8aaa;letter-spacing:1px;">${type.label}</span>
+        <span style="margin-left:auto;">${totLabel}</span>
       </div>
-      ${scoreLine}
-    </div>`;
-  });
+      <div class="card" style="padding:10px 6px;">${inner}</div>`;
+  }
 
-  html += `</div></div>`;
+  FLOW_TYPES.forEach(t => { html += renderSection(t); });
+
   el.innerHTML = html;
 }
 
