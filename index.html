@@ -6162,10 +6162,11 @@ function renderTeamPage(){
     // Goal dots
     dots+=`<circle cx="${x.toFixed(1)}" cy="${yt.toFixed(1)}" r="3.5" fill="${won?'#4ade80':'#3a9abf'}" stroke="#08141e" stroke-width="1"/>`;
     dots+=`<circle cx="${x.toFixed(1)}" cy="${yo.toFixed(1)}" r="3.5" fill="${lost?'#ef4444':'#c07830'}" stroke="#08141e" stroke-width="1"/>`;
-    // Score labels — team above dot, opp below (unless they're close, then offset)
-    const samePx = Math.abs(yt-yo)<11;
-    dots+=`<text x="${x.toFixed(1)}" y="${(yt-(samePx?6:5)).toFixed(1)}" text-anchor="middle" fill="${won?'#4ade80':'#7abcdc'}" font-size="8" font-weight="700">${d.tG}</text>`;
-    dots+=`<text x="${x.toFixed(1)}" y="${(yo+(samePx?13:12)).toFixed(1)}" text-anchor="middle" fill="${lost?'#f07070':'#c09060'}" font-size="8" font-weight="700">${d.oG}</text>`;
+    // Winner label above their dot, loser below — colors always match their line
+    const teamLblY = lost ? yt+12 : yt-6;
+    const oppLblY  = lost ? yo-6  : yo+12;
+    dots+=`<text x="${x.toFixed(1)}" y="${teamLblY.toFixed(1)}" text-anchor="middle" fill="#7abcdc" font-size="8" font-weight="700">${d.tG}</text>`;
+    dots+=`<text x="${x.toFixed(1)}" y="${oppLblY.toFixed(1)}"  text-anchor="middle" fill="#c09060" font-size="8" font-weight="700">${d.oG}</text>`;
     // Foul ± bar
     const fpm=d.fpm;
     const bh=Math.max(2, Math.abs(fpm)/maxFPM*foulBandH);
