@@ -6435,12 +6435,14 @@ function renderTeamPage(){
   qFoulHTML += hdrCell('TTL');
   qFoulHTML += divRow();
 
-  // Team fouls row (combined Ej + 5M) — worst quarter red, best green
+  // Team fouls row (combined Ej + 5M)
+  // worst = most team fouls AND team lost foul battle (pm<0); best = fewest team fouls AND team won (pm>=0)
   qFoulHTML += lblCell(teamName.substring(0,14));
   QS_ALL.forEach(q=>{
     const pg = qTF[q]/qDiv(q);
-    const isWorst = q!=='OT' && pg===maxFoulPG && maxFoulPG>minFoulPG;
-    const isBest  = q!=='OT' && pg===minFoulPG && maxFoulPG>minFoulPG;
+    const pm = qOF[q]-qTF[q];
+    const isWorst = q!=='OT' && pg===maxFoulPG && maxFoulPG>minFoulPG && pm<0;
+    const isBest  = q!=='OT' && pg===minFoulPG && maxFoulPG>minFoulPG && pm>=0;
     const bg  = isWorst?'#1e0808':isBest?'#001e0e':'';
     const clr = isWorst?'#ef4444':isBest?'#4ade80':'#c0d8f0';
     qFoulHTML += numCell(qTF[q], clr, bg);
@@ -6468,8 +6470,9 @@ function renderTeamPage(){
   qFoulHTML += lblCell('/Game','font-size:9px;color:#3a5a7a;');
   QS_ALL.forEach(q=>{
     const pg=(qTF[q]/qDiv(q)).toFixed(1);
-    const isWorst = q!=='OT' && Number(pg)===maxFoulPG && maxFoulPG>minFoulPG;
-    const isBest  = q!=='OT' && Number(pg)===minFoulPG && maxFoulPG>minFoulPG;
+    const pm = qOF[q]-qTF[q];
+    const isWorst = q!=='OT' && Number(pg)===maxFoulPG && maxFoulPG>minFoulPG && pm<0;
+    const isBest  = q!=='OT' && Number(pg)===minFoulPG && maxFoulPG>minFoulPG && pm>=0;
     const clr = isWorst?'#ef4444':isBest?'#4ade80':'#3a5a7a';
     qFoulHTML += pgCell(pg, clr);
   });
