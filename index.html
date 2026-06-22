@@ -6142,7 +6142,14 @@ function renderTeamPage(){
   const total5mDrawn    = tev.filter(is5mDrawn).length;
   const totalFoulsDrawn = totalEjDrawn + total5mDrawn;
   const totalFoulsComm  = totalEj + total5m;
-  const seasonFoulPM    = totalFoulsDrawn - totalFoulsComm;
+  // Opponent fouls committed — pulled directly from game events so it aligns
+  // with the Fouls by Quarter table below (more reliable than "drawn" tracking).
+  const _tgids = new Set(games.map(g=>g.gameId));
+  const totalOppFouls = events.filter(e=>
+    e._game && _tgids.has(e._game.gameId) &&
+    e.team!==teamName && (isEjComm(e)||is5mComm(e))
+  ).length;
+  const seasonFoulPM = totalOppFouls - totalFoulsComm;
 
   // Old-style Goalie Blocks (no companion Miss record) — blocked shots AGAINST this team.
   // They're on the OPPONENT's team rows so not in tev. New-style blocks already appear
@@ -6177,11 +6184,11 @@ function renderTeamPage(){
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 2fr;gap:6px;margin-bottom:14px;">
       ${sBox(totalFoulsComm,'FOULS')}
-      ${sBox(totalFoulsDrawn,'FOULS DRAWN','#4ade80')}
+      ${sBox(totalOppFouls,'OPP FOULS','#4ade80')}
       <div style="text-align:center;background:#111d2c;border:1px solid #1e3a5a;border-radius:8px;padding:8px 2px;">
         <div style="font-size:20px;font-weight:700;color:${fpmClr};">${fpmStr}</div>
         <div style="font-size:9px;color:#5a80a0;font-weight:700;letter-spacing:.5px;margin-top:2px;">SEASON FOUL ±</div>
-        <div style="font-size:8px;color:#3a5a7a;margin-top:2px;">${totalFoulsDrawn}D · ${totalFoulsComm}C</div>
+        <div style="font-size:8px;color:#3a5a7a;margin-top:2px;">${totalOppFouls}O · ${totalFoulsComm}C</div>
       </div>
     </div>`;
 
