@@ -6286,10 +6286,10 @@ function renderTeamPage(){
   trendData.forEach((d,i)=>{
     const x=xPos(i), won=d.tG>d.oG, lost=d.oG>d.tG;
     const yt=yGoal(d.tG), yo=yGoal(d.oG);
-    // Goal dots
-    dots+=`<circle cx="${x.toFixed(1)}" cy="${yt.toFixed(1)}" r="3.5" fill="${won?'#4ade80':'#3a9abf'}" stroke="#08141e" stroke-width="1"/>`;
-    dots+=`<circle cx="${x.toFixed(1)}" cy="${yo.toFixed(1)}" r="3.5" fill="${lost?'#ef4444':'#c07830'}" stroke="#08141e" stroke-width="1"/>`;
-    // Winner label above their dot, loser below — colors always match their line
+    // Goal dots — always use line color regardless of outcome
+    dots+=`<circle cx="${x.toFixed(1)}" cy="${yt.toFixed(1)}" r="3.5" fill="#3a9abf" stroke="#08141e" stroke-width="1"/>`;
+    dots+=`<circle cx="${x.toFixed(1)}" cy="${yo.toFixed(1)}" r="3.5" fill="#c07830" stroke="#08141e" stroke-width="1"/>`;
+    // Winner label above their dot, loser below
     const teamLblY = lost ? yt+12 : yt-6;
     const oppLblY  = lost ? yo-6  : yo+12;
     dots+=`<text x="${x.toFixed(1)}" y="${teamLblY.toFixed(1)}" text-anchor="middle" fill="#7abcdc" font-size="8" font-weight="700">${d.tG}</text>`;
