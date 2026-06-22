@@ -6248,9 +6248,9 @@ function renderTeamPage(){
     const gov = gev.filter(e=>e.team===opp);
     const tG  = gtv.filter(isGoal).length;
     const oG  = gov.filter(isGoal).length;
-    const fd  = gtv.filter(e=>isEjDrawn(e)||is5mDrawn(e)).length;
-    const fc  = gtv.filter(e=>isEjComm(e)||is5mComm(e)).length;
-    const fpm = fd - fc;
+    const oFC = gov.filter(e=>isEjComm(e)||is5mComm(e)).length; // opp fouls committed
+    const tFC = gtv.filter(e=>isEjComm(e)||is5mComm(e)).length; // team fouls committed
+    const fpm = oFC - tFC; // positive = disciplinary advantage (opp committed more)
     const date= (g.date||'').replace(/^(\d{1,2})\/(\d{1,2})\/(?:\d{2})?(\d{2})$/,'$1/$2');
     const abbr= opp.replace(/^(the\s+)/i,'').trim().substring(0,3).toUpperCase();
     return {tG, oG, fpm, date, abbr};
