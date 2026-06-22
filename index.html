@@ -6549,13 +6549,13 @@ function renderTeamPage(){
   // ── Assemble ──────────────────────────────────────────────
   document.getElementById('team-page-content').innerHTML = `
     ${summaryHTML}
-    <div class="stitle" style="margin-bottom:6px;">PLAYER STATS — ALL GAMES</div>
-    <div class="card" style="padding:10px 12px;margin-bottom:12px;">${playerTableHTML}</div>
     <div class="card" style="padding:10px 12px;margin-bottom:12px;">${trendHTML}</div>
     <div class="stitle" style="margin-bottom:6px;">QUARTER ANALYSIS</div>
     <div style="margin-bottom:12px;">${quarterAnalysisHTML}</div>
     <div class="stitle" style="margin-bottom:6px;">GAME HISTORY</div>
     <div class="card" style="padding:4px 12px;margin-bottom:12px;">${histHTML||'<div style="font-size:12px;color:#3a5a7a;padding:8px 0;">No games yet.</div>'}</div>
+    <div class="stitle" style="margin-bottom:6px;">PLAYER STATS — ALL GAMES</div>
+    <div class="card" style="padding:10px 12px;margin-bottom:12px;">${playerTableHTML}</div>
     <div class="stitle" style="margin-bottom:6px;">FOULS COMMITTED BY PLAYER</div>
     <div class="card" style="padding:12px;margin-bottom:12px;">${foulsHTML}</div>
   `;
