@@ -532,14 +532,14 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
     <div id="follow-chips-card" style="margin-bottom:12px;"></div>
 
     <!-- View toggle -->
-    <div style="display:flex;gap:5px;margin-bottom:6px;">
+    <div id="follow-view-btns" style="display:flex;gap:5px;margin-bottom:6px;">
       <button id="follow-btn-players"  class="btn-p" style="flex:1;padding:7px 2px;font-size:11px;" onclick="followSetView('players')">👤 Players</button>
       <button id="follow-btn-timeline" class="btn-s" style="flex:1;padding:7px 2px;font-size:11px;" onclick="followSetView('timeline')">📋 Timeline</button>
       <button id="follow-btn-flow"     class="btn-s" style="flex:1;padding:7px 2px;font-size:11px;" onclick="followSetView('flow')">📈 Flow</button>
       <button id="follow-btn-recap"    class="btn-s" style="flex:1;padding:7px 2px;font-size:11px;" onclick="followSetView('recap')">📊 Recap</button>
     </div>
     <!-- Shot chart pair — 50/50 -->
-    <div style="display:flex;gap:5px;margin-bottom:8px;">
+    <div id="follow-sc-btns" style="display:flex;gap:5px;margin-bottom:8px;">
       <button class="btn-s" id="follow-sc-white-btn" onclick="showFollowShotChart('white')"
               style="flex:1;padding:8px 4px;font-size:11px;font-weight:700;text-align:center;line-height:1.35;">
         📊 <span id="follow-sc-white-label">White</span> Shot Chart
@@ -548,6 +548,10 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
               style="flex:1;padding:8px 4px;font-size:11px;font-weight:700;text-align:center;line-height:1.35;">
         📊 <span id="follow-sc-dark-label">Dark</span> Shot Chart
       </button>
+    </div>
+    <!-- Copy to Message -->
+    <div id="follow-msg-btn-row" style="margin-bottom:8px;">
+      <button class="btn-s" style="width:100%;padding:7px;font-size:12px;" onclick="copyFollowView(this)">📋 Copy to Message</button>
     </div>
 
     <div id="follow-players-view"></div>
@@ -2950,6 +2954,38 @@ function _downloadPng(canvas, btn, origLabel){
   a.click();
   btn.textContent = '✓ Saved as PNG!';
   setTimeout(()=>btn.textContent = origLabel, 2500);
+}
+
+function copyFollowView(btn){
+  if(typeof html2canvas === 'undefined'){ btn.textContent='⚠ Not ready'; setTimeout(()=>btn.textContent='📋 Copy to Message',2000); return; }
+  const content = document.getElementById('follow-content');
+  if(!content) return;
+  const origLabel = btn.textContent;
+  btn.textContent = '⏳ Capturing…'; btn.disabled = true;
+  // Hide controls that should not appear in the snapshot
+  const toHide = ['follow-view-btns','follow-sc-btns','follow-msg-btn-row']
+    .map(id=>document.getElementById(id)).filter(Boolean);
+  toHide.forEach(el=>{ el._ph=el.style.display; el.style.display='none'; });
+  html2canvas(content, { backgroundColor:'#0a1828', scale:2, useCORS:true, logging:false })
+    .then(canvas=>{
+      toHide.forEach(el=>{ el.style.display=el._ph||''; });
+      btn.disabled=false;
+      canvas.toBlob(blob=>{
+        if(!blob){ btn.textContent='⚠ Failed'; setTimeout(()=>btn.textContent=origLabel,2000); return; }
+        if(navigator.clipboard && window.ClipboardItem){
+          navigator.clipboard.write([new ClipboardItem({'image/png':blob})])
+            .then(()=>{ btn.textContent='✓ Copied!'; setTimeout(()=>btn.textContent=origLabel,2000); })
+            .catch(()=>{ _sharePng(blob, canvas, btn, origLabel); });
+        } else {
+          _sharePng(blob, canvas, btn, origLabel);
+        }
+      }, 'image/png');
+    })
+    .catch(()=>{
+      toHide.forEach(el=>{ el.style.display=el._ph||''; });
+      btn.disabled=false;
+      btn.textContent='⚠ Failed'; setTimeout(()=>btn.textContent=origLabel,2000);
+    });
 }
 
 function _fallbackCopyText(btn){
