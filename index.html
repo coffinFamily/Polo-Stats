@@ -2914,12 +2914,14 @@ function copySummary(btn){
     btn.disabled = false;
     canvas.toBlob(blob => {
       if(!blob){ btn.textContent='⚠ Failed'; setTimeout(()=>btn.textContent=origLabel,2000); return; }
+      // 1) Desktop clipboard (Chrome/Safari macOS)
       if(navigator.clipboard && window.ClipboardItem){
         navigator.clipboard.write([new ClipboardItem({'image/png': blob})])
           .then(()=>{ btn.textContent='✓ Copied!'; setTimeout(()=>btn.textContent=origLabel,2000); })
-          .catch(()=>{ _downloadPng(canvas, btn, origLabel); });
+          .catch(()=>{ _sharePng(blob, canvas, btn, origLabel); });
+      // 2) iOS / mobile — Web Share API opens native share sheet (Messages, Mail, etc.)
       } else {
-        _downloadPng(canvas, btn, origLabel);
+        _sharePng(blob, canvas, btn, origLabel);
       }
     }, 'image/png');
   }).catch(()=>{
@@ -2929,8 +2931,19 @@ function copySummary(btn){
   });
 }
 
+function _sharePng(blob, canvas, btn, origLabel){
+  // Try native share sheet (iOS/Android) — opens Messages, Mail, etc. directly
+  const file = new File([blob], 'polo-summary.png', { type: 'image/png' });
+  if(navigator.share && navigator.canShare && navigator.canShare({ files: [file] })){
+    navigator.share({ files: [file], title: 'Game Summary' })
+      .then(()=>{ btn.textContent='✓ Shared!'; setTimeout(()=>btn.textContent=origLabel,2000); })
+      .catch(err=>{ if(err.name!=='AbortError') _downloadPng(canvas, btn, origLabel); else { btn.textContent=origLabel; } });
+  } else {
+    _downloadPng(canvas, btn, origLabel);
+  }
+}
+
 function _downloadPng(canvas, btn, origLabel){
-  // Clipboard image API not available — download as PNG file instead
   const a = document.createElement('a');
   a.download = 'polo-stats-' + Date.now() + '.png';
   a.href = canvas.toDataURL('image/png');
