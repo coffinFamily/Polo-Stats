@@ -6131,6 +6131,37 @@ function renderFollowFlow(ev, wN, dN){
     </div>
   </div>`;
 
+  // Determine which quarters to show — shared across all sections so columns align
+  const hasOT = FLOW_TYPES.some(t => ev.filter(t.filter).some(e=>String(e.q||'')==='OT'));
+  const showQs = hasOT ? ['1','2','3','4','OT'] : ['1','2','3','4'];
+
+  // Compute one shared grid-column definition for all three sections.
+  // Default: uniform 1fr per quarter.  Only go proportional if any quarter in
+  // any section has more events than can comfortably fit at uniform width.
+  const MAX_UNIFORM = 8;
+  let needsVariable = false;
+  FLOW_TYPES.forEach(t => {
+    const filtered = ev.filter(t.filter);
+    showQs.forEach(q => {
+      if(filtered.filter(e=>String(e.q||'1')===q).length > MAX_UNIFORM) needsVariable = true;
+    });
+  });
+
+  let sharedGridCols;
+  if(needsVariable){
+    const qWeights = showQs.map(q => {
+      let maxN = 0;
+      FLOW_TYPES.forEach(t => {
+        const n = ev.filter(t.filter).filter(e=>String(e.q||'1')===q).length;
+        maxN = Math.max(maxN, n);
+      });
+      return maxN === 0 ? 0.4 : maxN;
+    });
+    sharedGridCols = qWeights.map(w=>`${w}fr`).join(' ');
+  } else {
+    sharedGridCols = showQs.map(()=>'1fr').join(' ');
+  }
+
   // Helper: render one quarter-grid section for a given event filter
   function renderSection(type){
     const filtered = ev.filter(type.filter);
@@ -6147,17 +6178,8 @@ function renderFollowFlow(ev, wN, dN){
         byQ[q].sort((a,b) => Number(a.id) - Number(b.id));
     });
 
-    const showQs = ['1','2','3','4'];
-    if(byQ['OT'].length) showQs.push('OT');
-
-    const qWeights = showQs.map(q => {
-      const n = (byQ[q]||[]).length;
-      return n === 0 ? 0.4 : n;
-    });
-    const gridCols = qWeights.map(w => `${w}fr`).join(' ');
-
     let cumD = 0, cumW = 0;
-    let inner = `<div style="display:grid;grid-template-columns:${gridCols};gap:0;">`;
+    let inner = `<div style="display:grid;grid-template-columns:${sharedGridCols};gap:0;">`;
 
     showQs.forEach((q, qi) => {
       const qevs = byQ[q] || [];
