@@ -6831,20 +6831,21 @@ function renderPlayerPage(rec){
   }
 
   const COLS = [
-    {label:'G',   fn:e=>/^Goal \(/i.test(e.event||'')},
-    {label:'A',   fn:e=>e.event==='Assist'},
-    {label:'Stl', fn:e=>e.event==='Steal'},
-    {label:'Ej',  fn:e=>e.event==='Ejection'},
-    {label:'5M',  fn:e=>e.event==='5M Foul'},
-    {label:'Blk', fn:e=>/block/i.test(e.event||'')},
-    {label:'TO',  fn:e=>e.event==='Turnover'},
+    {label:'G',    fn:e=>/^Goal \(/i.test(e.event||'')},
+    {label:'A',    fn:e=>e.event==='Assist'},
+    {label:'Stl',  fn:e=>e.event==='Steal'},
+    {label:'Ej',   fn:e=>e.event==='Ejection'},
+    {label:'5M',   fn:e=>e.event==='5M Foul'},
+    {label:'Blk',  fn:e=>/block/i.test(e.event||'')},
+    {label:'TO',   fn:e=>e.event==='Turnover'},
+    {label:'Sprt', fn:e=>e.event==='Sprint Won'},
   ];
 
   const isThisPlayer = e => rec.playerId
     ? e.playerId === rec.playerId
     : (e.team === teamName && String(e.cap||'') === String(rec.cap));
 
-  const sortedGames = [...games].sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
+  const sortedGames = [...games].sort((a,b)=>parseDate(a.date||'')-parseDate(b.date||''));
   const gameRows = [];
   sortedGames.forEach(g=>{
     const opp = g.whiteTeam === teamName ? g.darkTeam : g.whiteTeam;
@@ -6856,7 +6857,9 @@ function renderPlayerPage(rec){
     const oG = gAll.filter(e=>e.team===opp&&/^Goal \(/i.test(e.event||'')).length;
     const won = tG>oG;
     const resultClr = won?'#4ade80':tG<oG?'#ef4444':'#7abcdc';
-    gameRows.push({opp, date:g.date||'', totals, tG, oG, resultClr});
+    const ms = parseDate(g.date||'');
+    const dateLabel = ms ? new Date(ms).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '';
+    gameRows.push({opp, dateLabel, totals, tG, oG, resultClr});
   });
 
   if(!gameRows.length){
@@ -6865,15 +6868,15 @@ function renderPlayerPage(rec){
   }
 
   const colTotals = COLS.map((c,i)=>gameRows.reduce((s,r)=>s+r.totals[i],0));
-  const hdrCells = COLS.map(c=>'<th style="text-align:center;padding:4px 5px;font-size:10px;font-weight:600;color:#4a7a9a;">'+c.label+'</th>').join('');
+  const hdrCells = COLS.map(c=>'<th style="text-align:center;padding:4px 3px;font-size:10px;font-weight:600;color:#4a7a9a;">'+c.label+'</th>').join('');
   let rowsHTML = '';
   gameRows.forEach(r=>{
-    const cells = r.totals.map(n=>'<td style="text-align:center;padding:5px 4px;font-size:12px;">'+(n>0?n:'<span style="color:#2a3a4a;">–</span>')+'</td>').join('');
+    const cells = r.totals.map(n=>'<td style="text-align:center;padding:5px 3px;font-size:12px;">'+(n>0?n:'<span style="color:#2a3a4a;">–</span>')+'</td>').join('');
     const score = '<span style="font-size:10px;font-weight:700;color:'+r.resultClr+';">'+r.tG+'-'+r.oG+'</span>';
     rowsHTML += '<tr style="border-bottom:1px solid #0e1e2e;">'+
-      '<td style="padding:5px 8px;white-space:nowrap;">'+
+      '<td style="padding:5px 6px;white-space:nowrap;">'+
         '<div style="font-size:12px;color:#c0d8f0;font-weight:600;">'+r.opp+'</div>'+
-        '<div style="font-size:10px;color:#4a7a9a;">'+r.date+' '+score+'</div>'+
+        '<div style="font-size:10px;color:#4a7a9a;">'+r.dateLabel+' '+score+'</div>'+
       '</td>'+cells+'</tr>';
   });
   const totalCells = colTotals.map(n=>'<td style="text-align:center;padding:5px 4px;font-size:12px;font-weight:700;color:#7abcdc;">'+(n||'–')+'</td>').join('');
