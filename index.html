@@ -4042,7 +4042,9 @@ function showShotChart(side) {
   const blockCount = shots.filter(e => e.type === 'Goalie Block').length;
   const pct = shots.length > 0 ? Math.round(goalCount / shots.length * 100) : 0;
 
-  _scData = { teamName, withZone, goalCount, missCount, blockCount };
+  const nameMode = window._scNameMode || false;
+  window._scNameMode = false;
+  _scData = { teamName, withZone, goalCount, missCount, blockCount, nameMode };
 
   // Build static pool SVG (background only — markers injected separately)
   const svgHTML = `<svg id="sc-svg" viewBox="0 0 ${VBW} ${VBH}" style="width:100%;display:block;">
@@ -4093,22 +4095,40 @@ function showShotChart(side) {
     <span style="color:#7abcdc;">Shooting% <strong>${pct}%</strong></span>
   </div>`;
 
-  // Filter chips — one per unique cap with shots
-  const caps = [...new Set(withZone.map(e => e.cap||'?'))].sort((a,b)=>Number(a)-Number(b));
+  // Filter chips
   let filtersHTML = `<button id="sc-f-all" onclick="filterShotChart(null)"
-    style="padding:5px 12px;border-radius:14px;font-size:12px;font-weight:600;border:1.5px solid #2a8aca;background:#0a3a5a;color:#7abcdc;cursor:pointer;">All</button>`;
-  caps.forEach(cap => {
-    const capShots  = withZone.filter(e => (e.cap||'?') === cap);
-    const capGoals  = capShots.filter(e => GOAL_TYPES.includes(e.type)).length;
-    const capMisses = capShots.filter(e => MISS_TYPES.includes(e.type)).length;
-    const capBlocks = capShots.filter(e => e.type === 'Goalie Block').length;
-    const capName   = (capShots[0]?.capName && !capShots[0].capName.includes('Placeholder')) ? capShots[0].capName.split(' ')[0] : '';
-    const label     = capName ? `#${cap} ${capName}` : `#${cap}`;
-    filtersHTML += `<button id="sc-f-${cap}" onclick="filterShotChart('${cap}')"
-      style="padding:5px 12px;border-radius:14px;font-size:12px;border:1.5px solid #1e3a5a;background:#0d1e2e;color:#5a7a9a;cursor:pointer;">
-      ${label} <span style="font-size:10px;color:#4a8a6a;">${capGoals}G</span><span style="font-size:10px;color:#8a4a4a;margin-left:2px;">${capMisses}M</span>${capBlocks?`<span style="font-size:10px;color:#c2620a;margin-left:2px;">${capBlocks}B</span>`:''}
-    </button>`;
-  });
+    style="padding:5px 12px;border-radius:14px;font-size:12px;font-weight:600;border:1.5px solid #2a8aca;background:#0a3a5a;color:#7abcdc;cursor:pointer;margin-bottom:6px;">All</button>`;
+  if(_scData.nameMode){
+    // Team Page: 2-column grid by player name (first initial + last name)
+    const playerKeys = [...new Set(withZone.map(e => e.playerKey||('#'+(e.cap||'?'))))].sort();
+    filtersHTML += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;width:100%;margin-top:4px;">`;
+    playerKeys.forEach(key => {
+      const keyShots  = withZone.filter(e => (e.playerKey||('#'+(e.cap||'?'))) === key);
+      const keyGoals  = keyShots.filter(e => GOAL_TYPES.includes(e.type)).length;
+      const keyMisses = keyShots.filter(e => MISS_TYPES.includes(e.type)).length;
+      const safeId    = key.replace(/[^a-zA-Z0-9]/g,'_');
+      filtersHTML += `<button id="sc-f-${safeId}" data-pkey="${key}" onclick="filterShotChart(${JSON.stringify(key)})"
+        style="padding:6px 10px;border-radius:10px;font-size:12px;border:1.5px solid #1e3a5a;background:#0d1e2e;color:#5a7a9a;cursor:pointer;text-align:left;">
+        ${key} <span style="font-size:10px;color:#4a8a6a;">${keyGoals}G</span><span style="font-size:10px;color:#8a4a4a;margin-left:2px;">${keyMisses}M</span>
+      </button>`;
+    });
+    filtersHTML += `</div>`;
+  } else {
+    // Game/Follow tab: cap-number chips
+    const caps = [...new Set(withZone.map(e => e.cap||'?'))].sort((a,b)=>Number(a)-Number(b));
+    caps.forEach(cap => {
+      const capShots  = withZone.filter(e => (e.cap||'?') === cap);
+      const capGoals  = capShots.filter(e => GOAL_TYPES.includes(e.type)).length;
+      const capMisses = capShots.filter(e => MISS_TYPES.includes(e.type)).length;
+      const capBlocks = capShots.filter(e => e.type === 'Goalie Block').length;
+      const capName   = (capShots[0]?.capName && !capShots[0].capName.includes('Placeholder')) ? capShots[0].capName.split(' ')[0] : '';
+      const label     = capName ? `#${cap} ${capName}` : `#${cap}`;
+      filtersHTML += `<button id="sc-f-${cap}" onclick="filterShotChart('${cap}')"
+        style="padding:5px 12px;border-radius:14px;font-size:12px;border:1.5px solid #1e3a5a;background:#0d1e2e;color:#5a7a9a;cursor:pointer;">
+        ${label} <span style="font-size:10px;color:#4a8a6a;">${capGoals}G</span><span style="font-size:10px;color:#8a4a4a;margin-left:2px;">${capMisses}M</span>${capBlocks?`<span style="font-size:10px;color:#c2620a;margin-left:2px;">${capBlocks}B</span>`:''}
+      </button>`;
+    });
+  }
 
   document.getElementById('sc-title').textContent = `${teamName} — Shot Chart`;
   document.getElementById('sc-summary').textContent = `${goalCount} goals · ${missCount} misses · ${blockCount} blocks · ${pct}% shooting`;
@@ -4131,7 +4151,8 @@ function renderShotChartMarkers(filterCap) {
     const [pctX, pctY] = (e.zone||'').split(',').map(Number);
     if (isNaN(pctX) || isNaN(pctY)) return;
     const cap = e.cap || '?';
-    const active = filterCap === null || filterCap === cap;
+    const active = filterCap === null ||
+      (_scData.nameMode ? (e.playerKey||('#'+cap)) === filterCap : cap === filterCap);
     const svgX = X + (pctX/100)*W;
     const svgY = Y + (pctY/100)*H;
     const key = `${Math.round(pctX/5)*5},${Math.round(pctY/5)*5}`;
@@ -4166,12 +4187,12 @@ function renderShotChartMarkers(filterCap) {
   if (g) g.innerHTML = html;
 }
 
-function filterShotChart(cap) {
-  renderShotChartMarkers(cap);
+function filterShotChart(key) {
+  renderShotChartMarkers(key);
   // Update chip active states
   document.querySelectorAll('[id^="sc-f-"]').forEach(btn => {
-    const isActive = (cap === null && btn.id === 'sc-f-all') ||
-                     (cap !== null && btn.id === `sc-f-${cap}`);
+    const isActive = (key === null && btn.id === 'sc-f-all') ||
+                     (key !== null && (btn.dataset.pkey === key || btn.id === `sc-f-${key}`));
     btn.style.background  = isActive ? '#0a3a5a' : '#0d1e2e';
     btn.style.color       = isActive ? '#7abcdc' : '#5a7a9a';
     btn.style.borderColor = isActive ? '#2a8aca' : '#1e3a5a';
@@ -6597,6 +6618,20 @@ function showTeamShotChart(){
     }
   });
   const mapped = Object.values(groups).filter(e=>!COUNTERPART[e.type]);
+  // Enrich each event with a name-based player key (first initial + last name)
+  // so the shot chart filter groups by identity across games where cap numbers differ
+  mapped.forEach(e => {
+    const pid = e.playerId;
+    const player = pid && state.players.find(p => String(p.playerId||p.id) === String(pid));
+    if(player && (player.last||player.first)){
+      const fi = (player.first||'').trim().charAt(0);
+      const ln = (player.last||'').trim();
+      e.playerKey = (fi ? fi+'. ' : '') + ln;
+    } else {
+      e.playerKey = '#' + (e.cap||'?');
+    }
+  });
+  window._scNameMode = true;
   const prevGame=state.game, prevEvents=state.events;
   state.game={...state.game, whiteTeam:teamName, darkTeam:'Opponent'};
   state.events=mapped;
