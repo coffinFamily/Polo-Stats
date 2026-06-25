@@ -5742,6 +5742,12 @@ function renderFollowRecap(ev, wN, dN){
   const winT=weWon?ourT:oppT, loseT=weWon?oppT:ourT;
   const margin=Math.abs(ourG-oppG);
 
+  // ── Game phase detection ──────────────────────────────────────────
+  const latestQ = ev.reduce((mx,e)=>Math.max(mx,Number(e.q)||0),0);
+  const isLive = latestQ < 4; // heuristic: no Q4 events yet → game not finished
+  const phaseSuffix = latestQ <= 1 ? ' — Q1' : latestQ===2 ? ' — at halftime' : latestQ===3 ? ' — after Q3' : '';
+  const analysisLabel = isLive ? (latestQ <= 2 ? 'HALFTIME ANALYSIS' : 'IN-GAME ANALYSIS') : 'GAME ANALYSIS';
+
   // Opening run
   const goalEvs = ev.filter(isGoal).sort((a,b)=>Number(a.id||0)-Number(b.id||0));
   let runTeam=null, runLen=0;
@@ -5767,105 +5773,197 @@ function renderFollowRecap(ev, wN, dN){
   if(runTeam){
     const runIsUs = runTeam === ourT;
     if(runLen>=4)       push(runLen*3,'🚀', runIsUs
-      ? `${ourT} stormed out to a ${runLen}-0 run to open the game, putting ${oppT} immediately on the back foot`
-      : `${oppT} came out fast with ${runLen} unanswered goals before ${ourT} could respond`);
+      ? (isLive ? `${ourT} has opened with a ${runLen}-0 run, putting ${oppT} immediately on the back foot`
+                : `${ourT} stormed out to a ${runLen}-0 run to open the game, putting ${oppT} immediately on the back foot`)
+      : (isLive ? `${oppT} came out of the gate fast with ${runLen} unanswered goals before ${ourT} could respond`
+                : `${oppT} came out fast with ${runLen} unanswered goals before ${ourT} could respond`));
     else if(runLen===3) push(8,'🚀', runIsUs
-      ? `${ourT} opened with three straight goals to set an early tone`
-      : `${oppT} scored the game's first three goals, forcing ${ourT} to play from behind`);
+      ? (isLive ? `${ourT} has opened with three straight goals — setting a strong early tone`
+                : `${ourT} opened with three straight goals to set an early tone`)
+      : (isLive ? `${oppT} scored the first three goals, forcing ${ourT} to play from behind early`
+                : `${oppT} scored the game's first three goals, forcing ${ourT} to play from behind`));
     else if(runLen===2) push(4,'🚀', runIsUs
-      ? `${ourT} got off to a quick 2-0 start`
+      ? (isLive ? `${ourT} is off to a quick 2-0 start` : `${ourT} got off to a quick 2-0 start`)
       : `${oppT} scored the first two goals before ${ourT} got on the board`);
   }
 
-  // Our ejection discipline
+  // Ejection discipline
   if(ourEj > 0 || oppEj > 0){
-    const ejComparable = ourEj > 0 && oppEj > 0;
-    if(ejComparable){
-      if(ourEj - oppEj >= 3)  push((ourEj-oppEj)*3,'🟥',`Ejection discipline was a major issue — ${ourT} committed ${ourEj} ejections to ${oppT}'s ${oppEj}, repeatedly playing shorthanded`);
-      else if(ourEj - oppEj === 2) push(5,'🟥',`${ourT}'s ${ourEj} ejections (vs ${oppEj} for ${oppT}) handed the opponent multiple 6-5 chances`);
-      else if(oppEj - ourEj >= 3)  push((oppEj-ourEj)*3,'💪',`${ourT} forced ${oppEj} ejections (took only ${ourEj}), creating repeated man-up opportunities`);
-      else if(oppEj - ourEj === 2) push(5,'💪',`${ourT} drew ${oppEj} ejections from ${oppT} vs only ${ourEj} of their own — a clear discipline advantage`);
-      else if(ourEj >= 5)          push(3,'🟥',`${ourT} committed ${ourEj} ejections — staying out of foul trouble would have helped`);
+    const ejCmp = ourEj > 0 && oppEj > 0;
+    if(ejCmp){
+      if(ourEj - oppEj >= 3)  push((ourEj-oppEj)*3,'🟥',
+        isLive ? `Ejection discipline is a major issue — ${ourT} has ${ourEj} ejections to ${oppT}'s ${oppEj}, repeatedly playing shorthanded`
+               : `Ejection discipline was a major issue — ${ourT} committed ${ourEj} ejections to ${oppT}'s ${oppEj}, repeatedly playing shorthanded`);
+      else if(ourEj - oppEj === 2) push(5,'🟥',
+        isLive ? `${ourT}'s ${ourEj} ejections (vs ${oppEj} for ${oppT}) is handing the opponent multiple 6-5 chances`
+               : `${ourT}'s ${ourEj} ejections (vs ${oppEj} for ${oppT}) handed the opponent multiple 6-5 chances`);
+      else if(oppEj - ourEj >= 3)  push((oppEj-ourEj)*3,'💪',
+        isLive ? `${ourT} is forcing ${oppEj} ejections (taking only ${ourEj}), creating repeated man-up opportunities`
+               : `${ourT} forced ${oppEj} ejections (took only ${ourEj}), creating repeated man-up opportunities`);
+      else if(oppEj - ourEj === 2) push(5,'💪',
+        isLive ? `${ourT} has drawn ${oppEj} ejections from ${oppT} vs only ${ourEj} of their own — a growing discipline advantage`
+               : `${ourT} drew ${oppEj} ejections from ${oppT} vs only ${ourEj} of their own — a clear discipline advantage`);
+      else if(ourEj >= 5) push(3,'🟥',
+        isLive ? `${ourT} has ${ourEj} ejections already — foul discipline matters more as the game goes on`
+               : `${ourT} committed ${ourEj} ejections — staying out of foul trouble would have helped`);
     } else if(ourEj > 0){
-      if(ourEj >= 4) push(ourEj*1.5,'🟥',`${ourT} picked up ${ourEj} ejections — keeping players in the pool is an area to focus on`);
+      if(ourEj >= 4) push(ourEj*1.5,'🟥',
+        isLive ? `${ourT} has ${ourEj} ejections already — cutting those down removes easy opponent scoring chances`
+               : `${ourT} picked up ${ourEj} ejections — keeping players in the pool is an area to focus on`);
     }
   }
 
-  // Man-up (6-5) conversion — only compare if both have ejections (both had 6-5 chances)
+  // Man-up (6-5) conversion — only compare if both have ejections
   const ejComparable = ourEj > 0 && oppEj > 0;
   if(ejComparable){
-    if(our65 - opp65 >= 2) push((our65-opp65)*2.5,'💪',`${ourT} capitalized on man-up opportunities, converting ${our65} 6-5 chances to ${oppT}'s ${opp65}`);
-    else if(opp65 - our65 >= 2) push((opp65-our65)*2.5,'⚠️',`${ourT} converted only ${our65} of their 6-5 chances while ${oppT} made the most of theirs (${opp65})`);
-    else if(our65 >= 3 && our65 === opp65) push(2,'💪',`Both teams converted ${our65} 6-5 opportunities — man-up was balanced on both sides`);
+    if(our65 - opp65 >= 2) push((our65-opp65)*2.5,'💪',
+      isLive ? `${ourT} is capitalizing on man-up opportunities, converting ${our65} 6-5 chances to ${oppT}'s ${opp65}`
+             : `${ourT} capitalized on man-up opportunities, converting ${our65} 6-5 chances to ${oppT}'s ${opp65}`);
+    else if(opp65 - our65 >= 2) push((opp65-our65)*2.5,'⚠️',
+      isLive ? `${ourT} has converted only ${our65} of their 6-5 chances while ${oppT} is making the most of theirs (${opp65})`
+             : `${ourT} converted only ${our65} of their 6-5 chances while ${oppT} made the most of theirs (${opp65})`);
+    else if(our65 >= 3 && our65 === opp65) push(2,'💪',
+      isLive ? `Both teams have converted ${our65} 6-5 opportunities — man-up is balanced so far`
+             : `Both teams converted ${our65} 6-5 opportunities — man-up was balanced on both sides`);
   } else if(our65 > 0){
-    push(our65,'💪',`${ourT} converted ${our65} man-up goal${our65>1?'s':''} on the power play`);
+    push(our65,'💪',
+      isLive ? `${ourT} has converted ${our65} man-up goal${our65>1?'s':''} on the power play`
+             : `${ourT} converted ${our65} man-up goal${our65>1?'s':''} on the power play`);
   }
 
-  // 5M fouls — our fouls hurt us, opponent fouls help us
+  // 5M fouls
   if(our5mF > 0 || opp5mF > 0){
     const foulComparable = our5mF > 0 && opp5mF > 0;
     if(foulComparable){
-      if(our5mF - opp5mF >= 2) push((our5mF-opp5mF)*2,'⚡',`${ourT} committed ${our5mF} 5m fouls vs ${opp5mF} for ${oppT} — too many unnecessary penalty chances given away`);
-      else if(opp5mF - our5mF >= 2) push((opp5mF-our5mF)*2,'⚡',`${ourT} drew ${opp5mF} penalty shots vs only ${our5mF} called against them — a favorable penalty margin`);
+      if(our5mF - opp5mF >= 2) push((our5mF-opp5mF)*2,'⚡',
+        isLive ? `${ourT} has committed ${our5mF} 5m fouls vs ${opp5mF} for ${oppT} — too many penalty chances being given away`
+               : `${ourT} committed ${our5mF} 5m fouls vs ${opp5mF} for ${oppT} — too many unnecessary penalty chances given away`);
+      else if(opp5mF - our5mF >= 2) push((opp5mF-our5mF)*2,'⚡',
+        isLive ? `${ourT} has drawn ${opp5mF} penalty shots vs only ${our5mF} called against them — a favorable penalty margin`
+               : `${ourT} drew ${opp5mF} penalty shots vs only ${our5mF} called against them — a favorable penalty margin`);
     } else if(our5mF > 0 && our5mF >= 2){
-      push(our5mF*1.5,'⚡',`${ourT} gave away ${our5mF} 5m penalties — cutting those down would remove easy opponent scoring chances`);
+      push(our5mF*1.5,'⚡',
+        isLive ? `${ourT} has given away ${our5mF} 5m penalties — cutting those down removes easy opponent scoring chances`
+               : `${ourT} gave away ${our5mF} 5m penalties — cutting those down would remove easy opponent scoring chances`);
     }
   }
 
-  // Turnovers — only compare if both teams have turnover data
+  // Turnovers
   const toComparable = ourTO > 0 && oppTO > 0;
   if(toComparable){
-    if(ourTO - oppTO >= 4)   push((ourTO-oppTO)*1.5,'🔄',`Turnovers were costly — ${ourT} gave the ball away ${ourTO} times vs ${oppTO} for ${oppT}`);
-    else if(ourTO - oppTO >= 2 && ourTO >= 5) push(ourTO-oppTO,'🔄',`${ourT}'s ${ourTO} turnovers to ${oppT}'s ${oppTO} created too many extra possessions for the opponent`);
-    else if(oppTO - ourTO >= 4) push((oppTO-ourTO)*1.5,'🔄',`${ourT} forced ${oppTO} turnovers and committed only ${ourTO} — a strong ball-security advantage`);
+    if(ourTO - oppTO >= 4)   push((ourTO-oppTO)*1.5,'🔄',
+      isLive ? `Turnovers are proving costly — ${ourT} has given the ball away ${ourTO} times vs ${oppTO} for ${oppT}`
+             : `Turnovers were costly — ${ourT} gave the ball away ${ourTO} times vs ${oppTO} for ${oppT}`);
+    else if(ourTO - oppTO >= 2 && ourTO >= 5) push(ourTO-oppTO,'🔄',
+      isLive ? `${ourT}'s ${ourTO} turnovers to ${oppT}'s ${oppTO} are creating too many extra possessions for the opponent`
+             : `${ourT}'s ${ourTO} turnovers to ${oppT}'s ${oppTO} created too many extra possessions for the opponent`);
+    else if(oppTO - ourTO >= 4) push((oppTO-ourTO)*1.5,'🔄',
+      isLive ? `${ourT} is forcing ${oppTO} turnovers and committing only ${ourTO} — a strong ball-security edge`
+             : `${ourT} forced ${oppTO} turnovers and committed only ${ourTO} — a strong ball-security advantage`);
   } else if(ourTO > 0 && ourTO >= 4){
-    push(ourTO,'🔄',`${ourT} turned the ball over ${ourTO} times — improving possession retention is a key area`);
+    push(ourTO,'🔄',
+      isLive ? `${ourT} has ${ourTO} turnovers already — improving possession retention is a key focus`
+             : `${ourT} turned the ball over ${ourTO} times — improving possession retention is a key area`);
   }
 
-  // Steals — only compare if both tracked
+  // Steals
   const stlComparable = ourStl > 0 && oppStl > 0;
   if(stlComparable){
-    if(ourStl - oppStl >= 3) push((ourStl-oppStl)*1.5,'🤽',`${ourT} dominated the ball-denial game with ${ourStl} steals compared to ${oppT}'s ${oppStl}`);
+    if(ourStl - oppStl >= 3) push((ourStl-oppStl)*1.5,'🤽',
+      isLive ? `${ourT} is dominating the ball-denial game with ${ourStl} steals vs ${oppT}'s ${oppStl}`
+             : `${ourT} dominated the ball-denial game with ${ourStl} steals compared to ${oppT}'s ${oppStl}`);
   } else if(ourStl > 0 && ourStl >= 3){
-    push(ourStl,'🤽',`${ourT} came up with ${ourStl} steals, creating extra offensive possessions`);
+    push(ourStl,'🤽',
+      isLive ? `${ourT} has ${ourStl} steals, creating extra offensive possessions`
+             : `${ourT} came up with ${ourStl} steals, creating extra offensive possessions`);
   }
 
-  // Goalie — compare only if both tracked
+  // Goalie
   const blkComparable = ourBlk > 0 && oppBlk > 0;
   if(blkComparable){
-    if(ourBlk - oppBlk >= 3)  push((ourBlk-oppBlk)*1.5,'🧤',`${ourT}'s goalkeeper was outstanding with ${ourBlk} saves compared to ${oppBlk} for ${oppT}`);
-    else if(oppBlk - ourBlk >= 3) push((oppBlk-ourBlk)*1.5,'🧤',`${oppT}'s keeper made ${oppBlk} saves vs ${ourBlk} — ${ourT} needs to find better looks on goal`);
+    if(ourBlk - oppBlk >= 3)  push((ourBlk-oppBlk)*1.5,'🧤',
+      isLive ? `${ourT}'s goalkeeper is having an outstanding game with ${ourBlk} saves vs ${oppBlk} for ${oppT}`
+             : `${ourT}'s goalkeeper was outstanding with ${ourBlk} saves compared to ${oppBlk} for ${oppT}`);
+    else if(oppBlk - ourBlk >= 3) push((oppBlk-ourBlk)*1.5,'🧤',
+      isLive ? `${oppT}'s keeper has ${oppBlk} saves vs ${ourBlk} — ${ourT} needs to find better looks on goal`
+             : `${oppT}'s keeper made ${oppBlk} saves vs ${ourBlk} — ${ourT} needs to find better looks on goal`);
   } else if(ourBlk > 0){
-    if(ourBlk >= 5) push(ourBlk,'🧤',`${ourT}'s goalkeeper was busy with ${ourBlk} saves — a standout performance between the pipes`);
+    if(ourBlk >= 5) push(ourBlk,'🧤',
+      isLive ? `${ourT}'s goalkeeper is having a busy, impactful game with ${ourBlk} saves`
+             : `${ourT}'s goalkeeper was busy with ${ourBlk} saves — a standout performance between the pipes`);
   }
 
-  // Shooting % — only when misses are actually tracked; don't compare if only one side tracked
+  // Shooting %
   if(ourPct !== null){
     if(oppPct !== null){
-      // Both tracked — safe to compare
       if(Math.abs(ourPct - oppPct) >= 15 && ourShots >= 5 && (oppG+oppM) >= 5){
-        if(ourPct > oppPct) push(Math.abs(ourPct-oppPct)*0.4,'🎯',`${ourT} converted ${ourPct}% of shots vs ${oppT}'s ${oppPct}% — a clear finishing edge`);
-        else                push(Math.abs(ourPct-oppPct)*0.4,'🎯',`Shot conversion was a challenge — ${ourT} finished at ${ourPct}% vs ${oppT}'s ${oppPct}%`);
+        if(ourPct > oppPct) push(Math.abs(ourPct-oppPct)*0.4,'🎯',
+          isLive ? `${ourT} is converting ${ourPct}% of shots vs ${oppT}'s ${oppPct}% — a clear finishing edge`
+                 : `${ourT} converted ${ourPct}% of shots vs ${oppT}'s ${oppPct}% — a clear finishing edge`);
+        else                push(Math.abs(ourPct-oppPct)*0.4,'🎯',
+          isLive ? `Shot conversion is a challenge — ${ourT} is at ${ourPct}% vs ${oppT}'s ${oppPct}%`
+                 : `Shot conversion was a challenge — ${ourT} finished at ${ourPct}% vs ${oppT}'s ${oppPct}%`);
       }
     } else {
-      // Only our team tracked — report standalone
       if(ourShots >= 5){
-        if(ourPct >= 65)      push(3,'🎯',`${ourT} was clinical in front of goal, converting ${ourPct}% of their ${ourShots} attempts`);
-        else if(ourPct <= 40) push(3,'🎯',`Shot conversion was a challenge for ${ourT} — finishing at ${ourPct}% from ${ourShots} attempts`);
+        if(ourPct >= 65)      push(3,'🎯',
+          isLive ? `${ourT} is clinical in front of goal, converting ${ourPct}% of ${ourShots} attempts`
+                 : `${ourT} was clinical in front of goal, converting ${ourPct}% of their ${ourShots} attempts`);
+        else if(ourPct <= 40) push(3,'🎯',
+          isLive ? `Shot conversion is a challenge for ${ourT} — finishing at ${ourPct}% from ${ourShots} attempts so far`
+                 : `Shot conversion was a challenge for ${ourT} — finishing at ${ourPct}% from ${ourShots} attempts`);
       }
     }
   }
 
-  // Quarter dominance (our perspective)
+  // Quarter dominance
   if(swingQ && Math.abs(swingAmt) >= 3){
     const ourQ=Q[swingQ].our, oppQ=Q[swingQ].opp;
-    if(swingAmt > 0) push(Math.abs(swingAmt)*1.2,'📈',`A dominant Q${swingQ} (${ourQ}-${oppQ}) from ${ourT} swung the game's momentum`);
-    else             push(Math.abs(swingAmt)*1.2,'📉',`${ourT} struggled in Q${swingQ} (${ourQ}-${oppQ}) — that quarter was where the deficit grew`);
+    if(swingAmt > 0) push(Math.abs(swingAmt)*1.2,'📈',
+      isLive ? `A dominant Q${swingQ} (${ourQ}-${oppQ}) from ${ourT} has shifted the momentum`
+             : `A dominant Q${swingQ} (${ourQ}-${oppQ}) from ${ourT} swung the game's momentum`);
+    else             push(Math.abs(swingAmt)*1.2,'📉',
+      isLive ? `${ourT} struggled in Q${swingQ} (${ourQ}-${oppQ}) — that's where the deficit has grown`
+             : `${ourT} struggled in Q${swingQ} (${ourQ}-${oppQ}) — that quarter was where the deficit grew`);
   }
 
   // Sort by score, keep top 3
   facts.sort((a,b)=>b.score-a.score);
   const topFacts=facts.slice(0,3);
+
+  // ── Per-player foul watch (live games only) ───────────────────────
+  let foulAlertHTML='';
+  if(isLive){
+    const pf={};
+    ev.filter(e=>(e.event==='Ejection'||e.event==='5M Foul')&&e.cap).forEach(e=>{
+      const k=`${e.team}|${e.cap}`;
+      if(!pf[k]) pf[k]={team:e.team,cap:e.cap,playerId:e.playerId||null,ej:0,fiveM:0};
+      if(e.event==='Ejection') pf[k].ej++; else pf[k].fiveM++;
+    });
+    const alerts=Object.values(pf).map(p=>({...p,total:p.ej+p.fiveM})).filter(p=>p.total>=2).sort((a,b)=>b.total-a.total||b.ej-a.ej);
+    if(alerts.length){
+      const rows=alerts.map(p=>{
+        const pl=p.playerId&&state.players.find(x=>String(x.playerId||x.id)===String(p.playerId));
+        const fi=pl?(pl.first||'').trim().charAt(0):'';
+        const ln=pl?(pl.last||'').trim():'';
+        const name=pl&&ln?(fi?fi+'. '+ln:ln):'#'+p.cap;
+        const clr=p.team===dN?'#7abcdc':'#c0d8f0';
+        const icon=p.total>=3?'🚨':'⚠️';
+        const detail=p.ej===2&&p.fiveM===0?'2 ejections':p.ej===0?`${p.fiveM} 5M fouls`:`${p.ej} ej + ${p.fiveM} 5M`;
+        const msg=p.total>=3
+          ?`${name} has ${p.total} fouls (${detail}) — may be at permanent ejection limit`
+          :`${name} has 2 fouls (${detail}) — one more and they're out`;
+        return `<div style="display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-top:1px solid #0a1820;">
+          <span style="font-size:15px;flex:0 0 auto;line-height:1.5;">${icon}</span>
+          <div><span style="font-size:11px;font-weight:700;color:${clr};">${p.team} · </span><span style="font-size:12px;color:#a8c8e0;line-height:1.5;">${msg}</span></div>
+        </div>`;
+      }).join('');
+      foulAlertHTML=`<div class="card" style="padding:10px 12px;margin-bottom:8px;border-left:3px solid #c07830;">
+        <div style="font-size:10px;font-weight:700;color:#c07830;letter-spacing:1px;margin-bottom:4px;">FOUL WATCH</div>
+        ${rows}
+      </div>`;
+    }
+  }
 
   // ── Render ────────────────────────────────────────────────────────────
   // Quarter breakdown cells — White left, Dark right (matches scoreboard above)
@@ -5911,16 +6009,22 @@ function renderFollowRecap(ev, wN, dN){
     </div>`;
   }).join('');
 
-  // Opening summary — from our team's perspective
-  const winSentence = tied
-    ? `${ourT} and ${oppT} played to a ${ourG}-${oppG} draw.`
-    : weWon
-      ? margin===1 ? `${ourT} edged ${oppT} ${ourG}-${oppG} in a tight contest.`
-        : margin<=3 ? `${ourT} defeated ${oppT} ${ourG}-${oppG}.`
-        : `${ourT} had a strong ${ourG}-${oppG} victory over ${oppT}.`
-      : margin===1 ? `${oppT} edged ${ourT} ${oppG}-${ourG} in a close game.`
-        : margin<=3 ? `${ourT} fell to ${oppT} ${ourG}-${oppG}.`
-        : `${ourT} were outscored ${ourG}-${oppG} by ${oppT}.`;
+  // Opening summary — present tense for live, past tense for completed
+  const winSentence = isLive
+    ? (tied
+        ? `${ourT} and ${oppT} are tied ${ourG}-${oppG}${phaseSuffix}.`
+        : weWon
+          ? `${ourT} leads ${oppT} ${ourG}-${oppG}${phaseSuffix}.`
+          : `${ourT} trails ${oppT} ${oppG}-${ourG}${phaseSuffix}.`)
+    : (tied
+        ? `${ourT} and ${oppT} played to a ${ourG}-${oppG} draw.`
+        : weWon
+          ? margin===1 ? `${ourT} edged ${oppT} ${ourG}-${oppG} in a tight contest.`
+            : margin<=3 ? `${ourT} defeated ${oppT} ${ourG}-${oppG}.`
+            : `${ourT} had a strong ${ourG}-${oppG} victory over ${oppT}.`
+          : margin===1 ? `${oppT} edged ${ourT} ${oppG}-${ourG} in a close game.`
+            : margin<=3 ? `${ourT} fell to ${oppT} ${ourG}-${oppG}.`
+            : `${ourT} were outscored ${ourG}-${oppG} by ${oppT}.`);
 
   const factHTML=topFacts.length
     ? topFacts.map(f=>`
@@ -5959,9 +6063,11 @@ function renderFollowRecap(ev, wN, dN){
       ${statRows||'<p style="font-size:12px;color:#3a5a7a;margin:0;">No stats yet.</p>'}
     </div>
 
+    ${foulAlertHTML}
+
     <!-- Analysis -->
     <div class="card" style="padding:12px;margin-bottom:8px;">
-      <div style="font-size:10px;font-weight:700;color:#2a5a7a;letter-spacing:1px;margin-bottom:8px;">GAME ANALYSIS</div>
+      <div style="font-size:10px;font-weight:700;color:#2a5a7a;letter-spacing:1px;margin-bottom:8px;">${analysisLabel}</div>
       <p style="font-size:13px;color:#c0d8f0;margin:0 0 4px;line-height:1.6;">${winSentence}</p>
       ${factHTML}
     </div>`;
