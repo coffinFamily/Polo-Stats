@@ -4143,7 +4143,8 @@ function showShotChart(side) {
       const keyGoals  = keyShots.filter(e => GOAL_TYPES.includes(e.type)).length;
       const keyMisses = keyShots.filter(e => MISS_TYPES.includes(e.type)).length;
       const safeId    = key.replace(/[^a-zA-Z0-9]/g,'_');
-      filtersHTML += `<button id="sc-f-${safeId}" data-pkey="${key}" onclick="filterShotChart(${JSON.stringify(key)})"
+      const escapedKey = key.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+      filtersHTML += `<button id="sc-f-${safeId}" data-pkey="${escapedKey}" onclick="filterShotChart(this.dataset.pkey)"
         style="padding:6px 10px;border-radius:10px;font-size:12px;border:1.5px solid #1e3a5a;background:#0d1e2e;color:#5a7a9a;cursor:pointer;text-align:left;">
         ${key} <span style="font-size:10px;color:#4a8a6a;">${keyGoals}G</span><span style="font-size:10px;color:#8a4a4a;margin-left:2px;">${keyMisses}M</span>
       </button>`;
@@ -6750,13 +6751,15 @@ function showTeamShotChart(){
     const key = gid ? String(gid) : ('_tp'+idx);
     const evType = r.event||r.type||'';
     const zone = gf(r,'zone','Zone');
+    const pid = r.playerId||r.playerID||r.PlayerID||null;
     if(!groups[key]){
       groups[key]={id:Date.now()+idx, q:gf(r,'q','Q'), time:gf(r,'time','Time'),
-        type:evType, team:teamName, cap:gf(r,'cap','Cap'), zone};
+        type:evType, team:teamName, cap:gf(r,'cap','Cap'), playerId:pid, zone};
     } else {
       const storedCp=COUNTERPART[groups[key].type], thisCp=COUNTERPART[evType];
-      if(storedCp&&!thisCp){ groups[key].type=evType; groups[key].cap=gf(r,'cap','Cap')||groups[key].cap; if(zone) groups[key].zone=zone; }
+      if(storedCp&&!thisCp){ groups[key].type=evType; groups[key].cap=gf(r,'cap','Cap')||groups[key].cap; groups[key].playerId=groups[key].playerId||pid; if(zone) groups[key].zone=zone; }
       else if(!groups[key].zone&&zone) groups[key].zone=zone;
+      if(!groups[key].playerId) groups[key].playerId=pid;
     }
   });
   const mapped = Object.values(groups).filter(e=>!COUNTERPART[e.type]);
