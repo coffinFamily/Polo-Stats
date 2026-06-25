@@ -2334,7 +2334,7 @@ function saveEditedEvent(){
     team:newTeam,
     cap:newCap||ev.cap,
     capName:player?player.name:(newCap?'#'+newCap:ev.capName),
-    playerId:player?player.playerId:ev.playerId,
+    playerId:player?player.playerId:(newCap===String(ev.cap||'')?ev.playerId:null),
     gm:gmEl?gmEl.value:ev.gm,
     assist:assistEl?(assistEl.value.trim()?'#'+assistEl.value.trim():''):ev.assist,
     drawnBy:drawnEl?(drawnEl.value.trim()?'#'+drawnEl.value.trim():''):ev.drawnBy,
