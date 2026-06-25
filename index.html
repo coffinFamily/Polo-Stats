@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>🤽 Water Polo Stats (Voice)</title>
+<title>🤽 Kook Stats</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -104,7 +104,8 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
 <body>
 
 <div class="nav">
-  <span style="font-size:18px;margin-right:4px;">🤽</span>
+  <span style="font-size:18px;margin-right:2px;">🤽</span>
+  <span style="font-size:13px;font-weight:700;color:#7abcdc;margin-right:6px;white-space:nowrap;">Kook Stats</span>
   <button class="nav-btn active" onclick="showTab('follow')">Follow</button>
   <button class="nav-btn auth-tab" onclick="showTab('game')">Game</button>
   <button class="nav-btn auth-tab" onclick="showTab('setup')">Game Setup</button>
@@ -587,10 +588,23 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
   <div id="sc-svg-container" style="padding:0 6px;"></div>
   <div id="sc-legend" style="padding:6px 16px 10px;"></div>
   <div style="padding:0 16px 10px;">
-    <div style="font-size:11px;color:#5a7a9a;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Filter by player</div>
+    <div id="sc-filter-label" style="font-size:11px;color:#5a7a9a;margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;">Filter by player</div>
     <div id="sc-filters" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
   </div>
   <div id="sc-nozone" style="padding:0 16px 24px;font-size:11px;color:#3a5a7a;"></div>
+</div>
+
+<!-- ═══ PLAYER PAGE OVERLAY ════════════════════════════════════════════ -->
+<div id="player-page-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:#08141e;overflow-y:auto;">
+  <div style="padding:12px 14px 6px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+    <div>
+      <div id="pp-title" style="font-size:17px;font-weight:700;color:#e0f0ff;"></div>
+      <div id="pp-subtitle" style="font-size:12px;color:#5a7a9a;margin-top:3px;"></div>
+    </div>
+    <button onclick="document.getElementById('player-page-overlay').style.display='none'"
+      style="flex:0 0 auto;width:40px;height:40px;border-radius:50%;background:#1e3a5a;border:2px solid #2a5a7a;color:#90c8e8;font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1;">✕</button>
+  </div>
+  <div id="pp-content" style="padding:0 14px 80px;"></div>
 </div>
 
 <!-- ═══ MODAL ══════════════════════════════════════════════════════════ -->
@@ -6383,15 +6397,17 @@ function renderTeamPage(){
   const playerMap = {};
   tev.filter(e=>e.cap).forEach(e=>{
     if(!playerMap[e.cap]){
-      let name='';
+      let name='', playerId='';
       if(e.playerId){
-        const p=state.players.find(p=>String(p.id)===String(e.playerId));
+        const p=state.players.find(p=>String(p.id)===String(e.playerId)||String(p.playerId)===String(e.playerId));
         if(p) name=fmtName(((p.first||'')+' '+(p.last||'')).trim())||'';
+        playerId=e.playerId;
       }
-      playerMap[e.cap]={cap:e.cap,name,gameIds:new Set()};
+      playerMap[e.cap]={cap:e.cap,name,playerId,gameIds:new Set()};
     }
     if(e._game) playerMap[e.cap].gameIds.add(e._game.gameId);
   });
+  if(!window._ppReg) window._ppReg = {};
   const sortedPlayers = Object.values(playerMap).sort((a,b)=>Number(a.cap)-Number(b.cap));
   const hc = 'color:#4a7a9a;';
   const colHdrs = PCOLS.map(c=>`<th style="text-align:center;padding:4px;font-size:10px;font-weight:600;${hc}">${c.label}</th>`).join('');
@@ -6401,10 +6417,14 @@ function renderTeamPage(){
     const tots=PCOLS.map(c=>c.label==='GP'?p.gameIds.size:pev.filter(c.fn).length);
     if(tots.slice(0,-1).every(n=>n===0)) return;
     const cells=tots.map(n=>`<td style="text-align:center;padding:5px 4px;font-size:12px;">${n>0?n:'<span style="color:#2a3a4a;">–</span>'}</td>`).join('');
+    const regKey=(p.playerId||('cap_'+p.cap+'_'+teamName)).replace(/[^a-zA-Z0-9_-]/g,'_');
+    window._ppReg[regKey]={playerId:p.playerId||'',name:p.name||'',teamName,cap:p.cap};
     tableRows+=`<tr style="border-bottom:1px solid #0e1e2e;">
       <td style="padding:5px 6px;white-space:nowrap;">
-        <span style="font-weight:700;color:#4a7a9a;margin-right:4px;">#${p.cap}</span>
-        ${p.name?`<span style="font-size:12px;color:#c0d8f0;">${p.name}</span>`:''}
+        <div onclick="showPlayerPage('${regKey}')" style="cursor:pointer;">
+          <span style="font-weight:700;color:#4a7a9a;margin-right:4px;">#${p.cap}</span>
+          ${p.name?`<span style="font-size:12px;color:#c0d8f0;text-decoration:underline;text-underline-offset:2px;">${p.name}</span>`:''}
+        </div>
       </td>${cells}</tr>`;
   });
   const playerTableHTML = tableRows
@@ -6781,6 +6801,168 @@ function showTeamShotChart(){
   state.game={...state.game, whiteTeam:teamName, darkTeam:'Opponent'};
   state.events=mapped;
   showShotChart('white');
+  state.game=prevGame; state.events=prevEvents;
+}
+
+// ─── Player Page ─────────────────────────────────────────────────────────────
+function showPlayerPage(regKey){
+  const rec = window._ppReg && window._ppReg[regKey];
+  if(!rec) return;
+  const overlay = document.getElementById('player-page-overlay');
+  document.getElementById('pp-title').textContent = rec.name || ('#'+rec.cap);
+  document.getElementById('pp-subtitle').textContent = rec.teamName || '';
+  document.getElementById('pp-content').innerHTML =
+    '<div style="text-align:center;padding:40px 0;color:#4a7a9a;font-size:13px;">Loading…</div>';
+  overlay.style.display = 'block';
+  overlay.scrollTop = 0;
+  renderPlayerPage(rec);
+}
+
+function renderPlayerPage(rec){
+  const content = document.getElementById('pp-content');
+  const { events, games, teamName:tpTeam } = _teamPage;
+  const teamName = rec.teamName;
+
+  if(!events || !events.length){
+    content.innerHTML = '<div class="card" style="padding:12px;font-size:12px;color:#5a7a9a;">Visit the Team Page for '+teamName+' first to load season data.</div>';
+    return;
+  }
+  if(tpTeam && tpTeam !== teamName){
+    content.innerHTML = '<div class="card" style="padding:12px;font-size:12px;color:#5a7a9a;">Team Page is loaded for '+tpTeam+'. Visit the Team Page for '+teamName+' to see this player\'s stats.</div>';
+    return;
+  }
+
+  const COLS = [
+    {label:'G',   fn:e=>/^Goal \(/i.test(e.event||'')},
+    {label:'A',   fn:e=>e.event==='Assist'},
+    {label:'Stl', fn:e=>e.event==='Steal'},
+    {label:'Ej',  fn:e=>e.event==='Ejection'},
+    {label:'5M',  fn:e=>e.event==='5M Foul'},
+    {label:'Blk', fn:e=>/block/i.test(e.event||'')},
+    {label:'TO',  fn:e=>e.event==='Turnover'},
+  ];
+
+  const isThisPlayer = e => rec.playerId
+    ? e.playerId === rec.playerId
+    : (e.team === teamName && String(e.cap||'') === String(rec.cap));
+
+  const sortedGames = [...games].sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
+  const gameRows = [];
+  sortedGames.forEach(g=>{
+    const opp = g.whiteTeam === teamName ? g.darkTeam : g.whiteTeam;
+    const gev = events.filter(e=>e._game&&e._game.gameId===g.gameId&&isThisPlayer(e));
+    const totals = COLS.map(c=>gev.filter(c.fn).length);
+    if(totals.every(n=>n===0)) return;
+    const gAll = events.filter(e=>e._game&&e._game.gameId===g.gameId);
+    const tG = gAll.filter(e=>e.team===teamName&&/^Goal \(/i.test(e.event||'')).length;
+    const oG = gAll.filter(e=>e.team===opp&&/^Goal \(/i.test(e.event||'')).length;
+    const won = tG>oG;
+    const resultClr = won?'#4ade80':tG<oG?'#ef4444':'#7abcdc';
+    gameRows.push({opp, date:g.date||'', totals, tG, oG, resultClr});
+  });
+
+  if(!gameRows.length){
+    content.innerHTML = '<div class="card" style="padding:12px;font-size:12px;color:#5a7a9a;">No stats found for this player in the season data.</div>';
+    return;
+  }
+
+  const colTotals = COLS.map((c,i)=>gameRows.reduce((s,r)=>s+r.totals[i],0));
+  const hdrCells = COLS.map(c=>'<th style="text-align:center;padding:4px 5px;font-size:10px;font-weight:600;color:#4a7a9a;">'+c.label+'</th>').join('');
+  let rowsHTML = '';
+  gameRows.forEach(r=>{
+    const cells = r.totals.map(n=>'<td style="text-align:center;padding:5px 4px;font-size:12px;">'+(n>0?n:'<span style="color:#2a3a4a;">–</span>')+'</td>').join('');
+    const score = '<span style="font-size:10px;font-weight:700;color:'+r.resultClr+';">'+r.tG+'-'+r.oG+'</span>';
+    rowsHTML += '<tr style="border-bottom:1px solid #0e1e2e;">'+
+      '<td style="padding:5px 8px;white-space:nowrap;">'+
+        '<div style="font-size:12px;color:#c0d8f0;font-weight:600;">'+r.opp+'</div>'+
+        '<div style="font-size:10px;color:#4a7a9a;">'+r.date+' '+score+'</div>'+
+      '</td>'+cells+'</tr>';
+  });
+  const totalCells = colTotals.map(n=>'<td style="text-align:center;padding:5px 4px;font-size:12px;font-weight:700;color:#7abcdc;">'+(n||'–')+'</td>').join('');
+  const regKeyEsc = (rec.playerId||('cap_'+rec.cap+'_'+rec.teamName)).replace(/[^a-zA-Z0-9_-]/g,'_');
+
+  content.innerHTML =
+    '<div style="margin-bottom:8px;">'+
+      '<button class="btn-s" style="width:100%;padding:8px;font-size:12px;" onclick="showPlayerShotChart(\''+regKeyEsc+'\')">📊 Shot Chart</button>'+
+    '</div>'+
+    '<div class="card" style="padding:4px 0 4px;margin-bottom:8px;">'+
+      '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">'+
+        '<table class="tbl" style="min-width:320px;">'+
+          '<thead><tr style="border-bottom:1px solid #1e3a5a;">'+
+            '<th style="text-align:left;padding:4px 8px;font-size:10px;font-weight:600;color:#4a7a9a;">Opponent</th>'+hdrCells+
+          '</tr></thead>'+
+          '<tbody>'+rowsHTML+
+            '<tr style="border-top:2px solid #1e3a5a;background:#0a1a2a;">'+
+              '<td style="padding:5px 8px;font-size:11px;font-weight:700;color:#5a7a9a;">TOTAL</td>'+totalCells+
+            '</tr>'+
+          '</tbody>'+
+        '</table>'+
+      '</div>'+
+    '</div>';
+}
+
+function showPlayerShotChart(regKey){
+  const rec = window._ppReg && window._ppReg[regKey];
+  if(!rec) return;
+  const { events, games } = _teamPage;
+  const teamName = rec.teamName;
+
+  if(!events || !events.length){
+    alert('Visit the Team Page for '+teamName+' first to load season data.');
+    return;
+  }
+
+  const isThisPlayer = e => rec.playerId
+    ? e.playerId === rec.playerId
+    : (e.team === teamName && String(e.cap||'') === String(rec.cap));
+
+  const COUNTERPART = {'Shot On Goal':1,'Ejection Drawn':1,'5m Drawn':1,'5M Drawn':1};
+  const GOAL_TYPES  = ['Goal (Reg)','Goal (6-5)','5M Goal','Goal (5M)','Goal (Counter)'];
+  const MISS_TYPES  = ['Missed Shot','Missed Shot 5M','Miss (Blocked)'];
+
+  const groups = {};
+  events.filter(e=>e.team===teamName&&isThisPlayer(e)).forEach(function(r,idx){
+    const gid = r.groupId||r.groupID||r.GroupID||'';
+    const key = gid ? String(gid) : ('_pp'+idx);
+    const evType = r.event||r.type||'';
+    const zone = r.zone||r.Zone||'';
+    const pid = r.playerId||r.playerID||r.PlayerID||null;
+    if(!groups[key]){
+      groups[key]={id:Date.now()+idx, q:r.q||r.Q||'', time:r.time||r.Time||'',
+        type:evType, team:teamName, cap:r.cap||r.Cap||'', playerId:pid, zone, _game:r._game||null};
+    } else {
+      const storedCp=COUNTERPART[groups[key].type], thisCp=COUNTERPART[evType];
+      if(storedCp&&!thisCp){
+        groups[key].type=evType; groups[key].cap=r.cap||r.Cap||groups[key].cap;
+        groups[key].playerId=groups[key].playerId||pid;
+        if(zone) groups[key].zone=zone;
+      } else if(!groups[key].zone&&zone){ groups[key].zone=zone; }
+      if(!groups[key].playerId) groups[key].playerId=pid;
+      if(!groups[key]._game) groups[key]._game=r._game||null;
+    }
+  });
+
+  const mapped = Object.values(groups).filter(e=>!COUNTERPART[e.type]);
+  mapped.forEach(e=>{
+    const g = e._game;
+    e.playerKey = g ? (g.whiteTeam===teamName ? g.darkTeam : g.whiteTeam) : 'Unknown';
+  });
+
+  if(!mapped.filter(e=>GOAL_TYPES.includes(e.type)||MISS_TYPES.includes(e.type)).length){
+    alert('No shot data found for this player.');
+    return;
+  }
+
+  window._scNameMode = true;
+  const prevGame=state.game, prevEvents=state.events;
+  state.game={...state.game, whiteTeam:teamName, darkTeam:'Opponent'};
+  state.events=mapped;
+  showShotChart('white');
+  // Override title and filter label for player context
+  const scTitle = document.getElementById('sc-title');
+  if(scTitle) scTitle.textContent = (rec.name||('#'+rec.cap)) + ' — Shot Chart';
+  const scLbl = document.getElementById('sc-filter-label');
+  if(scLbl) scLbl.textContent = 'Filter by opponent';
   state.game=prevGame; state.events=prevEvents;
 }
 
