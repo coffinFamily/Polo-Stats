@@ -2963,7 +2963,7 @@ function copyFollowView(btn){
   const origLabel = btn.textContent;
   btn.textContent = '⏳ Capturing…'; btn.disabled = true;
   // Hide controls that should not appear in the snapshot
-  const toHide = ['follow-view-btns','follow-sc-btns','follow-msg-btn-row']
+  const toHide = ['follow-chips-card','follow-view-btns','follow-sc-btns','follow-msg-btn-row']
     .map(id=>document.getElementById(id)).filter(Boolean);
   toHide.forEach(el=>{ el._ph=el.style.display; el.style.display='none'; });
   html2canvas(content, { backgroundColor:'#0a1828', scale:2, useCORS:true, logging:false })
