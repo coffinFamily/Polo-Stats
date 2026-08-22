@@ -497,6 +497,7 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
     <div id="follow-selector-collapsed" style="display:none;">
       <div style="display:flex;align-items:center;gap:8px;">
         <span id="follow-selected-label" style="flex:1;font-size:13px;font-weight:600;color:#c0d8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
+        <button onclick="archiveGame(_follow.gameId)" style="flex:0 0 auto;font-size:11px;padding:4px 10px;border-radius:7px;border:1px solid #2a3a4a;background:#0a1420;color:#4a6a8a;cursor:pointer;white-space:nowrap;">Archive</button>
         <button onclick="expandFollowSelector()" style="flex:0 0 auto;font-size:11px;padding:4px 10px;border-radius:7px;border:1px solid #1e3a5a;background:#0a1e2e;color:#5a9abb;cursor:pointer;white-space:nowrap;">Change ▾</button>
       </div>
     </div>
@@ -518,6 +519,7 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
         style="width:100%;font-size:13px;padding:9px 10px;border-radius:8px;border:1px solid #1e3a5a;background:#0a1820;color:#c0d8f0;">
         <option value="">— Select a game —</option>
       </select>
+      <div id="follow-archived-wrap"></div>
     </div>
   </div>
 
@@ -658,6 +660,7 @@ let state = {
   session: ls('wp-session', null),
   flow: null, flowIdx: 0, flowCtx: {}, pendingData: {},
 };
+let _archivedGames = ls('wp-archived-games', {});
 
 // Migration: ensure the current active game + events exist in savedGames/gameEvents
 (function migrateSavedGames(){
@@ -799,7 +802,9 @@ function changeQ(d){
 function populateGameSelector(){
   const sel=document.getElementById('game-sel');
   if(!sel) return;
-  const games=[...state.savedGames].sort((a,b)=>parseDate(b.date)-parseDate(a.date));
+  const games=[...state.savedGames]
+    .filter(g=>!_archivedGames[g.gameId])
+    .sort((a,b)=>parseDate(b.date)-parseDate(a.date));
   sel.innerHTML='';
   if(!games.length){
     sel.innerHTML='<option value="">— no games saved —</option>';
@@ -5355,12 +5360,59 @@ function renderFollowGameList(){
     });
   }
 
+  // Separate active vs archived
+  const active   = games.filter(g=>!_archivedGames[g.gameId]);
+  const archived = games.filter(g=>!!_archivedGames[g.gameId]);
+
   sel.innerHTML = '<option value="">— Select a game —</option>';
-  games.forEach(g=>{
+  active.forEach(g=>{
     const label = (g.whiteTeam||'White')+' vs '+(g.darkTeam||'Dark')+' — '+fmtDate(g.date);
     const isSel = g.gameId===cur ? ' selected' : '';
     sel.innerHTML += '<option value="'+g.gameId+'"'+isSel+'>'+label+'</option>';
   });
+
+  // Archived section — render below the select as a collapsible list
+  const arcWrap = document.getElementById('follow-archived-wrap');
+  if(arcWrap){
+    if(!archived.length){ arcWrap.innerHTML=''; return; }
+    const open = arcWrap.dataset.open==='1';
+    arcWrap.innerHTML =
+      '<button onclick="(function(w){w.dataset.open=w.dataset.open===\'1\'?\'0\':\'1\';renderFollowGameList();})(document.getElementById(\'follow-archived-wrap\'))"'+
+        ' style="width:100%;margin-top:8px;padding:5px 10px;font-size:11px;font-weight:600;border-radius:8px;border:1px solid #1e3a5a;background:#0a1420;color:#5a7a9a;cursor:pointer;text-align:left;">'+
+        (open?'▾':'▸')+' Archived ('+archived.length+')</button>'+
+      (open ? '<div style="margin-top:4px;display:flex;flex-direction:column;gap:4px;">' +
+        archived.map(g=>{
+          const label=(g.whiteTeam||'White')+' vs '+(g.darkTeam||'Dark')+' — '+fmtDate(g.date);
+          return '<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:#0a1420;border-radius:7px;border:1px solid #1a2a3a;">'+
+            '<span style="flex:1;font-size:12px;color:#4a6a8a;">'+label+'</span>'+
+            '<button onclick="unarchiveGame(\''+g.gameId+'\')" style="flex:0 0 auto;font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid #1e3a5a;background:#0a1e30;color:#5a9abb;cursor:pointer;">Restore</button>'+
+          '</div>';
+        }).join('')+
+      '</div>' : '');
+  }
+}
+
+function archiveGame(gameId){
+  if(!gameId) return;
+  _archivedGames[gameId]=true;
+  localStorage.setItem('wp-archived-games', JSON.stringify(_archivedGames));
+  renderFollowGameList();
+  populateGameSelector();
+  // If the currently-viewed game was just archived, collapse back to selector
+  if(_follow.gameId===gameId){
+    _follow.gameId=null; _follow.events=[];
+    const content=document.getElementById('follow-content');
+    if(content) content.style.display='none';
+    expandFollowSelector();
+  }
+}
+
+function unarchiveGame(gameId){
+  if(!gameId) return;
+  delete _archivedGames[gameId];
+  localStorage.setItem('wp-archived-games', JSON.stringify(_archivedGames));
+  renderFollowGameList();
+  populateGameSelector();
 }
 
 function _followGameLabel(gameId){
