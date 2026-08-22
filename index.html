@@ -127,7 +127,7 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
           <button class="btn-p" id="start-btn" onclick="toggleTimer()" style="padding:10px 14px;font-size:15px;border-radius:8px;min-width:72px;">▶ Start</button>
         </div>
         <div class="row" style="justify-content:center;margin-top:8px;gap:5px;">
-          <button class="btn-s" onclick="resetTimer()">Reset 8m</button>
+          <button id="reset-timer-btn" class="btn-s" onclick="resetTimer()">Reset 8m</button>
           <button class="btn-s" onclick="adjustTimer(5)">+5s</button>
           <button class="btn-s" onclick="adjustTimer(-5)">−5s</button>
           <button class="btn-s" onclick="adjustTimer(30)">+30s</button>
@@ -775,7 +775,8 @@ function toggleTimer(){
 function resetTimer(){
   state.running=false; clearInterval(timerInterval);
   document.getElementById('start-btn').textContent='▶ Start';
-  state.timerSecs=480; updateTimerDisplay();
+  const mins=(state.game&&state.game.quarterMins)||8;
+  state.timerSecs=mins*60; updateTimerDisplay();
 }
 
 function adjustTimer(d){ state.timerSecs=Math.max(0,state.timerSecs+d); updateTimerDisplay(); }
@@ -2045,6 +2046,8 @@ function renderGameUI(){
   document.getElementById('q-display').textContent='Q'+state.q+(state.q>4?' (OT)':'');
   populateGameSelector();
   updateTimerDisplay(); updateScores();
+  const _rb=document.getElementById('reset-timer-btn');
+  if(_rb) _rb.textContent='Reset '+(g.quarterMins||8)+'m';
 
   const p=state.prefs||{}, dp=p.dark||{}, wp=p.white||{};
   const ag=state.activeGoalie||{};
@@ -3128,8 +3131,8 @@ function toggleRbRow(side,pid){
 // ═══════════════════════════════════════════════════════════
 //  NEW GAME WIZARD
 // ═══════════════════════════════════════════════════════════
-const NGW_STEPS=['date','white-team','white-name','white-prefs','white-gk','dark-team','dark-name','dark-prefs','dark-gk'];
-const NGW_LABELS={'date':'Game date','white-team':'White caps — select team','white-name':'White caps — display name','white-prefs':'White caps — stats to capture','white-gk':'White caps — goalkeeper','dark-team':'Dark caps — select team','dark-name':'Dark caps — display name','dark-prefs':'Dark caps — stats to capture','dark-gk':'Dark caps — goalkeeper'};
+const NGW_STEPS=['date','quarter-length','white-team','white-name','white-prefs','white-gk','dark-team','dark-name','dark-prefs','dark-gk'];
+const NGW_LABELS={'date':'Game date','quarter-length':'Quarter length','white-team':'White caps — select team','white-name':'White caps — display name','white-prefs':'White caps — stats to capture','white-gk':'White caps — goalkeeper','dark-team':'Dark caps — select team','dark-name':'Dark caps — display name','dark-prefs':'Dark caps — stats to capture','dark-gk':'Dark caps — goalkeeper'};
 
 function _defPrefs(){ return {goals:true,miss:true,assist:true,ejection:true,ejectionDrawn:true,fiveM:true,fiveMDrawn:true,steal:true,turnover:true,goalieBlock:true,fieldBlock:true,sprintWon:true,goalZone:true,goalGM:true,missZone:true,blockZone:true}; }
 
@@ -3139,6 +3142,7 @@ function startNewGameWizard(){
   state._ngw={
     stepIdx:0,
     date: g.date||today,
+    quarterMins: g.quarterMins||8,
     white:{ teamId:g.whiteTeamId||'', displayName:g.whiteTeam||'', prefs:JSON.parse(JSON.stringify((state.prefs||{}).white||_defPrefs())), gk:(state.activeGoalie||{}).white||'' },
     dark: { teamId:g.darkTeamId||'',  displayName:g.darkTeam||'',  prefs:JSON.parse(JSON.stringify((state.prefs||{}).dark||_defPrefs())),  gk:(state.activeGoalie||{}).dark||''  }
   };
@@ -3182,6 +3186,23 @@ function ngwStepBody(step,w){
       <input type="date" id="ngw-date" value="${w.date}"
         style="width:100%;box-sizing:border-box;font-size:16px;padding:10px;border-radius:8px;border:1px solid #1e3a5a;background:#0a1820;color:#c0d8f0;"
         onchange="state._ngw.date=this.value">`;
+  }
+
+  if(step==='quarter-length'){
+    const opts=[
+      {mins:8, label:'8 minutes', desc:'College · Men\'s'},
+      {mins:7, label:'7 minutes', desc:'High School Varsity · Club 18U'},
+      {mins:6, label:'6 minutes', desc:'JV · 16U'},
+    ];
+    return `<p style="color:#7a9bb8;font-size:13px;margin-bottom:14px;">How long is each quarter?</p>`+
+      opts.map(o=>{
+        const sel=w.quarterMins===o.mins;
+        return `<button onclick="state._ngw.quarterMins=${o.mins};document.querySelectorAll('.ngw-ql-btn').forEach(b=>{b.style.background='#0a1420';b.style.borderColor='#1e3a5a';b.style.color='#5a7a9a';});this.style.background='#0a3a5a';this.style.borderColor='#0a84c8';this.style.color='#7adcff';"
+          class="ngw-ql-btn" style="display:block;width:100%;margin-bottom:10px;padding:14px 16px;border-radius:10px;border:2px solid ${sel?'#0a84c8':'#1e3a5a'};background:${sel?'#0a3a5a':'#0a1420'};color:${sel?'#7adcff':'#5a7a9a'};cursor:pointer;text-align:left;">
+          <span style="font-size:17px;font-weight:700;display:block;">${o.label}</span>
+          <span style="font-size:12px;opacity:0.7;">${o.desc}</span>
+        </button>`;
+      }).join('');
   }
 
   if(step==='white-team'||step==='dark-team'){
@@ -3323,6 +3344,7 @@ function ngwSave(){
   state.game={
     sheetUrl, gameId:'game-'+genId(),
     date:w.date,
+    quarterMins:w.quarterMins||8,
     whiteTeam:w.white.displayName||'White', whiteTeamFull:fullName(w.white.teamId)||w.white.displayName||'White',
     whiteTeamId:w.white.teamId, whiteRoster:buildRoster(w.white.teamId),
     darkTeam: w.dark.displayName||'Dark',   darkTeamFull: fullName(w.dark.teamId) ||w.dark.displayName||'Dark',
