@@ -2124,8 +2124,8 @@ function renderGameUI(){
 function updateScores(){
   const g=state.game;
   const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
-  document.getElementById('dark-score').textContent=state.events.filter(e=>e.type.match(/^Goal \(/)&&e.team===dN).length;
-  document.getElementById('white-score').textContent=state.events.filter(e=>e.type.match(/^Goal \(/)&&e.team===wN).length;
+  document.getElementById('dark-score').textContent=state.events.filter(e=>/^Goal \(/i.test(e.event||'')&&e.team===dN).length;
+  document.getElementById('white-score').textContent=state.events.filter(e=>/^Goal \(/i.test(e.event||'')&&e.team===wN).length;
   renderTimeouts();
 }
 
