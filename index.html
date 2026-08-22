@@ -310,7 +310,7 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
     </div>
     <!-- CSV Import -->
     <div class="card" style="margin-bottom:8px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="(function(){const b=document.getElementById('csv-import-body');const a=document.getElementById('csv-chevron');const open=b.style.display!=='none';b.style.display=open?'none':'block';a.textContent=open?'▸':'▾';})()">
+      <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="toggleCSVImport()">
         <div class="stitle" style="margin:0;">⬆ Import players from CSV</div>
         <span id="csv-chevron" style="color:#5a7a9a;font-size:14px;">▸</span>
       </div>
@@ -3532,9 +3532,23 @@ function addPlayer(){
   renderPlayersList();
 }
 
+function toggleCSVImport(){
+  const b=document.getElementById('csv-import-body');
+  const a=document.getElementById('csv-chevron');
+  const open=b.style.display!=='none';
+  b.style.display=open?'none':'block';
+  a.textContent=open?'▸':'▾';
+}
+
 function importPlayersCSV(){
   const raw=document.getElementById('csv-import-text').value.trim();
-  if(!raw) return;
+  if(!raw){
+    const result=document.getElementById('csv-import-result');
+    result.style.color='#ffaaaa';
+    result.textContent='Paste player data above first';
+    setTimeout(()=>{ result.textContent=''; },3000);
+    return;
+  }
 
   const lines=raw.split('\n').map(l=>l.trim()).filter(l=>l);
   let added=0, skipped=0, teamsCreated=0;
