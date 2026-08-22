@@ -3610,10 +3610,12 @@ function importPlayersCSV(){
   ss('wp-players',state.players);
   ss('wp-teams',state.teams);
 
-  // Sync new players and any newly-created teams to sheet
+  // Sync new players and any newly-created teams to sheet.
+  // Stagger individual POSTs by 300ms each to avoid hitting Apps Script's
+  // concurrent-execution limit, which silently drops excess simultaneous requests.
   if(state.rosterSheetUrl){
-    state.players.slice(-added).forEach(p=>syncPlayerToSheet(p));
     state.teams.filter(t=>newTeamIds.has(t.id)).forEach(t=>rosterPost({action:'upsert-team',team:t}));
+    state.players.slice(-added).forEach((p,i)=>setTimeout(()=>syncPlayerToSheet(p), i*300));
   }
 
   // Report
