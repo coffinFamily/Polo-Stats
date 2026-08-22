@@ -963,6 +963,10 @@ function refreshEventsFromSheet(gameId){
   if(!url||!gameId) return;
   var COUNTERPART_TYPES={'Shot On Goal':1,'Ejection Drawn':1,'5m Drawn':1};
   function gf(r,a,b){ return (r[a]!=null&&r[a]!=='')?r[a]:((r[b]!=null&&r[b]!=='')?r[b]:''); }
+  // Sheet stores full team names; map them back to display names so score filters work
+  var dN=state.game.darkTeam||'Dark', wN=state.game.whiteTeam||'White';
+  var dFull=state.game.darkTeamFull||dN, wFull=state.game.whiteTeamFull||wN;
+  function normTeam(t){ return t===dFull?dN:t===wFull?wN:t; }
   fetch(url+'?action=events&gameId='+encodeURIComponent(gameId),{cache:'no-store'})
     .then(function(resp){ return resp.json(); })
     .then(function(data){
@@ -972,11 +976,13 @@ function refreshEventsFromSheet(gameId){
         var gid=r.groupId||r.groupID||r.GroupID||r.group_id||'';
         var key=gid?String(gid):('_r'+idx);
         var evType=r.event||r.Event||'';
+        var rawTeam=gf(r,'team','Team');
+        var team=normTeam(rawTeam);
         if(!groups[key]){
           groups[key]={
             id:gid?(Number(gid)||Date.now()+idx):(Date.now()+idx),
             q:gf(r,'q','Q'), time:fmtGameTime(gf(r,'time','Time')),
-            type:evType, team:gf(r,'team','Team'),
+            type:evType, team:team,
             cap:gf(r,'cap','Cap'), capName:(gf(r,'cap','Cap')?'#'+gf(r,'cap','Cap'):''),
             playerId:r.playerId||r.playerID||r.PlayerID||null,
             zone:gf(r,'zone','Zone'), gm:gf(r,'gm','GM')
@@ -984,7 +990,7 @@ function refreshEventsFromSheet(gameId){
         } else {
           var haveCP=COUNTERPART_TYPES[groups[key].type], thisCP=COUNTERPART_TYPES[evType];
           if(haveCP&&!thisCP){
-            groups[key].type=evType; groups[key].team=gf(r,'team','Team');
+            groups[key].type=evType; groups[key].team=team;
             groups[key].cap=gf(r,'cap','Cap');
             groups[key].capName=(gf(r,'cap','Cap')?'#'+gf(r,'cap','Cap'):'');
             groups[key].playerId=r.playerId||r.playerID||r.PlayerID||groups[key].playerId;
