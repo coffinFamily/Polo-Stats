@@ -100,6 +100,8 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
 .pref-toggle.off .pref-label{text-decoration:none;}
 @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-8px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
 </style>
+<!-- OneSignal Web Push SDK -->
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 </head>
 <body>
 
@@ -489,7 +491,10 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
   <div class="card" id="follow-selector-card">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
       <div class="stitle" style="margin:0;">Follow a game</div>
-      <span id="follow-sync-status" style="font-size:10px;color:#3a5a7a;"></span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span id="follow-sync-status" style="font-size:10px;color:#3a5a7a;"></span>
+        <button id="foul-alert-subscribe-btn" onclick="toggleFoulAlerts()" style="display:none;font-size:10px;padding:3px 9px;border-radius:8px;border:1px solid #1e3a5a;background:#0a1420;color:#5a7a9a;cursor:pointer;white-space:nowrap;">🔔 Enable Alerts</button>
+      </div>
     </div>
     <div id="follow-no-url" class="warn" style="display:none;">⚠️ No sheet URL configured — set it in Game Setup.</div>
 
@@ -524,6 +529,15 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
   </div>
 
   <div id="follow-content" style="display:none;">
+
+    <!-- Foul alert banner -->
+    <div id="foul-alert-banner" style="display:none;background:#1a0a0a;border:2px solid #ef4444;border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <div style="font-size:13px;font-weight:700;color:#ef4444;">⚠️ FOUL TROUBLE</div>
+        <button onclick="document.getElementById('foul-alert-banner').style.display='none'" style="font-size:16px;color:#5a2a2a;background:none;border:none;cursor:pointer;line-height:1;">✕</button>
+      </div>
+      <div id="foul-alert-text" style="font-size:12px;color:#f8a0a0;margin-top:4px;line-height:1.5;"></div>
+    </div>
 
     <!-- Score -->
     <div class="card" id="follow-score-card"></div>
@@ -793,9 +807,16 @@ function syncGameEvents(){
 }
 
 function changeQ(d){
+  const prevQ = state.q;
   state.q=Math.min(6,Math.max(1,state.q+d));
   document.getElementById('q-display').textContent='Q'+state.q+(state.q>4?' (OT)':'');
   ss('wp-q',state.q);
+  // Quarter-end foul summary when advancing to a new quarter
+  if(d > 0 && state.q > prevQ && typeof sendQuarterFoulSummary !== 'undefined'){
+    const gameId = state.game && state.game.gameId;
+    const converted = state.events.map(e=>({...e, event:e.type||e.event||''}));
+    sendQuarterFoulSummary(prevQ, converted, gameId);
+  }
 }
 
 // ─── Game selector (Game tab Q row) ──────────────────────────
@@ -1408,6 +1429,10 @@ function finalizeEvent(){
   showEventToast('✓ '+row.type,(row.team||'')+(row.cap?' · #'+row.cap:''),isGoal?'#22c55e':'#0a84c8');
   // Push to sheet after UI update so sheet errors never block the UI
   pushToSheet({action:'events', rows:eventToRows({...row, gameId:state.game.gameId||'', date:state.game.date||''})});
+  // Foul trouble check — fires when an ejection or 5M foul is logged
+  if(row.type==='Ejection'||row.type==='5M Foul'){
+    if(typeof gameCheckFouls !== 'undefined') gameCheckFouls();
+  }
   // Shot Clock: auto-credit defending team with Team Defense
   if(row.type === 'Shot Clock'){
     const g=state.game, dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
@@ -5300,6 +5325,7 @@ async function followLoadEvents(){
     const data = await resp.json();
     _follow.events = data.events || [];
     renderFollowContent();
+    if(typeof followCheckFouls !== 'undefined') followCheckFouls();
     const t = new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     followSetStatus('⟳ '+t);
   } catch(e){
@@ -7236,6 +7262,167 @@ refreshGameSelectorFromSheet();
 refreshEventsFromSheet(state.game&&state.game.gameId);
 initVoice();
 updateCritStatsBtn();
+
+// ═══════════════════════════════════════════════════════════
+//  FOUL ALERTS — in-app banner + OneSignal push
+// ═══════════════════════════════════════════════════════════
+
+// ── Replace with your REST API Key from OneSignal dashboard ──
+// Settings → Keys & IDs → REST API Key
+const ONESIGNAL_APP_ID  = 'cf7214ff-9cb0-433e-a70d-ac6ec3339edf';
+const ONESIGNAL_REST_KEY = ''; // <-- paste your REST API Key here
+
+// Track which foul-trouble alerts have already fired this session
+// Key: "gameId|team|cap|foulCount"  so we don't re-alert every poll
+const _sentFoulAlerts = new Set();
+
+// ── OneSignal init ────────────────────────────────────────────
+window.OneSignalDeferred = window.OneSignalDeferred || [];
+OneSignalDeferred.push(async function(OneSignal) {
+  await OneSignal.init({
+    appId: ONESIGNAL_APP_ID,
+    notifyButton: { enable: false },
+    allowLocalhostAsSecureOrigin: true,
+  });
+  // Show the Enable Alerts button once SDK is ready
+  updateFoulAlertBtn();
+  OneSignal.User.PushSubscription.addEventListener('change', updateFoulAlertBtn);
+});
+
+function updateFoulAlertBtn() {
+  const btn = document.getElementById('foul-alert-subscribe-btn');
+  if (!btn || typeof OneSignal === 'undefined') return;
+  btn.style.display = 'inline-block';
+  const subscribed = OneSignal.User.PushSubscription.optedIn;
+  btn.textContent = subscribed ? '🔔 Alerts On' : '🔔 Enable Alerts';
+  btn.style.color  = subscribed ? '#4ade80' : '#5a7a9a';
+  btn.style.borderColor = subscribed ? '#166534' : '#1e3a5a';
+}
+
+async function toggleFoulAlerts() {
+  if (typeof OneSignal === 'undefined') return;
+  const subscribed = OneSignal.User.PushSubscription.optedIn;
+  if (subscribed) {
+    await OneSignal.User.PushSubscription.optOut();
+  } else {
+    await OneSignal.Notifications.requestPermission();
+  }
+  updateFoulAlertBtn();
+}
+
+// ── Send a push notification via OneSignal REST API ───────────
+function sendPushNotification(title, body) {
+  if (!ONESIGNAL_REST_KEY) return; // no key configured — skip push
+  fetch('https://api.onesignal.com/notifications', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Key ' + ONESIGNAL_REST_KEY
+    },
+    body: JSON.stringify({
+      app_id: ONESIGNAL_APP_ID,
+      target_channel: 'push',
+      included_segments: ['All'],
+      headings: { en: title },
+      contents: { en: body },
+      ttl: 300 // expire after 5 min — stale foul alerts are useless
+    })
+  }).catch(() => {});
+}
+
+// ── In-app banner ─────────────────────────────────────────────
+function showFoulAlertBanner(lines) {
+  const banner = document.getElementById('foul-alert-banner');
+  const text   = document.getElementById('foul-alert-text');
+  if (!banner || !text) return;
+  text.innerHTML = lines.join('<br>');
+  banner.style.display = 'block';
+  // Vibrate: 3 short pulses
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+}
+
+// ── Core foul detection ───────────────────────────────────────
+// events: array of sheet-format events (have .event, .team, .cap fields)
+// gameId: for dedup key
+function checkFoulTrouble(events, gameId) {
+  if (!events || !events.length || !gameId) return;
+
+  const FOUL_EVENTS = new Set(['Ejection', '5M Foul']);
+  const foulMap = {}; // "team|cap" → { team, cap, name, count }
+
+  events.forEach(e => {
+    const evType = e.event || e.type || '';
+    if (!FOUL_EVENTS.has(evType)) return;
+    const key = (e.team||'') + '|' + (e.cap||'');
+    if (!foulMap[key]) foulMap[key] = { team:e.team||'', cap:e.cap||'', name:e.capName||('Cap #'+(e.cap||'?')), count:0 };
+    foulMap[key].count++;
+  });
+
+  const troubleLines = [];
+  Object.values(foulMap).forEach(p => {
+    if (p.count < 2) return;
+    const alertKey = gameId + '|' + p.team + '|' + p.cap + '|' + p.count;
+    if (_sentFoulAlerts.has(alertKey)) return; // already alerted for this exact count
+    _sentFoulAlerts.add(alertKey);
+
+    const line = '#' + p.cap + ' (' + p.team + ') — ' + p.count + ' fouls';
+    troubleLines.push(line);
+
+    const title = '⚠️ Foul Trouble — #' + p.cap + ' ' + p.team;
+    const body  = p.count + ' fouls. Watch drives + 2m attacks on this player.';
+    sendPushNotification(title, body);
+  });
+
+  if (troubleLines.length) showFoulAlertBanner(troubleLines);
+}
+
+// ── Quarter-end foul summary ──────────────────────────────────
+// Called when quarter advances (changeQ) — summarizes all players with 2+ fouls
+function sendQuarterFoulSummary(endedQ, events, gameId) {
+  if (!events || !events.length) return;
+
+  const FOUL_EVENTS = new Set(['Ejection', '5M Foul']);
+  const foulMap = {};
+  events
+    .filter(e => Number(e.q||e.Q||0) <= endedQ)
+    .forEach(e => {
+      const evType = e.event || e.type || '';
+      if (!FOUL_EVENTS.has(evType)) return;
+      const key = (e.team||'') + '|' + (e.cap||'');
+      if (!foulMap[key]) foulMap[key] = { team:e.team||'', cap:e.cap||'', count:0 };
+      foulMap[key].count++;
+    });
+
+  const players2plus = Object.values(foulMap).filter(p => p.count >= 2);
+  if (!players2plus.length) return;
+
+  const lines = players2plus.map(p => '#' + p.cap + ' ' + p.team + ': ' + p.count);
+  const summaryKey = gameId + '|Q' + endedQ + '-summary';
+  if (_sentFoulAlerts.has(summaryKey)) return;
+  _sentFoulAlerts.add(summaryKey);
+
+  showFoulAlertBanner(['End of Q' + endedQ + ' — players with 2+ fouls:', ...lines]);
+
+  const title = '📋 Q' + endedQ + ' Foul Summary';
+  const body  = lines.join(' · ');
+  sendPushNotification(title, body);
+}
+
+// ── Hook into Follow tab poll ─────────────────────────────────
+// Called from renderFollowContent after events are updated
+function followCheckFouls() {
+  checkFoulTrouble(_follow.events, _follow.gameId);
+}
+
+// ── Hook into Game tab event log ──────────────────────────────
+// Called from finalizeEvent after a foul is logged
+function gameCheckFouls() {
+  const gameId = state.game && state.game.gameId;
+  if (!gameId) return;
+  // Convert local state.events (type field) to common format for checker
+  const converted = state.events.map(e => ({...e, event: e.type||e.event||''}));
+  checkFoulTrouble(converted, gameId);
+}
 </script>
 </body>
 </html>
