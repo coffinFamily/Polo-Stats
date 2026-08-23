@@ -493,7 +493,7 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
       <div class="stitle" style="margin:0;">Follow a game</div>
       <div style="display:flex;align-items:center;gap:8px;">
         <span id="follow-sync-status" style="font-size:10px;color:#3a5a7a;"></span>
-        <button id="foul-alert-subscribe-btn" onclick="toggleFoulAlerts()" style="display:none;font-size:10px;padding:3px 9px;border-radius:8px;border:1px solid #1e3a5a;background:#0a1420;color:#5a7a9a;cursor:pointer;white-space:nowrap;">🔔 Enable Alerts</button>
+        <button id="foul-alert-subscribe-btn" onclick="toggleFoulAlerts()" style="font-size:10px;padding:3px 9px;border-radius:8px;border:1px solid #1e3a5a;background:#0a1420;color:#5a7a9a;cursor:pointer;white-space:nowrap;">🔔 Enable Alerts</button>
       </div>
     </div>
     <div id="follow-no-url" class="warn" style="display:none;">⚠️ No sheet URL configured — set it in Game Setup.</div>
@@ -7358,22 +7358,25 @@ function checkFoulTrouble(events, gameId) {
     foulMap[key].count++;
   });
 
-  const troubleLines = [];
-  Object.values(foulMap).forEach(p => {
-    if (p.count < 2) return;
+  const players2plus = Object.values(foulMap).filter(p => p.count >= 2);
+
+  // Always update banner with the full current list of 2+ foul players
+  if (players2plus.length) {
+    const lines = players2plus.map(p => '#' + p.cap + ' (' + p.team + ') — ' + p.count + ' fouls');
+    showFoulAlertBanner(lines);
+  } else {
+    const banner = document.getElementById('foul-alert-banner');
+    if (banner) banner.style.display = 'none';
+  }
+
+  // Only send push for newly-reached thresholds
+  players2plus.forEach(p => {
     const alertKey = gameId + '|' + p.team + '|' + p.cap + '|' + p.count;
-    if (_sentFoulAlerts.has(alertKey)) return; // already alerted for this exact count
+    if (_sentFoulAlerts.has(alertKey)) return;
     _sentFoulAlerts.add(alertKey);
-
-    const line = '#' + p.cap + ' (' + p.team + ') — ' + p.count + ' fouls';
-    troubleLines.push(line);
-
-    const title = '⚠️ Foul Trouble — #' + p.cap + ' ' + p.team;
-    const body  = p.count + ' fouls. Watch drives + 2m attacks on this player.';
-    sendPushNotification(title, body);
+    sendPushNotification('⚠️ Foul Trouble — #' + p.cap + ' ' + p.team,
+      p.count + ' fouls. Watch drives + 2m attacks on this player.');
   });
-
-  if (troubleLines.length) showFoulAlertBanner(troubleLines);
 }
 
 // ── Quarter-end foul summary ──────────────────────────────────
