@@ -5268,6 +5268,7 @@ function voiceStartFlow(eventType, prefill) {
 // ═══════════════════════════════════════════════════════════
 let _follow = { gameId:null, games:[], events:[], view:'players', flowType:'goals', sortMode:'recent' };
 let _followTimer = null;
+let _gameAlertSubs = JSON.parse(localStorage.getItem('wp-game-alert-subs') || '{}');
 const FOLLOW_INTERVAL = 20000; // 20-second live refresh
 
 async function initFollowTab(){
@@ -5479,6 +5480,7 @@ function followSelectGame(gameId){
   }
   if(content) content.style.display='block';
   collapseFollowSelector(_followGameLabel(gameId));
+  updateFoulAlertBtn();
   followLoadEvents();
 }
 
@@ -7291,22 +7293,34 @@ OneSignalDeferred.push(async function(OneSignal) {
 
 function updateFoulAlertBtn() {
   const btn = document.getElementById('foul-alert-subscribe-btn');
-  if (!btn || typeof OneSignal === 'undefined') return;
+  if (!btn) return;
+  const gameId = _follow.gameId;
+  if (!gameId) { btn.style.display = 'none'; return; }
   btn.style.display = 'inline-block';
-  const subscribed = OneSignal.User.PushSubscription.optedIn;
-  btn.textContent = subscribed ? '🔔 Alerts On' : '🔔 Enable Alerts';
-  btn.style.color  = subscribed ? '#4ade80' : '#5a7a9a';
-  btn.style.borderColor = subscribed ? '#166534' : '#1e3a5a';
+  const on = !!_gameAlertSubs[gameId];
+  btn.textContent = on ? '🔔 Alerts On' : '🔔 Enable Alerts';
+  btn.style.color       = on ? '#4ade80' : '#5a7a9a';
+  btn.style.borderColor = on ? '#166534' : '#1e3a5a';
 }
 
 async function toggleFoulAlerts() {
-  if (typeof OneSignal === 'undefined') return;
-  const subscribed = OneSignal.User.PushSubscription.optedIn;
-  if (subscribed) {
-    await OneSignal.User.PushSubscription.optOut();
-  } else {
-    await OneSignal.Notifications.requestPermission();
+  const gameId = _follow.gameId;
+  if (!gameId) return;
+  if (_gameAlertSubs[gameId]) {
+    delete _gameAlertSubs[gameId];
+    localStorage.setItem('wp-game-alert-subs', JSON.stringify(_gameAlertSubs));
+    updateFoulAlertBtn();
+    return;
   }
+  // Turning on: request browser push permission if not already granted
+  if (typeof OneSignal !== 'undefined') {
+    try {
+      const optedIn = OneSignal.User.PushSubscription.optedIn;
+      if (!optedIn) await OneSignal.Notifications.requestPermission();
+    } catch(e) {}
+  }
+  _gameAlertSubs[gameId] = true;
+  localStorage.setItem('wp-game-alert-subs', JSON.stringify(_gameAlertSubs));
   updateFoulAlertBtn();
 }
 
@@ -7414,6 +7428,7 @@ function sendQuarterFoulSummary(endedQ, events, gameId) {
 // ── Hook into Follow tab poll ─────────────────────────────────
 // Called from renderFollowContent after events are updated
 function followCheckFouls() {
+  if (!_gameAlertSubs[_follow.gameId]) return;
   checkFoulTrouble(_follow.events, _follow.gameId);
 }
 
