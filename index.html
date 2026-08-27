@@ -823,8 +823,9 @@ function changeQ(d){
 function populateGameSelector(){
   const sel=document.getElementById('game-sel');
   if(!sel) return;
+  const _isInactive = g => g.status==='inactive' || !!_archivedGames[g.gameId];
   const games=[...state.savedGames]
-    .filter(g=>!_archivedGames[g.gameId])
+    .filter(g=>!_isInactive(g))
     .sort((a,b)=>parseDate(b.date)-parseDate(a.date));
   sel.innerHTML='';
   if(!games.length){
@@ -863,13 +864,22 @@ async function refreshGameSelectorFromSheet(){
           darkRoster:[], whiteRoster:[],
           sheetUrl:url,
           creatorEmail:sg.creatorEmail||'',
+          status: sg.status||'active',
           _fromSheet:true
         });
         changed=true;
       } else {
-        // Always sync creatorEmail from sheet — catches manual edits and wizard updates
+        // Sync creatorEmail and status from sheet — sheet is authoritative for both
         if((sg.creatorEmail||'')!==(exists.creatorEmail||'')){
           exists.creatorEmail=sg.creatorEmail||'';
+          changed=true;
+        }
+        if(sg.status && sg.status!==exists.status){
+          exists.status=sg.status;
+          // Keep localStorage archive in sync
+          if(sg.status==='inactive') _archivedGames[sg.gameId]=true;
+          else delete _archivedGames[sg.gameId];
+          localStorage.setItem('wp-archived-games',JSON.stringify(_archivedGames));
           changed=true;
         }
       }
@@ -2017,6 +2027,12 @@ const PREF_CATS = [
   {key:'blockZone',      label:'Block Zone',         emoji:'🗺️', section:'detail'},
   {key:'fieldBlock',     label:'Field Blocks',       emoji:'🛡️', section:'detail'},
   {key:'sprintWon',      label:'Sprint Won',         emoji:'🏃',  section:'detail'},
+  // ── Effort & Discipline ─────────────────────────────────────
+  {key:'offensive', label:'Offensive Foul',   emoji:'⚠️',  section:'effort'},
+  {key:'defEffort', label:'Defensive Effort', emoji:'🛡️', section:'effort'},
+  {key:'lostBall',  label:'Lost Ball',        emoji:'💧',  section:'effort'},
+  {key:'scoredOn',  label:'Scored On',        emoji:'🥅',  section:'effort'},
+  {key:'shotClock', label:'Shot Clock',       emoji:'⏱️', section:'effort'},
 ];
 
 function renderPrefsTab(){
@@ -2033,7 +2049,9 @@ function renderPrefsTab(){
     const mkBtn = c => { const on=prefs[c.key]!==false; return `<button class="pref-toggle ${on?'on':'off'}" onclick="togglePref('${side}','${c.key}')">${prefIcon(c.key)}<span class="pref-label">${c.label}</span></button>`; };
     const basicBtns  = PREF_CATS.filter(c=>c.section==='basic').map(mkBtn).join('');
     const detailBtns = PREF_CATS.filter(c=>c.section==='detail').map(mkBtn).join('');
+    const effortBtns = PREF_CATS.filter(c=>c.section==='effort').map(mkBtn).join('');
     const allOn = PREF_CATS.every(c => prefs[c.key] !== false);
+    const divider = label => `<div style="display:flex;align-items:center;gap:8px;margin:10px 0 8px;"><span style="font-size:10px;color:#2a4a5a;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;white-space:nowrap;">${label}</span><div style="flex:1;height:1px;background:#1a2e42;"></div></div>`;
     return `<div class="card" style="margin-bottom:10px;">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
         <span style="padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700;${headerStyle}">${isDark?'Dark':'White'}</span>
@@ -2043,11 +2061,10 @@ function renderPrefsTab(){
         </button>
       </div>
       <div style="display:flex;gap:7px;flex-wrap:wrap;">${basicBtns}</div>
-      <div style="display:flex;align-items:center;gap:8px;margin:10px 0 8px;">
-        <span style="font-size:10px;color:#2a4a5a;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;white-space:nowrap;">More stats</span>
-        <div style="flex:1;height:1px;background:#1a2e42;"></div>
-      </div>
+      ${divider('More stats')}
       <div style="display:flex;gap:7px;flex-wrap:wrap;">${detailBtns}</div>
+      ${divider('Effort & Discipline')}
+      <div style="display:flex;gap:7px;flex-wrap:wrap;">${effortBtns}</div>
     </div>`;
   }
 
@@ -2127,6 +2144,11 @@ function prefIcon(key){
   if(key==='goalGM')        return '🥅 ';
   if(key==='missZone')      return '📍 ';
   if(key==='blockZone')     return '🗺️ ';
+  if(key==='offensive')     return '⚠️ ';
+  if(key==='defEffort')     return '🛡️ ';
+  if(key==='lostBall')      return '💧 ';
+  if(key==='scoredOn')      return '🥅 ';
+  if(key==='shotClock')     return '⏱️ ';
   return '';
 }
 
@@ -3165,7 +3187,7 @@ function renderSetupUI(){
 }
 
 function populateTeamDropdowns(){
-  const sorted=[...state.teams].sort((a,b)=>a.name.localeCompare(b.name));
+  const sorted=[...state.teams].filter(t=>t.active!==false).sort((a,b)=>a.name.localeCompare(b.name));
   ['dark','white'].forEach(side=>{
     const sel=document.getElementById(side+'-team-roster');
     const cur=state.game[side+'TeamId']||'';
@@ -3186,7 +3208,7 @@ function buildRosterUI(side){
   const nameInput=document.getElementById(side+'-team-name');
   if(team&&!nameInput.value) nameInput.value=team.name;
 
-  const teamPlayers=state.players.filter(p=>(p.teamIds||[]).map(String).includes(String(teamId)));
+  const teamPlayers=state.players.filter(p=>p.active!==false&&(p.teamIds||[]).map(String).includes(String(teamId)));
   if(!teamPlayers.length){ rowsEl.innerHTML=''; emptyEl.style.display='block'; return; }
   emptyEl.style.display='none';
 
@@ -3229,7 +3251,7 @@ function toggleRbRow(side,pid){
 const NGW_STEPS=['date','quarter-length','white-team','white-name','white-prefs','white-gk','dark-team','dark-name','dark-prefs','dark-gk'];
 const NGW_LABELS={'date':'Game date','quarter-length':'Quarter length','white-team':'White caps — select team','white-name':'White caps — display name','white-prefs':'White caps — stats to capture','white-gk':'White caps — goalkeeper','dark-team':'Dark caps — select team','dark-name':'Dark caps — display name','dark-prefs':'Dark caps — stats to capture','dark-gk':'Dark caps — goalkeeper'};
 
-function _defPrefs(){ return {goals:true,miss:true,assist:true,ejection:true,ejectionDrawn:true,fiveM:true,fiveMDrawn:true,steal:true,turnover:true,goalieBlock:true,fieldBlock:true,sprintWon:true,goalZone:true,goalGM:true,missZone:true,blockZone:true}; }
+function _defPrefs(){ return {goals:true,miss:true,assist:true,ejection:true,ejectionDrawn:true,fiveM:true,fiveMDrawn:true,steal:true,turnover:true,goalieBlock:true,fieldBlock:true,sprintWon:true,goalZone:true,goalGM:true,missZone:true,blockZone:true,offensive:true,defEffort:true,lostBall:true,scoredOn:true,shotClock:true}; }
 
 function startNewGameWizard(){
   const g=state.game;
@@ -3302,7 +3324,7 @@ function ngwStepBody(step,w){
 
   if(step==='white-team'||step==='dark-team'){
     const side=step.replace('-team','');
-    const sorted=[...state.teams].sort((a,b)=>a.name.localeCompare(b.name));
+    const sorted=[...state.teams].filter(t=>t.active!==false).sort((a,b)=>a.name.localeCompare(b.name));
     const cur=w[side].teamId;
     let opts=`<option value="">Select team…</option>`;
     sorted.forEach(t=>{ opts+=`<option value="${t.id}"${String(t.id)===String(cur)?' selected':''}>${t.name}</option>`; });
@@ -3332,7 +3354,9 @@ function ngwStepBody(step,w){
       </button>`; };
     const basicBtns  = PREF_CATS.filter(c=>c.section==='basic').map(mkNgwBtn).join('');
     const detailBtns = PREF_CATS.filter(c=>c.section==='detail').map(mkNgwBtn).join('');
+    const effortBtns = PREF_CATS.filter(c=>c.section==='effort').map(mkNgwBtn).join('');
     const allOn = PREF_CATS.every(c => prefs[c.key] !== false);
+    const ngwDivider = label => `<div style="display:flex;align-items:center;gap:8px;margin:10px 0 8px;"><span style="font-size:10px;color:#2a4a5a;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;white-space:nowrap;">${label}</span><div style="flex:1;height:1px;background:#1a2e42;"></div></div>`;
     return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
         <p style="color:#7a9bb8;font-size:13px;margin:0;">Tap to <strong>deselect</strong> stats you won't be tracking for <strong>${side} caps</strong>.</p>
         <button onclick="ngwSelectAllPrefs('${side}')" style="flex:0 0 auto;padding:4px 12px;border-radius:10px;font-size:11px;font-weight:600;background:#0a1e30;border:1px solid #0a84c8;color:#5bc8f0;cursor:pointer;white-space:nowrap;">
@@ -3340,11 +3364,10 @@ function ngwStepBody(step,w){
         </button>
       </div>
       <div style="display:flex;flex-wrap:wrap;">${basicBtns}</div>
-      <div style="display:flex;align-items:center;gap:8px;margin:10px 0 8px;">
-        <span style="font-size:10px;color:#2a4a5a;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;white-space:nowrap;">More stats</span>
-        <div style="flex:1;height:1px;background:#1a2e42;"></div>
-      </div>
-      <div style="display:flex;flex-wrap:wrap;">${detailBtns}</div>`;
+      ${ngwDivider('More stats')}
+      <div style="display:flex;flex-wrap:wrap;">${detailBtns}</div>
+      ${ngwDivider('Effort & Discipline')}
+      <div style="display:flex;flex-wrap:wrap;">${effortBtns}</div>`;
   }
 
   if(step==='white-gk'||step==='dark-gk'){
@@ -3789,14 +3812,18 @@ function renderPlayersList(query){
     return alpha(a,b);
   });
 
-  const filtered=q?sorted.filter(p=>{
+  // Split into active and inactive before search filter (inactive shown in separate section)
+  const activePlayers   = sorted.filter(p=>p.active!==false);
+  const inactivePlayers = sorted.filter(p=>p.active===false);
+
+  const filtered=q?activePlayers.filter(p=>{
     const name=`${p.first||''} ${p.last||''}`.toLowerCase();
     const teams=(p.teamIds||[]).map(tid=>state.teams.find(t=>String(t.id)===String(tid))?.name||'').join(' ').toLowerCase();
     return name.includes(q)||teams.includes(q);
-  }):sorted;
+  }):activePlayers;
 
-  if(!filtered.length){
-    el.innerHTML=`<p style="text-align:center;color:#5a7a9a;padding:20px;">No players match "${query}"</p>`;
+  if(!filtered.length && !inactivePlayers.length){
+    el.innerHTML=`<p style="text-align:center;color:#5a7a9a;padding:20px;">${q?`No players match "${query}"`:'No players yet'}</p>`;
     return;
   }
 
@@ -3853,7 +3880,10 @@ function renderPlayersList(query){
       html+=`</div>
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <span style="font-size:9px;color:#2a4a6a;font-family:monospace;">${p.id}</span>
-          <button class="btn-d" style="padding:4px 12px;font-size:12px;" onclick="deletePlayer('${p.id}')">Remove player</button>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-s" style="padding:4px 12px;font-size:12px;color:#f59e0b;border-color:#78350f;" onclick="deactivatePlayer('${p.id}')">Deactivate</button>
+            <button class="btn-d" style="padding:4px 12px;font-size:12px;" onclick="deletePlayer('${p.id}')">Remove</button>
+          </div>
         </div>
       </div>`;
     } else {
@@ -3876,6 +3906,28 @@ function renderPlayersList(query){
       </div>`;
     }
   });
+
+  // Inactive players collapsible section
+  if(inactivePlayers.length){
+    const openKey='players-inactive-open';
+    const open=sessionStorage.getItem(openKey)==='1';
+    html+=`<button onclick="sessionStorage.setItem('${openKey}',sessionStorage.getItem('${openKey}')==='1'?'0':'1');renderPlayersList()"
+      style="width:100%;margin-top:8px;padding:5px 10px;font-size:11px;font-weight:600;border-radius:8px;border:1px solid #1e3a5a;background:#0a1420;color:#5a7a9a;cursor:pointer;text-align:left;">
+      ${open?'▾':'▸'} Inactive players (${inactivePlayers.length})</button>`;
+    if(open){
+      html+='<div style="margin-top:4px;">';
+      inactivePlayers.forEach(p=>{
+        const teamPills=(p.teamIds||[]).map(tid=>state.teams.find(t=>String(t.id)===String(tid))).filter(Boolean)
+          .map(t=>`<span style="background:#0a1e30;border:1px solid #1e3a5a;border-radius:10px;padding:2px 8px;font-size:11px;color:#3a5a7a;">${t.name}</span>`).join('');
+        html+=`<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#0a1820;border:1px solid #0e2a3a;border-radius:8px;margin-bottom:4px;opacity:0.6;">
+          <span style="font-weight:600;font-size:13px;flex:1;">${p.last?p.last+', '+p.first:p.first}</span>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;">${teamPills||'<span style="font-size:11px;color:#2a4a6a;font-style:italic;">no team</span>'}</div>
+          <button onclick="activatePlayer('${p.id}')" style="flex:0 0 auto;font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid #1e3a5a;background:#0a1e30;color:#5a9abb;cursor:pointer;">Restore</button>
+        </div>`;
+      });
+      html+='</div>';
+    }
+  }
 
   el.innerHTML=html;
 }
@@ -3909,6 +3961,25 @@ function deletePlayer(id){
   state.players=state.players.filter(p=>String(p.id)!==String(id));
   ss('wp-players',state.players);
   deletePlayerFromSheet(id);
+  renderPlayersList();
+}
+
+function deactivatePlayer(id){
+  const p=state.players.find(p=>String(p.id)===String(id));
+  if(!p) return;
+  p.active=false;
+  ss('wp-players',state.players);
+  syncPlayerToSheet(p);
+  window._rosterExpandedId=null;
+  renderPlayersList();
+}
+
+function activatePlayer(id){
+  const p=state.players.find(p=>String(p.id)===String(id));
+  if(!p) return;
+  p.active=true;
+  ss('wp-players',state.players);
+  syncPlayerToSheet(p);
   renderPlayersList();
 }
 
@@ -4029,20 +4100,34 @@ function renderTeamsList(query){
     el.innerHTML=`<p style="text-align:center;color:#5a7a9a;padding:20px;">No teams match "${query}"</p>`;
     return;
   }
-  let html='';
-  filtered.forEach(t=>{
-    const count=state.players.filter(p=>(p.teamIds||[]).map(String).includes(String(t.id))).length;
-    html+=`<div class="card" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;">
+  const active   = filtered.filter(t=>t.active!==false);
+  const inactive = filtered.filter(t=>t.active===false);
+  const mkTeamCard = (t, isInactive) => {
+    const count=state.players.filter(p=>p.active!==false&&(p.teamIds||[]).map(String).includes(String(t.id))).length;
+    const dim=isInactive?'opacity:0.6;':'';
+    return `<div class="card" style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;${dim}">
       <div>
         <span style="font-weight:600;">${t.name}</span>
         <div class="pill-id">ID: ${t.id}</div>
       </div>
-      <div class="row" style="gap:10px;">
+      <div class="row" style="gap:8px;">
         <span style="font-size:12px;color:#5a7a9a;">${count} player${count!==1?'s':''}</span>
+        ${isInactive
+          ? `<button class="btn-s" style="padding:3px 8px;font-size:11px;" onclick="activateTeam('${t.id}')">Restore</button>`
+          : `<button class="btn-s" style="padding:3px 8px;font-size:11px;color:#f59e0b;border-color:#78350f;" onclick="deactivateTeam('${t.id}')">Deactivate</button>`}
         <button class="btn-d" style="padding:3px 8px;font-size:11px;" onclick="deleteTeam('${t.id}')">Remove</button>
       </div>
     </div>`;
-  });
+  };
+  let html=active.map(t=>mkTeamCard(t,false)).join('');
+  if(inactive.length){
+    const openKey='teams-inactive-open';
+    const open=sessionStorage.getItem(openKey)==='1';
+    html+=`<button onclick="sessionStorage.setItem('${openKey}',sessionStorage.getItem('${openKey}')==='1'?'0':'1');renderTeamsList()"
+      style="width:100%;margin-top:8px;padding:5px 10px;font-size:11px;font-weight:600;border-radius:8px;border:1px solid #1e3a5a;background:#0a1420;color:#5a7a9a;cursor:pointer;text-align:left;">
+      ${open?'▾':'▸'} Inactive (${inactive.length})</button>`;
+    if(open) html+=`<div style="margin-top:4px;">`+inactive.map(t=>mkTeamCard(t,true)).join('')+`</div>`;
+  }
   el.innerHTML=html;
 }
 
@@ -4055,6 +4140,26 @@ function deleteTeam(id){
   deleteTeamFromSheet(id);
   renderTeamsList();
   renderPlayersList();
+}
+
+function deactivateTeam(id){
+  const t=state.teams.find(t=>String(t.id)===String(id));
+  if(!t) return;
+  t.active=false;
+  ss('wp-teams',state.teams);
+  syncTeamToSheet(t);
+  renderTeamsList();
+  populateTeamDropdowns();
+}
+
+function activateTeam(id){
+  const t=state.teams.find(t=>String(t.id)===String(id));
+  if(!t) return;
+  t.active=true;
+  ss('wp-teams',state.teams);
+  syncTeamToSheet(t);
+  renderTeamsList();
+  populateTeamDropdowns();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -5387,9 +5492,10 @@ function renderFollowGameList(){
     });
   }
 
-  // Separate active vs archived
-  const active   = games.filter(g=>!_archivedGames[g.gameId]);
-  const archived = games.filter(g=>!!_archivedGames[g.gameId]);
+  // Separate active vs archived (check both sheet status and legacy localStorage)
+  const _isInactiveG = g => g.status==='inactive' || !!_archivedGames[g.gameId];
+  const active   = games.filter(g=>!_isInactiveG(g));
+  const archived = games.filter(g=>_isInactiveG(g));
 
   sel.innerHTML = '<option value="">— Select a game —</option>';
   active.forEach(g=>{
@@ -5419,10 +5525,25 @@ function renderFollowGameList(){
   }
 }
 
+function _setGameInactive(gameId, inactive) {
+  // Update localStorage (legacy, device-local fallback)
+  if (inactive) _archivedGames[gameId] = true;
+  else delete _archivedGames[gameId];
+  localStorage.setItem('wp-archived-games', JSON.stringify(_archivedGames));
+  // Update savedGames status (written back to localStorage and POSTed to sheet)
+  const g = state.savedGames.find(g => g.gameId === gameId);
+  if (g) { g.status = inactive ? 'inactive' : 'active'; ss('wp-saved-games', state.savedGames); }
+  // Persist to sheet so status survives device switches
+  const url = state.game && state.game.sheetUrl;
+  if (url) {
+    try { fetch(url, { method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({action:'updateGameStatus', gameId, status: inactive ? 'inactive' : 'active'}) }); } catch(e) {}
+  }
+}
+
 function archiveGame(gameId){
   if(!gameId) return;
-  _archivedGames[gameId]=true;
-  localStorage.setItem('wp-archived-games', JSON.stringify(_archivedGames));
+  _setGameInactive(gameId, true);
   renderFollowGameList();
   populateGameSelector();
   // If the currently-viewed game was just archived, collapse back to selector
@@ -5436,8 +5557,7 @@ function archiveGame(gameId){
 
 function unarchiveGame(gameId){
   if(!gameId) return;
-  delete _archivedGames[gameId];
-  localStorage.setItem('wp-archived-games', JSON.stringify(_archivedGames));
+  _setGameInactive(gameId, false);
   renderFollowGameList();
   populateGameSelector();
 }
