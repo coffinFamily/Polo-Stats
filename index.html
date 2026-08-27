@@ -7478,7 +7478,7 @@ function showFoulAlertBanner(lines) {
 // ── Core foul detection ───────────────────────────────────────
 // events: array of sheet-format events (have .event, .team, .cap fields)
 // gameId: for dedup key
-function checkFoulTrouble(events, gameId) {
+function checkFoulTrouble(events, gameId, sendPush) {
   if (!events || !events.length || !gameId) return;
 
   const FOUL_EVENTS = new Set(['Ejection', '5M Foul']);
@@ -7503,14 +7503,16 @@ function checkFoulTrouble(events, gameId) {
     if (banner) banner.style.display = 'none';
   }
 
-  // Only send push for newly-reached thresholds
-  players2plus.forEach(p => {
-    const alertKey = gameId + '|' + p.team + '|' + p.cap + '|' + p.count;
-    if (_sentFoulAlerts.has(alertKey)) return;
-    _sentFoulAlerts.add(alertKey);
-    sendPushNotification('⚠️ Foul Trouble — #' + p.cap + ' ' + p.team,
-      p.count + ' fouls. Watch drives + 2m attacks on this player.');
-  });
+  // Only send push for newly-reached thresholds, and only when push is enabled
+  if (sendPush) {
+    players2plus.forEach(p => {
+      const alertKey = gameId + '|' + p.team + '|' + p.cap + '|' + p.count;
+      if (_sentFoulAlerts.has(alertKey)) return;
+      _sentFoulAlerts.add(alertKey);
+      sendPushNotification('⚠️ Foul Trouble — #' + p.cap + ' ' + p.team,
+        p.count + ' fouls. Watch drives + 2m attacks on this player.');
+    });
+  }
 }
 
 // ── Quarter-end foul summary ──────────────────────────────────
@@ -7548,8 +7550,8 @@ function sendQuarterFoulSummary(endedQ, events, gameId) {
 // ── Hook into Follow tab poll ─────────────────────────────────
 // Called from renderFollowContent after events are updated
 function followCheckFouls() {
-  if (!_gameAlertSubs[_follow.gameId]) return;
-  checkFoulTrouble(_follow.events, _follow.gameId);
+  // Banner always shown; push only fires when user has enabled alerts for this game
+  checkFoulTrouble(_follow.events, _follow.gameId, !!_gameAlertSubs[_follow.gameId]);
 }
 
 // ── Hook into Game tab event log ──────────────────────────────
@@ -7559,7 +7561,7 @@ function gameCheckFouls() {
   if (!gameId) return;
   // Convert local state.events (type field) to common format for checker
   const converted = state.events.map(e => ({...e, event: e.type||e.event||''}));
-  checkFoulTrouble(converted, gameId);
+  checkFoulTrouble(converted, gameId, true);
 }
 </script>
 </body>
