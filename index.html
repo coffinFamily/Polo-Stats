@@ -744,6 +744,20 @@ const EVENT_DEFS = {
   'team-defense':   {label:'Team Defense',      flow:[]},
 };
 
+// ─── Quarter/period labeling ──────────────────────────────────
+// state.q runs 1-6: 1-4 are regulation quarters, 5-6 are OT1/OT2.
+// Every "by quarter" view must key off this instead of a literal 'OT'
+// string (events never store that — q is always numeric).
+const Q_PERIODS = ['1','2','3','4','5','6'];
+function qName(q){ // 'Q1'..'Q4', 'OT1', 'OT2' — for headers/labels
+  const n = Number(q);
+  return n>4 ? 'OT'+(n-4) : 'Q'+n;
+}
+function qShort(q){ // '1'..'4', 'OT1', 'OT2' — for compact table headers
+  const n = Number(q);
+  return n>4 ? 'OT'+(n-4) : String(n);
+}
+
 // Pool SVG constants — 23 yards (~21m) wide × 25m long; showing attacking half (12.5m)
 // Correct aspect ratio W:H = 21:12.5 = 1.68 (pool is wider than half its length)
 const POOL = { VBW:300, VBH:210, X:40, Y:42, W:252, H:150 };
@@ -809,7 +823,7 @@ function syncGameEvents(){
 function changeQ(d){
   const prevQ = state.q;
   state.q=Math.min(6,Math.max(1,state.q+d));
-  document.getElementById('q-display').textContent='Q'+state.q+(state.q>4?' (OT)':'');
+  document.getElementById('q-display').textContent=qName(state.q);
   ss('wp-q',state.q);
   // Quarter-end foul summary when advancing to a new quarter
   if(d > 0 && state.q > prevQ && typeof sendQuarterFoulSummary !== 'undefined'){
@@ -928,7 +942,7 @@ function switchGame(gameId){
           // Convert sheet rows into local event format.
           // GAS field names may vary in casing — resolve each defensively.
           var rows=data.events||[];
-          var COUNTERPART_TYPES={'Shot On Goal':1,'Ejection Drawn':1,'5m Drawn':1};
+          var COUNTERPART_TYPES={'Shot On Goal':1,'Ejection Drawn':1,'5m Drawn':1,'5M Drawn':1};
 
           function gf(r,a,b){ return (r[a]!==undefined&&r[a]!==null&&r[a]!=='')?r[a]:((r[b]!==undefined&&r[b]!==null&&r[b]!=='')?r[b]:''); }
 
@@ -997,7 +1011,7 @@ function switchGame(gameId){
 function refreshEventsFromSheet(gameId){
   const url=state.game&&state.game.sheetUrl;
   if(!url||!gameId) return;
-  var COUNTERPART_TYPES={'Shot On Goal':1,'Ejection Drawn':1,'5m Drawn':1};
+  var COUNTERPART_TYPES={'Shot On Goal':1,'Ejection Drawn':1,'5m Drawn':1,'5M Drawn':1};
   function gf(r,a,b){ return (r[a]!=null&&r[a]!=='')?r[a]:((r[b]!=null&&r[b]!=='')?r[b]:''); }
   // Sheet stores full team names; map them back to display names so score filters work
   var dN=state.game.darkTeam||'Dark', wN=state.game.whiteTeam||'White';
@@ -1616,7 +1630,7 @@ function eventToRows(ev){
 
   // Ejection drawn / 5m drawn
   if(ev.drawnBy){
-    const drawnType=ev.type.includes('Ejection')?'Ejection Drawn':'5m Drawn';
+    const drawnType=ev.type.includes('Ejection')?'Ejection Drawn':'5M Drawn';
     rows.push({...base, event:drawnType, team:fullOpp, cap:ev.drawnBy.replace('#',''), playerId:ev.drawnPlayerId||'', zone:'', gm:''});
   }
 
@@ -2160,7 +2174,7 @@ function renderGameUI(){
   document.getElementById('dark-btn-title').textContent=dN+' — Dark';
   document.getElementById('white-btn-title').textContent=wN+' — White';
   const _gl=document.getElementById('game-label'); if(_gl) _gl.textContent=dN+' vs '+wN;
-  document.getElementById('q-display').textContent='Q'+state.q+(state.q>4?' (OT)':'');
+  document.getElementById('q-display').textContent=qName(state.q);
   populateGameSelector();
   updateTimerDisplay(); updateScores();
   const _rb=document.getElementById('reset-timer-btn');
@@ -2376,7 +2390,7 @@ function editEvent(id){
   </div>
   <div class="grid2" style="margin-bottom:12px;">
     <div><div class="stitle">Quarter</div>
-      <select id="edit-q" style="width:100%;">${['1','2','3','4','OT'].map(q=>`<option value="${q}"${ev.q==q?' selected':''}>${q}</option>`).join('')}</select>
+      <select id="edit-q" style="width:100%;">${Q_PERIODS.map(q=>`<option value="${q}"${ev.q==q?' selected':''}>${qName(q)}</option>`).join('')}</select>
     </div>
     <div><div class="stitle">Time</div>
       <input id="edit-time" type="text" value="${ev.time||''}">
@@ -2559,7 +2573,7 @@ function exportCSV(){
 function showQuarterStats(){
   const g=state.game;
   const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
-  const quarters=['1','2','3','4','OT'];
+  const quarters=Q_PERIODS;
   const cats=[
     {label:'Goals',     types:['Goal (Reg)','Goal (6-5)','Goal (5M)','Goal (Counter)']},
     {label:'Assists',   types:['Assist']},
@@ -2604,7 +2618,7 @@ function showQuarterStats(){
       <table style="width:100%;border-collapse:collapse;font-size:12px;">
         <thead><tr>
           <th style="text-align:left;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">Stat</th>
-          ${activeQs.map(q=>`<th style="text-align:center;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">${q==='OT'?'OT':'Q'+q}</th>`).join('')}
+          ${activeQs.map(q=>`<th style="text-align:center;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">${qName(q)}</th>`).join('')}
           <th style="text-align:center;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">Tot</th>
         </tr></thead><tbody>`;
     visibleCats.forEach(c=>{
@@ -2620,7 +2634,7 @@ function showQuarterStats(){
   });
 
   // Plain-text for clipboard
-  const qHead = activeQs.map(q=>q==='OT'?'OT ':'Q'+q+' ').join('  ');
+  const qHead = activeQs.map(q=>qName(q)+' ').join('  ');
   let txt = `📈 By Quarter\n`;
   [wN,dN].forEach(team=>{
     const visC = cats.filter(c=>activeQs.some(q=>data[team][c.label][q]));
@@ -4914,6 +4928,11 @@ function resolveToken(token, rosterSide) {
   return { match: 'none' };
 }
 
+// Matches "5m", "5 m", "five meter(s)", "5 meter(s)" — spoken digit or spelled-out.
+const FIVE_M_RE = /\b(?:five|5)\s*m(?:eters?|etres?)?\b/;
+// Matches "6 on 5", "six on five", "power play" — spoken digit or spelled-out.
+const SIX_ON_FIVE_RE = /\b(?:six|6)\s*on\s*(?:five|5)\b|\bpower\s*play\b/;
+
 function parseVoiceTranscript(text) {
   // ── Normalise common mis-transcriptions ─────────────────
   // "call" is never a valid stat; speech recognition often hears "goal" as "call"
@@ -4922,19 +4941,25 @@ function parseVoiceTranscript(text) {
 
   // ── Event type ──────────────────────────────────────────
   let eventType = null;
+  const has5m = FIVE_M_RE.test(t);
+  const has65 = SIX_ON_FIVE_RE.test(t);
   if (/\bgoal\b/.test(t)) {
-    if (/\b(six.?on.?five|6.?on.?5|power.?play)\b/.test(t)) eventType = 'goal-65';
+    if (has65) eventType = 'goal-65';
+    else if (has5m) eventType = 'goal-5m';
+    else if (/\b(counter|fast.?break)\b/.test(t)) eventType = 'goal-counter';
     else eventType = 'goal-reg';
   } else if (/\b(kickout|kick.?out|ejection|kicked.?out)\b/.test(t)) {
     eventType = 'ejection';
-  } else if (/\b(five.?m(eter)?|5.?m\b|foul|penalty)\b/.test(t)) {
+  } else if (/\b(miss(ed)?(\s+shot)?)\b/.test(t)) {
+    // Must be checked before the 5m-penalty branch — "missed 5 meter shot"
+    // contains the same "5 meter" marker as a 5m foul but is a miss, not a foul.
+    eventType = has5m ? 'miss-5m' : 'miss';
+  } else if (has5m || /\b(foul|penalty)\b/.test(t)) {
     eventType = '5m-penalty';  // voice triggers the full 5M flow
   } else if (/\b(steal|steel|steele)\b/.test(t)) {
     eventType = 'steal';
   } else if (/\bturnover\b/.test(t)) {
     eventType = 'turnover';
-  } else if (/\b(miss(ed)?(\s+shot)?)\b/.test(t)) {
-    eventType = 'miss';
   } else if (/\b(save|goalie.?block)\b/.test(t)) {
     eventType = 'goalie-block';
   } else if (/\b(field.?block|block)\b/.test(t)) {
@@ -4966,18 +4991,24 @@ function parseVoiceTranscript(text) {
   const oppSide = mainTeamSide === 'dark' ? 'white' : 'dark';
 
   // ── Main player token ────────────────────────────────────
+  // Strip the "5 meter"/"5m" and "6 on 5"/"power play" event markers BEFORE
+  // looking for the cap number — otherwise a digit inside one of those phrases
+  // (e.g. the "6" in "6 on 5 goal white 3") gets mistaken for the player's cap.
+  const tokenSource = primaryPart
+    .replace(FIVE_M_RE, ' ').replace(SIX_ON_FIVE_RE, ' ')
+    .replace(/\s+/g, ' ').trim();
   // Strategy: literal digits first (unambiguous), then number words, then name text.
   // Number words like "six"/"five" must NOT be in the noise list — they are valid cap numbers.
   let mainToken = null;
-  const digitM = primaryPart.match(/\b(\d+)\b/);
+  const digitM = tokenSource.match(/\b(\d+)\b/);
   if (digitM) {
     // "dark 6 steal" → "6"
     mainToken = digitM[1];
   } else {
     // Strip event/team phrases, then look for a number word ("six", "five", etc.)
     const numWords = 'one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen';
-    const strippedForNum = primaryPart
-      .replace(/\b(six\s*on\s*five|6\s*on\s*5|power\s*play|five\s*met\w*|five\s*meter|kickout|kick\s*out|ejection|steal|steel|steele|goal|turnover|miss\w*|save|block|field\s*block|goalie\s*block|sprint|won|foul|penalty|dark|white|light|by|the|a|cap|number|pound|hashtag|offensive|defensive|effort|lost|ball|scored|on|against|shot|clock)\b/gi, ' ')
+    const strippedForNum = tokenSource
+      .replace(/\b(counter|fast\s*break|kickout|kick\s*out|ejection|steal|steel|steele|goal|turnover|miss\w*|save|block|field\s*block|goalie\s*block|sprint|won|foul|penalty|dark|white|light|by|the|a|cap|number|pound|hashtag|offensive|defensive|effort|lost|ball|scored|on|against|shot|clock)\b/gi, ' ')
       .replace(/\s+/g, ' ').trim();
     const numWordM = strippedForNum.match(new RegExp('\\b(' + numWords + ')\\b', 'i'));
     if (numWordM) {
@@ -4985,8 +5016,8 @@ function parseVoiceTranscript(text) {
       mainToken = numWordM[1];
     } else {
       // Fall back to name: strip all event/team noise, remainder is a player name
-      const nameNoise = /\b(goal|kickout|kick|out|ejection|foul|penalty|steal|steel|steele|turnover|miss(ed)?|shot|save|block|field|goalie|sprint|won|six\s*on\s*five|power\s*play|five\s*met\w*|dark|white|light|a|the|by|cap|number|pound|hashtag|assist(ed)?|drawn|from|stolen|offensive|defensive|effort|lost|ball|scored|against|clock)\b/g;
-      mainToken = primaryPart.replace(nameNoise, ' ').replace(/\s+/g, ' ').trim() || null;
+      const nameNoise = /\b(goal|kickout|kick|out|ejection|foul|penalty|steal|steel|steele|turnover|miss(ed)?|shot|save|block|field|goalie|sprint|won|counter|fast\s*break|dark|white|light|a|the|by|cap|number|pound|hashtag|assist(ed)?|drawn|from|stolen|offensive|defensive|effort|lost|ball|scored|against|clock)\b/g;
+      mainToken = tokenSource.replace(nameNoise, ' ').replace(/\s+/g, ' ').trim() || null;
     }
   }
 
@@ -5786,7 +5817,7 @@ function showFollowChipPopup(key){
 function showFollowQuarterStats(ev, game){
   const dN = (game && (game.darkTeam  || game.dark))  || 'Dark';
   const wN = (game && (game.whiteTeam || game.white)) || 'White';
-  const quarters = ['1','2','3','4','OT'];
+  const quarters = Q_PERIODS;
   const cats = [
     {label:'Goals',     types:['Goal (Reg)','Goal (6-5)','Goal (5M)','Goal (Counter)']},
     {label:'Assists',   types:['Assist']},
@@ -5831,7 +5862,7 @@ function showFollowQuarterStats(ev, game){
       <table style="width:100%;border-collapse:collapse;font-size:12px;">
         <thead><tr>
           <th style="text-align:left;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">Stat</th>
-          ${activeQs.map(q=>`<th style="text-align:center;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">${q==='OT'?'OT':'Q'+q}</th>`).join('')}
+          ${activeQs.map(q=>`<th style="text-align:center;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">${qName(q)}</th>`).join('')}
           <th style="text-align:center;padding:4px 6px;color:#5a7a9a;font-weight:500;border-bottom:1px solid #1e3a5a;">Tot</th>
         </tr></thead><tbody>`;
     visCats.forEach(c => {
@@ -5983,12 +6014,12 @@ function renderFollowTimeline(ev, wN, dN){
   const el = document.getElementById('follow-timeline-view');
   if(!el) return;
   if(!ev.length){ el.innerHTML='<div class="card" style="color:#3a5a7a;font-size:12px;">No events yet.</div>'; return; }
-  const quarters = ['1','2','3','4','OT'];
+  const quarters = Q_PERIODS;
   let html = '';
   quarters.forEach(q=>{
     const qev = ev.filter(e=>String(e.q)===q).sort((a,b)=>String(b.time||'').localeCompare(String(a.time||'')));
     if(!qev.length) return;
-    html += '<div class="stitle">Q'+q+'</div><div class="card" style="padding:4px 10px;margin-bottom:8px;">';
+    html += '<div class="stitle">'+qName(q)+'</div><div class="card" style="padding:4px 10px;margin-bottom:8px;">';
     qev.forEach(e=>{
       const isDk = e.team===dN;
       const badge = isDk
@@ -6083,23 +6114,24 @@ function renderFollowRecap(ev, wN, dN){
   const oppPct = isOurDark ? wPct : dPct;
   const ourShots = ourG + ourM + ourBlkOld;
 
-  // Quarter goal counts
-  const qg = q=>({
-    our: cnt(ourT, e=>String(e.q)===q&&isGoal(e)),
-    opp: cnt(oppT, e=>String(e.q)===q&&isGoal(e))
-  });
-  const Q=[null,qg('1'),qg('2'),qg('3'),qg('4')]; // 1-indexed
-
-  // Winner / margin
-  const tied=ourG===oppG, weWon=ourG>oppG;
-  const winT=weWon?ourT:oppT, loseT=weWon?oppT:ourT;
-  const margin=Math.abs(ourG-oppG);
-
   // ── Game phase detection ──────────────────────────────────────────
   const latestQ = ev.reduce((mx,e)=>Math.max(mx,Number(e.q)||0),0);
   const isLive = latestQ < 4; // heuristic: no Q4 events yet → game not finished
   const phaseSuffix = latestQ <= 1 ? ' — Q1' : latestQ===2 ? ' — at halftime' : latestQ===3 ? ' — after Q3' : '';
   const analysisLabel = isLive ? (latestQ <= 2 ? 'HALFTIME ANALYSIS' : 'IN-GAME ANALYSIS') : 'GAME ANALYSIS';
+
+  // Quarter goal counts — extend past Q4 into OT1/OT2 when the game went there
+  const qg = q=>({
+    our: cnt(ourT, e=>String(e.q)===q&&isGoal(e)),
+    opp: cnt(oppT, e=>String(e.q)===q&&isGoal(e))
+  });
+  const qIdxs = Array.from({length:Math.max(4,Math.min(6,latestQ))},(_,i)=>i+1); // 1-indexed periods to show
+  const Q=[null]; qIdxs.forEach(i=>{ Q[i]=qg(String(i)); });
+
+  // Winner / margin
+  const tied=ourG===oppG, weWon=ourG>oppG;
+  const winT=weWon?ourT:oppT, loseT=weWon?oppT:ourT;
+  const margin=Math.abs(ourG-oppG);
 
   // Opening run
   const goalEvs = ev.filter(isGoal).sort((a,b)=>Number(a.id||0)-Number(b.id||0));
@@ -6111,9 +6143,9 @@ function renderFollowRecap(ev, wN, dN){
   }
   if(runLen<2){ runTeam=null; runLen=0; }
 
-  // Biggest single-quarter swing (from our perspective: positive = we led that quarter)
+  // Biggest single-period swing (from our perspective: positive = we led that period)
   let swingQ=0, swingAmt=0;
-  for(let i=1;i<=4;i++){
+  for(const i of qIdxs){
     const diff = Q[i].our - Q[i].opp;
     if(Math.abs(diff)>Math.abs(swingAmt)&&(Q[i].our+Q[i].opp)>0){ swingAmt=diff; swingQ=i; }
   }
@@ -6269,15 +6301,15 @@ function renderFollowRecap(ev, wN, dN){
     }
   }
 
-  // Quarter dominance
+  // Quarter/OT dominance
   if(swingQ && Math.abs(swingAmt) >= 3){
-    const ourQ=Q[swingQ].our, oppQ=Q[swingQ].opp;
+    const ourQ=Q[swingQ].our, oppQ=Q[swingQ].opp, swingLabel=qName(swingQ);
     if(swingAmt > 0) push(Math.abs(swingAmt)*1.2,'📈',
-      isLive ? `A dominant Q${swingQ} (${ourQ}-${oppQ}) from ${ourT} has shifted the momentum`
-             : `A dominant Q${swingQ} (${ourQ}-${oppQ}) from ${ourT} swung the game's momentum`);
+      isLive ? `A dominant ${swingLabel} (${ourQ}-${oppQ}) from ${ourT} has shifted the momentum`
+             : `A dominant ${swingLabel} (${ourQ}-${oppQ}) from ${ourT} swung the game's momentum`);
     else             push(Math.abs(swingAmt)*1.2,'📉',
-      isLive ? `${ourT} struggled in Q${swingQ} (${ourQ}-${oppQ}) — that's where the deficit has grown`
-             : `${ourT} struggled in Q${swingQ} (${ourQ}-${oppQ}) — that quarter was where the deficit grew`);
+      isLive ? `${ourT} struggled in ${swingLabel} (${ourQ}-${oppQ}) — that's where the deficit has grown`
+             : `${ourT} struggled in ${swingLabel} (${ourQ}-${oppQ}) — that quarter was where the deficit grew`);
   }
 
   // Sort by score, keep top 3
@@ -6319,16 +6351,17 @@ function renderFollowRecap(ev, wN, dN){
   }
 
   // ── Render ────────────────────────────────────────────────────────────
-  // Quarter breakdown cells — White left, Dark right (matches scoreboard above)
-  const qCells=[1,2,3,4].map(i=>{
-    const qw = isOurDark ? Q[i].opp : Q[i].our;  // white goals this quarter
-    const qd = isOurDark ? Q[i].our : Q[i].opp;  // dark goals this quarter
+  // Quarter/OT breakdown cells — White left, Dark right (matches scoreboard above)
+  const lastQIdx = qIdxs[qIdxs.length-1];
+  const qCells=qIdxs.map(i=>{
+    const qw = isOurDark ? Q[i].opp : Q[i].our;  // white goals this period
+    const qd = isOurDark ? Q[i].our : Q[i].opp;  // dark goals this period
     const wW = qw > qd;
     const dW = qd > qw;
     // Team identity colors are fixed — bold = winner, normal = loser
-    const sep = i < 4 ? 'border-right:1px solid #0d1e2e;' : '';
+    const sep = i < lastQIdx ? 'border-right:1px solid #0d1e2e;' : '';
     return `<div style="text-align:center;padding:6px 4px;${sep}">
-      <div style="font-size:9px;color:#4a7a9a;font-weight:700;letter-spacing:.5px;margin-bottom:5px;">Q${i}</div>
+      <div style="font-size:9px;color:#4a7a9a;font-weight:700;letter-spacing:.5px;margin-bottom:5px;">${qName(i)}</div>
       <div style="font-size:16px;font-weight:${wW?700:400};color:#c0d8f0;line-height:1.15;">${qw}</div>
       <div style="font-size:16px;font-weight:${dW?700:400};color:#7abcdc;line-height:1.15;">${qd}</div>
     </div>`;
@@ -6471,9 +6504,9 @@ function renderFollowFlow(ev, wN, dN){
     </div>
   </div>`;
 
-  // Determine which quarters to show — shared across all sections so columns align
-  const hasOT = FLOW_TYPES.some(t => ev.filter(t.filter).some(e=>String(e.q||'')==='OT'));
-  const showQs = hasOT ? ['1','2','3','4','OT'] : ['1','2','3','4'];
+  // Determine which quarters/OT periods to show — shared across all sections so columns align
+  const maxQNum = ev.reduce((mx,e)=>Math.max(mx,Number(e.q)||0),0);
+  const showQs = Array.from({length:Math.max(4,Math.min(6,maxQNum))},(_,i)=>String(i+1));
 
   // Compute one shared grid-column definition for all three sections.
   // Default: uniform 1fr per quarter.  Only go proportional if any quarter in
@@ -6506,12 +6539,12 @@ function renderFollowFlow(ev, wN, dN){
   function renderSection(type){
     const filtered = ev.filter(type.filter);
 
-    const QS = ['1','2','3','4','OT'];
+    const QS = Q_PERIODS;
     const byQ = {};
     QS.forEach(q => byQ[q] = []);
     filtered.forEach(e => {
       const q = String(e.q||'1');
-      (byQ[q] || (byQ['OT'])).push(e);
+      (byQ[q] || byQ[QS[QS.length-1]]).push(e);
     });
     QS.forEach(q => {
       if(byQ[q].length > 1 && byQ[q][0]?.id)
@@ -6559,7 +6592,7 @@ function renderFollowFlow(ev, wN, dN){
 
       inner += `<div style="padding:4px 6px;${borderL}">
         <div style="font-size:10px;font-weight:700;color:#2a5a8a;letter-spacing:1px;
-                    text-align:center;margin-bottom:6px;">Q${q}</div>
+                    text-align:center;margin-bottom:6px;">${qName(q)}</div>
         <div style="display:flex;gap:3px;flex-wrap:wrap;align-items:flex-start;
                     min-height:44px;padding:5px 4px;background:#05101a;border-radius:6px;">
           ${pipes || '<div style="flex:1;"></div>'}
@@ -6980,17 +7013,19 @@ function renderTeamPage(){
 
   // ── Quarter analysis — Goals & Fouls ─────────────────────
   const QS_BASE = ['1','2','3','4'];
-  const hasOT = events.some(e =>
-    String(e.q)==='OT' &&
+  const isRegQ = q => QS_BASE.includes(q);
+  const teamEventsAll = events.filter(e =>
     e._game && (e._game.whiteTeam===teamName || e._game.darkTeam===teamName));
-  const QS_ALL = hasOT ? [...QS_BASE,'OT'] : QS_BASE;
+  const maxQNum = teamEventsAll.reduce((mx,e)=>Math.max(mx,Number(e.q)||0),0);
+  const QS_ALL = maxQNum>5 ? [...QS_BASE,'5','6'] : maxQNum>4 ? [...QS_BASE,'5'] : QS_BASE;
 
-  // Games that went to OT (for per-game divisor)
-  const otGameIds = hasOT ? new Set(
-    events.filter(e=>String(e.q)==='OT'&&
-      e._game&&(e._game.whiteTeam===teamName||e._game.darkTeam===teamName))
-      .map(e=>e._game.gameId)) : new Set();
-  const qDiv = q => q==='OT' ? (otGameIds.size||1) : (games.length||1);
+  // Games that reached each OT period (for per-game divisor)
+  const otGameIds = {};
+  ['5','6'].forEach(q=>{
+    otGameIds[q] = new Set(
+      teamEventsAll.filter(e=>String(e.q)===q).map(e=>e._game.gameId));
+  });
+  const qDiv = q => isRegQ(q) ? (games.length||1) : (otGameIds[q].size||1);
 
   // Events that belong to games the team played in (for opponent data)
   const teamGameIds = new Set(games.map(g=>g.gameId));
@@ -7037,7 +7072,7 @@ function renderTeamPage(){
   let qGoalHTML = `<div style="display:grid;grid-template-columns:${qColsFr};gap:0;">`;
   // Header row
   qGoalHTML += hdrCell('');
-  QS_ALL.forEach(q=>{ qGoalHTML += hdrCell(q==='OT'?'OT':'Q'+q); });
+  QS_ALL.forEach(q=>{ qGoalHTML += hdrCell(qShort(q)); });
   qGoalHTML += hdrCell('TTL');
   qGoalHTML += divRow();
 
@@ -7045,8 +7080,8 @@ function renderTeamPage(){
   qGoalHTML += lblCell(teamName.substring(0,14));
   QS_ALL.forEach(q=>{
     const pg = qTG[q]/qDiv(q);
-    const isLull   = q!=='OT' && pg===minGoalPG && minGoalPG<maxGoalPG;
-    const isSurge  = q!=='OT' && pg===maxGoalPG && minGoalPG<maxGoalPG;
+    const isLull   = isRegQ(q) && pg===minGoalPG && minGoalPG<maxGoalPG;
+    const isSurge  = isRegQ(q) && pg===maxGoalPG && minGoalPG<maxGoalPG;
     const bg  = isLull?'#1e0e00':isSurge?'#001e0e':'';
     const clr = isLull?'#c08040':isSurge?'#4ade80':'#c0d8f0';
     qGoalHTML += numCell(qTG[q], clr, bg);
@@ -7073,8 +7108,8 @@ function renderTeamPage(){
   qGoalHTML += lblCell('/Game','font-size:9px;color:#3a5a7a;');
   QS_ALL.forEach(q=>{
     const pg=(qTG[q]/qDiv(q)).toFixed(1);
-    const isLull  = q!=='OT' && Number(pg)===minGoalPG && minGoalPG<maxGoalPG;
-    const isSurge = q!=='OT' && Number(pg)===maxGoalPG && minGoalPG<maxGoalPG;
+    const isLull  = isRegQ(q) && Number(pg)===minGoalPG && minGoalPG<maxGoalPG;
+    const isSurge = isRegQ(q) && Number(pg)===maxGoalPG && minGoalPG<maxGoalPG;
     const clr = isLull?'#c08040':isSurge?'#4ade80':'#3a5a7a';
     qGoalHTML += pgCell(pg, clr);
   });
@@ -7086,7 +7121,7 @@ function renderTeamPage(){
   let qFoulHTML = `<div style="display:grid;grid-template-columns:${qColsFr};gap:0;">`;
   // Header
   qFoulHTML += hdrCell('');
-  QS_ALL.forEach(q=>{ qFoulHTML += hdrCell(q==='OT'?'OT':'Q'+q); });
+  QS_ALL.forEach(q=>{ qFoulHTML += hdrCell(qShort(q)); });
   qFoulHTML += hdrCell('TTL');
   qFoulHTML += divRow();
 
@@ -7096,8 +7131,8 @@ function renderTeamPage(){
   QS_ALL.forEach(q=>{
     const pg = qTF[q]/qDiv(q);
     const pm = qOF[q]-qTF[q];
-    const isWorst = q!=='OT' && pg===maxFoulPG && maxFoulPG>minFoulPG && pm<0;
-    const isBest  = q!=='OT' && pg===minFoulPG && maxFoulPG>minFoulPG && pm>=0;
+    const isWorst = isRegQ(q) && pg===maxFoulPG && maxFoulPG>minFoulPG && pm<0;
+    const isBest  = isRegQ(q) && pg===minFoulPG && maxFoulPG>minFoulPG && pm>=0;
     const bg  = isWorst?'#1e0808':isBest?'#001e0e':'';
     const clr = isWorst?'#ef4444':isBest?'#4ade80':'#c0d8f0';
     qFoulHTML += numCell(qTF[q], clr, bg);
@@ -7126,8 +7161,8 @@ function renderTeamPage(){
   QS_ALL.forEach(q=>{
     const pg=(qTF[q]/qDiv(q)).toFixed(1);
     const pm = qOF[q]-qTF[q];
-    const isWorst = q!=='OT' && Number(pg)===maxFoulPG && maxFoulPG>minFoulPG && pm<0;
-    const isBest  = q!=='OT' && Number(pg)===minFoulPG && maxFoulPG>minFoulPG && pm>=0;
+    const isWorst = isRegQ(q) && Number(pg)===maxFoulPG && maxFoulPG>minFoulPG && pm<0;
+    const isBest  = isRegQ(q) && Number(pg)===minFoulPG && maxFoulPG>minFoulPG && pm>=0;
     const clr = isWorst?'#ef4444':isBest?'#4ade80':'#3a5a7a';
     qFoulHTML += pgCell(pg, clr);
   });
@@ -7540,9 +7575,9 @@ function sendQuarterFoulSummary(endedQ, events, gameId) {
   if (_sentFoulAlerts.has(summaryKey)) return;
   _sentFoulAlerts.add(summaryKey);
 
-  showFoulAlertBanner(['End of Q' + endedQ + ' — players with 2+ fouls:', ...lines]);
+  showFoulAlertBanner(['End of ' + qName(endedQ) + ' — players with 2+ fouls:', ...lines]);
 
-  const title = '📋 Q' + endedQ + ' Foul Summary';
+  const title = '📋 ' + qName(endedQ) + ' Foul Summary';
   const body  = lines.join(' · ');
   sendPushNotification(title, body);
 }
