@@ -726,8 +726,8 @@ const EVENT_DEFS = {
   'goal-counter':   {label:'Goal (Counter)',    flow:['cap','zone','gm']},
   'miss':           {label:'Missed Shot',       flow:['cap','zone']},
   'miss-5m':        {label:'Missed Shot 5M',    flow:['cap']},
-  'ejection':       {label:'Ejection',          flow:['cap']},
-  '5m-penalty':     {label:'5M Penalty',        flow:['cap']},
+  'ejection':       {label:'Ejection',          flow:['cap','drawn']},
+  '5m-penalty':     {label:'5M Penalty',        flow:['cap','drawn']},
   'steal':          {label:'Steal',             flow:['cap']},
   'turnover':       {label:'Turnover',          flow:['cap']},
   'assist':         {label:'Assist',            flow:['cap']},
@@ -1360,6 +1360,8 @@ function applyPrefFilters(flow, side, eventType){
     if(s==='gm'   && isGoal)  return tp.goalGM    !== false;
     if(s==='zone' && isMiss)  return tp.missZone  !== false;
     if(s==='zone' && isBlock) return tp.blockZone !== false;
+    if(s==='drawn' && eventType==='ejection')     return tp.ejectionDrawn !== false;
+    if(s==='drawn' && eventType==='5m-penalty')   return tp.fiveMDrawn    !== false;
     return true;
   });
 }
@@ -1488,7 +1490,7 @@ function finalize5mPenalty(){
     cap:d.cap||'', capName:d.capName||'',
     playerId:d.playerId||null,
     zone:'', gm:'', assist:'',
-    drawnBy:'', drawnByName:'', drawnPlayerId:null,
+    drawnBy:d.drawnBy?'#'+d.drawnBy:'', drawnByName:d.drawnByName||'', drawnPlayerId:d.drawnPlayerId||null,
     turnoverBy:'', shooterCap:'',
   };
 
@@ -1767,7 +1769,7 @@ function showModalStep(step){
     renderCapPicker(atkRoster, atkIsDk, `Shooter — ${atkName}`, 'shooterCap', true);
   }
   else if(step==='drawn'){
-    renderCapPicker(oppRoster,!isDk,`Drawn by — ${isDk?wN:dN}`,'drawn');
+    renderCapPicker(oppRoster,!isDk,`Drawn by — ${isDk?wN:dN}`,'drawn',true);
   }
   else if(step==='5m-shooter'){
     const title = `Shooter — ${isDk?wN:dN}`;
@@ -2234,7 +2236,7 @@ function renderGameUI(){
   const ROWS = [
     ['goal-reg','assist'],
     ['miss','steal','turnover'],
-    ['ejection','ejection-drawn','5m-penalty','5m-drawn'],
+    ['ejection','5m-penalty'],
     ['field-block','goalie-block','sprint-won'],
     ['offensive','def-effort','lost-ball','shot-clock','scored-on'],
   ];
