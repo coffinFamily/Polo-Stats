@@ -28,8 +28,10 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
 .evt-dk:hover{background:#162878;}
 .evt-wh{padding:10px 6px;border-radius:8px;font-weight:600;font-size:12px;text-align:center;line-height:1.3;background:#dde8f0;color:#1a2a3a;border:1px solid #aac0d0;}
 .evt-wh:hover{background:#c8d8e8;}
-.evt-nt{padding:10px 6px;border-radius:8px;font-weight:600;font-size:12px;text-align:center;line-height:1.3;background:#0d3a2a;color:#6ee7b7;border:1px solid #1a5a3a;}
-.evt-nt:hover{background:#1a4a3a;}
+.evt-nt{padding:18px 8px;border-radius:11px;font-weight:700;font-size:15px;text-align:center;line-height:1.3;background:#123252;color:#dceaf8;border:1.5px solid #2c5a82;}
+.evt-nt:hover{background:#173e64;}
+.evt-nt:active{transform:scale(0.97);}
+.evt-icon-lg{display:inline-block;transform:scale(1.6);margin-right:2px;vertical-align:middle;}
 .timer{font-size:52px;font-weight:300;font-variant-numeric:tabular-nums;letter-spacing:3px;}
 .timer.run{color:#22c55e;}
 .timer.low{color:#ef4444;}
@@ -183,10 +185,8 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
     </div>
   </div>
 
-  <div class="stitle" id="white-btn-title">White events</div>
-  <div id="white-btns"></div>
-  <div class="stitle" id="dark-btn-title">Dark events</div>
-  <div id="dark-btns"></div>
+  <div class="stitle">Record an event</div>
+  <div id="event-btns"></div>
   <!-- Critical stats + Voice capture -->
   <div class="card" id="voice-card" style="display:none;padding:8px 10px;margin-top:10px;">
     <!-- Row 1: By Quarter + Fouls (50/50) -->
@@ -1374,17 +1374,36 @@ function startFlow(type,forceTeam){
   if(forceTeam) flow = applyPrefFilters(flow, forceTeam, type);
   // Goalie Block with forced team: skip the goalie-team picker step
   if(type==='goalie-block' && forceTeam) flow = flow.filter(s=>s!=='goalie-team');
-  // All other non-forced flows get a team-pick step prepended
-  if(!forceTeam && type!=='goalie-block') flow=['team-pick',...flow];
+  // Flows that start with 'cap' pick their team inline on that same screen
+  // (see showModalStep's 'cap' branch) instead of a separate team-pick step.
+  // Only flows with no cap step at all (e.g. Shot Clock) still need one.
+  const startsWithCap = flow[0]==='cap';
+  const teamPickInline = !forceTeam && type!=='goalie-block' && startsWithCap;
+  if(!forceTeam && type!=='goalie-block' && !startsWithCap) flow=['team-pick',...flow];
   state.flow=flow; state.flowIdx=0;
   const teamName=forceTeam?(forceTeam==='dark'?state.game.darkTeam||'Dark':state.game.whiteTeam||'White'):null;
   state.flowCtx={eventType:type, eventLabel:def.label, team:forceTeam||null,
-    goalieTeam: (type==='goalie-block'&&forceTeam)?forceTeam:null};
+    goalieTeam: (type==='goalie-block'&&forceTeam)?forceTeam:null,
+    teamPickInline};
   state.pendingData=forceTeam?{
     teamLabel:teamName,
     ...(type==='goalie-block'?{goalieTeamLabel:teamName}:{})
   }:{};
   showModalStep(flow[0]);
+}
+
+// Team picked inline on the cap screen (see startFlow's teamPickInline).
+// Re-applies pref filters to the remaining steps now that team is known
+// (they couldn't be filtered up front, same as the goalie-team case in
+// nextStep), then re-renders the same cap step with that team's roster.
+function pickFlowTeam(side){
+  const g=state.game, dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
+  state.flowCtx.team=side;
+  state.pendingData.teamLabel=side==='dark'?dN:wN;
+  const rest=state.flow.slice(state.flowIdx+1);
+  const filtered=applyPrefFilters(rest, side, state.flowCtx.eventType);
+  state.flow=[...state.flow.slice(0,state.flowIdx+1), ...filtered];
+  showModalStep('cap');
 }
 
 function nextStep(field,val,label,playerId){
@@ -1568,31 +1587,6 @@ function finalizeGoalieBlock(){
   pushToSheet({action:'events', rows:eventToRows({...blockRow, gameId, date})});
 }
 
-function quickGoalieBlock(team, cap){
-  const prefs = (state.prefs||{})[team]||{};
-  const g = state.game;
-  const dN = g.darkTeam||'Dark', wN = g.whiteTeam||'White';
-  const teamName = team==='dark' ? dN : wN;
-  const roster = team==='dark' ? (g.darkRoster||[]) : (g.whiteRoster||[]);
-  const player = roster.find(p => p.cap === cap);
-  state.flowCtx = {
-    eventType: 'goalie-block', eventLabel: 'Goalie Block',
-    team: team, goalieTeam: team
-  };
-  state.pendingData = {
-    teamLabel: teamName, goalieTeamLabel: teamName,
-    goalieCap: cap, goalieCapName: player ? player.name : '#'+cap,
-    goaliePlayerId: player ? player.playerId : null
-  };
-  // Zone capture if enabled, then always ask for shooter cap
-  const flow = [];
-  if(prefs.blockZone !== false) flow.push('zone');
-  flow.push('shooter-cap');
-  state.flow = flow;
-  state.flowIdx = 0;
-  showModalStep(flow[0]);
-}
-
 function selectActiveGoalie(team, cap){
   const g=state.game;
   const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
@@ -1675,7 +1669,13 @@ function showModalStep(step){
     </div>`;
   }
   else if(step==='cap'){
-    renderCapPicker(roster,isDk,`${isDk?dN:wN} — who?`,'cap');
+    const teamKnown=!!state.flowCtx.team;
+    if(teamKnown){
+      renderCapPicker(roster,isDk,`${isDk?dN:wN} — who?`,'cap');
+    } else {
+      document.getElementById('modal-body').innerHTML=
+        `<p style="color:#5a7a9a;font-size:12px;text-align:center;padding:8px 0 2px;">Pick a team above to choose who.</p>`;
+    }
     // Remove any overlays left over from previous flows — they live on
     // the .modal element (not modal-body) so innerHTML replacement doesn't clear them.
     const _modal=body.closest('.modal');
@@ -1684,6 +1684,8 @@ function showModalStep(step){
       if(_oldToggle&&_oldToggle.parentNode) _oldToggle.parentNode.remove();
       const _oldGoal=_modal.querySelector('#goal-subtype-panel');
       if(_oldGoal) _oldGoal.remove();
+      const _oldTeam=_modal.querySelector('#flow-team-panel');
+      if(_oldTeam) _oldTeam.remove();
     }
     const et=state.flowCtx.eventType;
     // Goal subtype radio pills: Even / Advantage / 5M / Counter
@@ -1716,7 +1718,8 @@ function showModalStep(step){
       const is5m=et==='miss-5m';
       const body=document.getElementById('modal-body');
       const toggle=document.createElement('div');
-      toggle.style.cssText='position:absolute;top:14px;right:16px;z-index:2;';
+      const toggleTop=state.flowCtx.teamPickInline?86:14;
+      toggle.style.cssText=`position:absolute;top:${toggleTop}px;right:16px;z-index:2;`;
       toggle.innerHTML=`<button id="miss5m-toggle" onclick="toggleMiss5m()"
         style="display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;transition:all 0.15s;
           ${is5m?'background:#c25000;border:1.5px solid #ff9500;color:#fff;':'background:#0a1e30;border:1.5px solid #2a4a6a;color:#5a7a9a;'}">
@@ -1726,6 +1729,24 @@ function showModalStep(step){
       const modal=body.closest('.modal');
       if(modal&&modal.style.position!=='relative') modal.style.position='relative';
       modal.appendChild(toggle);
+    }
+    // Team toggle — flows that don't already have a fixed team (manual grid
+    // taps) pick it here, on the same screen as the cap, instead of a
+    // separate team-pick step. Inserted last so it lands above everything
+    // else (goal-subtype pills included).
+    if(state.flowCtx.teamPickInline){
+      const curTeam=state.flowCtx.team;
+      const teamPanel=document.createElement('div');
+      teamPanel.id='flow-team-panel';
+      teamPanel.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;';
+      const dkOn=curTeam==='dark', whOn=curTeam==='white';
+      const dkStyle=dkOn?'box-shadow:0 0 0 2px #5878c8,0 0 14px rgba(64,96,176,0.55);':'opacity:0.7;';
+      const whStyle=whOn?'box-shadow:0 0 0 2px #90aac0,0 0 14px rgba(200,216,232,0.4);':'opacity:0.7;';
+      teamPanel.innerHTML=
+        `<button class="team-dk" style="${dkStyle}" onclick="pickFlowTeam('dark')">${dN}</button>`+
+        `<button class="team-wh" style="${whStyle}" onclick="pickFlowTeam('white')">${wN}</button>`;
+      const mb=document.getElementById('modal-body');
+      mb.insertBefore(teamPanel,mb.firstChild);
     }
   }
   else if(step==='goalie-team'){
@@ -1857,13 +1878,11 @@ function toggleMiss5m(){
   const def=EVENT_DEFS[next];
   state.flowCtx.eventType=next;
   state.flowCtx.eventLabel=def.label;
-  // Rebuild remaining flow from current index
-  const g=state.game;
-  const isDk=state.flowCtx.team==='dark';
-  const side=isDk?'dark':'white';
-  let newFlow=applyPrefFilters([...def.flow],side,next);
-  // Skip steps already completed (we're on 'cap' right now = idx 0 of the new flow)
-  state.flow=newFlow;
+  // Rebuild remaining flow from current index. If team isn't picked yet
+  // (teamPickInline flows), defer pref filtering to pickFlowTeam — filtering
+  // with a guessed team here could permanently drop a step the real team wants.
+  const team=state.flowCtx.team;
+  state.flow = team ? applyPrefFilters([...def.flow],team,next) : [...def.flow];
   state.flowIdx=0;
   document.getElementById('modal-title').textContent=def.label;
   // Re-render the cap step so the toggle button updates
@@ -1875,10 +1894,12 @@ function setGoalSubtype(key){
   if(!def) return;
   state.flowCtx.eventType=key;
   state.flowCtx.eventLabel=def.label;
-  // Rebuild flow for the selected goal type (5M has no zone step; others do)
-  const isDk=state.flowCtx.team==='dark';
-  const side=isDk?'dark':'white';
-  state.flow=applyPrefFilters([...def.flow],side,key);
+  // Rebuild flow for the selected goal type (5M has no zone step; others do).
+  // If team isn't picked yet (teamPickInline flows), defer pref filtering to
+  // pickFlowTeam — filtering with a guessed team here could permanently drop
+  // a step the real team wants.
+  const team=state.flowCtx.team;
+  state.flow = team ? applyPrefFilters([...def.flow],team,key) : [...def.flow];
   state.flowIdx=0;
   document.getElementById('modal-title').textContent=def.label;
   // Re-render cap step so the active pill updates
@@ -2180,8 +2201,6 @@ function renderGameUI(){
   const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
   document.getElementById('dark-name-score').textContent=dN;
   document.getElementById('white-name-score').textContent=wN;
-  document.getElementById('dark-btn-title').textContent=dN+' — Dark';
-  document.getElementById('white-btn-title').textContent=wN+' — White';
   const _gl=document.getElementById('game-label'); if(_gl) _gl.textContent=dN+' vs '+wN;
   document.getElementById('q-display').textContent=qName(state.q);
   populateGameSelector();
@@ -2190,56 +2209,46 @@ function renderGameUI(){
   if(_rb) _rb.textContent='Reset '+(g.quarterMins||8)+'m';
 
   const p=state.prefs||{}, dp=p.dark||{}, wp=p.white||{};
-  const ag=state.activeGoalie||{};
-  const dkCap=ag.dark, whCap=ag.white;
 
-  function prefEnabled(prefs, type){
-    if(type==='goal-reg'||type==='goal-65'||type==='goal-5m'||type==='goal-counter') return prefs.goals !== false;
-    if(type==='miss')                        return prefs.miss           !== false;
-    if(type==='ejection')                    return prefs.ejection       !== false;
-    if(type==='ejection-drawn')              return prefs.ejectionDrawn  !== false;
-    if(type==='5m-penalty')                  return prefs.fiveM          !== false;
-    if(type==='5m-drawn')                    return prefs.fiveMDrawn     !== false;
-    if(type==='steal')                       return prefs.steal          !== false;
-    if(type==='turnover')                    return prefs.turnover       !== false;
-    if(type==='assist')                      return prefs.assist         !== false;
-    if(type==='goalie-block')                return prefs.goalieBlock    !== false;
-    if(type==='field-block')                 return prefs.fieldBlock     !== false;
-    if(type==='sprint-won')                  return prefs.sprintWon      !== false;
-    if(type==='offensive')                   return prefs.offensive      !== false;
-    if(type==='def-effort')                  return prefs.defEffort      !== false;
-    if(type==='lost-ball')                   return prefs.lostBall       !== false;
-    if(type==='scored-on')                   return prefs.scoredOn       !== false;
-    if(type==='shot-clock')                  return prefs.shotClock      !== false;
-    return true;
+  // A single button now serves both teams (team is picked on the cap screen
+  // that follows), so a stat shows up here if EITHER team wants it tracked.
+  function prefEnabled(type){
+    const check=prefs=>{
+      if(type==='goal-reg'||type==='goal-65'||type==='goal-5m'||type==='goal-counter') return prefs.goals !== false;
+      if(type==='miss')                        return prefs.miss           !== false;
+      if(type==='ejection')                    return prefs.ejection       !== false;
+      if(type==='5m-penalty')                  return prefs.fiveM          !== false;
+      if(type==='steal')                       return prefs.steal          !== false;
+      if(type==='turnover')                    return prefs.turnover       !== false;
+      if(type==='goalie-block')                return prefs.goalieBlock    !== false;
+      if(type==='field-block')                 return prefs.fieldBlock     !== false;
+      if(type==='sprint-won')                  return prefs.sprintWon      !== false;
+      if(type==='offensive')                   return prefs.offensive      !== false;
+      if(type==='def-effort')                  return prefs.defEffort      !== false;
+      if(type==='lost-ball')                   return prefs.lostBall       !== false;
+      if(type==='scored-on')                   return prefs.scoredOn       !== false;
+      if(type==='shot-clock')                  return prefs.shotClock      !== false;
+      return true;
+    };
+    return check(dp) || check(wp);
   }
 
   // Buttons stretch to fill each row — rows with fewer buttons get wider buttons.
-  function buildRow(types, side, prefs){
-    const isDk = side==='dark';
-    const cls  = isDk ? 'evt-dk' : 'evt-wh';
-    const teamCap = isDk ? dkCap : whCap;
-    const teamName = isDk ? dN : wN;
+  function buildRow(types){
     const btnStyle = `flex:1;min-width:0;`;
     let btns='';
     types.forEach(t=>{
-      if(!prefEnabled(prefs,t)) return;
+      if(!prefEnabled(t)) return;
       const ico = evtIcon(t);
-      if(t==='goalie-block'){
-        if(teamCap){
-          btns+=`<button class="${cls}" style="${btnStyle}" title="GK Block — ${teamName} #${teamCap}" onclick="quickGoalieBlock('${side}','${teamCap}')">${ico}GK Block</button>`;
-        } else {
-          btns+=`<button class="${cls}" style="${btnStyle}" onclick="startFlow('goalie-block','${side}')">${ico}Goalie Block</button>`;
-        }
-      } else {
-        btns+=`<button class="${cls}" style="${btnStyle}" onclick="startFlow('${t}','${side}')">${ico}${EVENT_DEFS[t].btnLabel||EVENT_DEFS[t].label}</button>`;
-      }
+      const icoLg = ico ? `<span class="evt-icon-lg">${ico}</span>` : '';
+      const label = EVENT_DEFS[t].btnLabel||EVENT_DEFS[t].label;
+      btns+=`<button class="evt-nt" style="${btnStyle}" onclick="startFlow('${t}')">${icoLg}${label}</button>`;
     });
     if(!btns) return '';
-    return `<div style="display:flex;gap:6px;margin-bottom:5px;">${btns}</div>`;
+    return `<div style="display:flex;gap:8px;margin-bottom:8px;">${btns}</div>`;
   }
 
-  // Row layout per team
+  // Row layout — one grid for both teams; team is chosen on the cap screen.
   const ROWS = [
     ['goal-reg'],
     ['miss','steal','turnover'],
@@ -2248,8 +2257,7 @@ function renderGameUI(){
     ['offensive','def-effort','lost-ball','shot-clock','scored-on'],
   ];
 
-  document.getElementById('dark-btns').innerHTML  = ROWS.map(r=>buildRow(r,'dark', dp)).join('');
-  document.getElementById('white-btns').innerHTML = ROWS.map(r=>buildRow(r,'white',wp)).join('');
+  document.getElementById('event-btns').innerHTML = ROWS.map(buildRow).join('');
   renderEventLog();
 
   // Show the "Start New Game" hero when no game has been configured yet
