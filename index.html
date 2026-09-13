@@ -720,10 +720,10 @@ state.players = state.players.map(p => {
 //  EVENT DEFINITIONS
 // ═══════════════════════════════════════════════════════════
 const EVENT_DEFS = {
-  'goal-reg':       {label:'Goal (Reg)',       btnLabel:'Goal', flow:['cap','zone','gm']},
-  'goal-65':        {label:'Goal (6-5)',        flow:['cap','zone','gm']},
+  'goal-reg':       {label:'Goal (Reg)',       btnLabel:'Goal', flow:['cap','zone','gm','assist']},
+  'goal-65':        {label:'Goal (6-5)',        flow:['cap','zone','gm','assist']},
   'goal-5m':        {label:'Goal (5M)',         flow:['cap','gm']},
-  'goal-counter':   {label:'Goal (Counter)',    flow:['cap','zone','gm']},
+  'goal-counter':   {label:'Goal (Counter)',    flow:['cap','zone','gm','assist']},
   'miss':           {label:'Missed Shot',       flow:['cap','zone']},
   'miss-5m':        {label:'Missed Shot 5M',    flow:['cap']},
   'ejection':       {label:'Ejection',          flow:['cap','drawn']},
@@ -1362,6 +1362,7 @@ function applyPrefFilters(flow, side, eventType){
     if(s==='zone' && isBlock) return tp.blockZone !== false;
     if(s==='drawn' && eventType==='ejection')     return tp.ejectionDrawn !== false;
     if(s==='drawn' && eventType==='5m-penalty')   return tp.fiveMDrawn    !== false;
+    if(s==='assist' && isGoal)                    return tp.assist        !== false;
     return true;
   });
 }
@@ -1697,15 +1698,15 @@ function showModalStep(step){
       const pillsHTML=goalOptions.map(opt=>{
         const active=et===opt.key;
         const s=active
-          ?'background:#0a3a5a;border:1.5px solid #0a84c8;color:#7abcdc;'
-          :'background:#0a1e30;border:1.5px solid #1e3a5a;color:#5a7a9a;';
+          ?'background:#0a84c8;border:1.5px solid #3ab4f0;color:#ffffff;box-shadow:0 0 0 1px rgba(10,132,200,0.4);'
+          :'background:#1e3a5a;border:1.5px solid #3a5a7a;color:#d0e4f8;';
         return `<button onclick="setGoalSubtype('${opt.key}')" `
-          +`style="padding:5px 12px;border-radius:16px;font-size:12px;font-weight:700;cursor:pointer;${s}">`
+          +`style="padding:10px 4px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;${s}">`
           +`${opt.label}</button>`;
       }).join('');
       const panel=document.createElement('div');
       panel.id='goal-subtype-panel';
-      panel.style.cssText='display:flex;flex-wrap:wrap;justify-content:flex-end;gap:5px;margin-bottom:10px;';
+      panel.style.cssText='display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px;';
       panel.innerHTML=pillsHTML;
       const mb=document.getElementById('modal-body');
       mb.insertBefore(panel,mb.firstChild);
@@ -2234,7 +2235,7 @@ function renderGameUI(){
 
   // Row layout per team
   const ROWS = [
-    ['goal-reg','assist'],
+    ['goal-reg'],
     ['miss','steal','turnover'],
     ['ejection','5m-penalty'],
     ['field-block','goalie-block','sprint-won'],
