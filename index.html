@@ -3452,7 +3452,72 @@ function ngwNext(){
   ngwRender();
 }
 
-function ngwSave(){
+// ─── Duplicate-game guard ──────────────────────────────────────
+// Common scenario: one person sets up the game on their device, then hands
+// stat-taking to someone else on a *different* device/browser. That second
+// device has no local game state, so finishing the wizard there would create
+// a second, disconnected game entry (and all their events would land under
+// a gameId nobody else is watching). Catch that before it happens.
+function findDuplicateActiveGame(w){
+  const wid=w.white.teamId, did=w.dark.teamId;
+  const date=w.date;
+  const curId=state.game&&state.game.gameId;
+  return state.savedGames.find(g=>{
+    if(g.gameId===curId) return false;
+    if(g.status==='inactive'||_archivedGames[g.gameId]) return false;
+    if((g.date||'')!==(date||'')) return false;
+    if(wid&&did){
+      const sameOrder = String(g.whiteTeamId||'')===String(wid) && String(g.darkTeamId||'')===String(did);
+      const swapped    = String(g.whiteTeamId||'')===String(did) && String(g.darkTeamId||'')===String(wid);
+      return sameOrder||swapped;
+    }
+    // No team IDs on one/both sides (ad-hoc opponent name) — fall back to display names
+    const wn=(w.white.displayName||'').trim().toLowerCase(), dn=(w.dark.displayName||'').trim().toLowerCase();
+    if(!wn||!dn) return false;
+    const gw=(g.whiteTeam||'').trim().toLowerCase(), gd=(g.darkTeam||'').trim().toLowerCase();
+    return (gw===wn&&gd===dn)||(gw===dn&&gd===wn);
+  });
+}
+
+// onStartAnyway/onBack default to the New Game wizard's own handlers; the Setup-tab
+// save path (saveGame) passes its own so "back" doesn't land the user in the wizard UI.
+function showNgwDuplicateWarning(dup, onStartAnyway, onBack){
+  window._dupWarnStartAnyway = onStartAnyway || _ngwCommitNewGame;
+  window._dupWarnBack = onBack || ngwRender;
+  const label=(dup.whiteTeam||'White')+' vs '+(dup.darkTeam||'Dark')+' — '+fmtDate(dup.date);
+  document.getElementById('modal-title').textContent='⚠️ Possible Duplicate Game';
+  document.getElementById('modal-body').innerHTML=`
+    <p style="color:#a8c8e0;font-size:13px;line-height:1.6;margin-bottom:14px;">
+      A game already exists for <strong>${label}</strong>. If someone else already set this
+      game up, resume it instead — so stats land in one place and everyone sees the same game.
+    </p>
+    <button class="btn-p" style="width:100%;margin-bottom:8px;padding:12px;font-weight:700;" onclick="ngwResumeExisting('${dup.gameId}')">↩ Resume Existing Game</button>
+    <button class="btn-s" style="width:100%;margin-bottom:8px;" onclick="_dupWarnStartAnyway()">Start a New Game Anyway</button>
+    <button class="btn-s" style="width:100%;" onclick="_dupWarnBack()">‹ Back</button>
+  `;
+  document.getElementById('modal-overlay').style.display='flex';
+}
+
+function ngwResumeExisting(gameId){
+  switchGame(gameId);
+  closeModal();
+  renderPrefsTab();
+  renderSetupUI();
+  populateGameSelector();
+  showEventToast('✓ Joined existing game', 'Loading stats already recorded…', '#22c55e');
+}
+
+async function ngwSave(){
+  const w=state._ngw;
+  // Best-effort refresh so a game created on another device shows up here
+  // even if this device has never seen it before. Never block on failure.
+  try { await refreshGameSelectorFromSheet(); } catch(e){}
+  const dup=findDuplicateActiveGame(w);
+  if(dup){ showNgwDuplicateWarning(dup); return; }
+  _ngwCommitNewGame();
+}
+
+function _ngwCommitNewGame(){
   const w=state._ngw;
   // Capture last-step GK selection
   const gkSel=document.getElementById('ngw-dark-gk-sel');
@@ -3538,7 +3603,7 @@ function ngwSave(){
   if(!wh&&!dk) setTimeout(()=>showEventToast('Tip: set Default # on players','so rosters load automatically','#e8c84a'),2200);
 }
 
-function saveGame(){
+async function saveGame(){
   const sheetUrl=document.getElementById('sheet-url-input').value.trim();
   const date=document.getElementById('game-date').value;
   const darkTeam=document.getElementById('dark-team-name').value.trim()||'Dark';
@@ -3600,14 +3665,36 @@ function saveGame(){
   // Only overwrite each GK when the dropdown had a team; otherwise preserve the
   // existing active goalie so a blank dropdown can't silently clear it mid-game.
   const prevGoalie=state.activeGoalie||{};
-  state.activeGoalie={
+  const activeGoalie={
     dark:  darkTeamId  ? readGK('dark', darkTeamId)  : prevGoalie.dark,
     white: whiteTeamId ? readGK('white',whiteTeamId) : prevGoalie.white,
   };
+
+  const params={sheetUrl,date,darkTeam,whiteTeam,darkTeamId,whiteTeamId,darkRoster,whiteRoster,activeGoalie};
+
+  // "Save Game Setup" is meant to update the current game, never create a new one —
+  // a fresh gameId is only supposed to come from the New Game wizard. But someone can
+  // reach the Setup tab directly on a device with no active game (e.g. a second phone
+  // handed off to a parent to take stats), which used to mint an orphan gameId here
+  // with no matching Games-tab row. Guard the same way the wizard does.
+  const isNewGame = !(state.game&&state.game.gameId);
+  if(isNewGame){
+    try { await refreshGameSelectorFromSheet(); } catch(e){}
+    const dup=findDuplicateActiveGame({white:{teamId:whiteTeamId,displayName:whiteTeam},dark:{teamId:darkTeamId,displayName:darkTeam},date});
+    if(dup){
+      showNgwDuplicateWarning(dup, ()=>_saveGameCommit(params), ()=>document.getElementById('modal-overlay').style.display='none');
+      return;
+    }
+  }
+  _saveGameCommit(params);
+}
+
+function _saveGameCommit(p){
+  const {sheetUrl,date,darkTeam,whiteTeam,darkTeamId,whiteTeamId,darkRoster,whiteRoster,activeGoalie}=p;
+  state.activeGoalie=activeGoalie;
   ss('wp-active-goalie', state.activeGoalie);
 
-  // Preserve existing gameId — Save Game Setup updates the current game, never creates a new one.
-  // A new gameId (and sheet init row) is only generated by the New Game wizard.
+  const isNewGame = !(state.game&&state.game.gameId);
   const existingGameId=state.game&&state.game.gameId?state.game.gameId:'game-'+genId();
   const _fullName=teamId=>{ const t=state.teams.find(t=>String(t.id)===String(teamId)); return t?t.name:''; };
 
@@ -3640,6 +3727,16 @@ function saveGame(){
   else state.savedGames.push(_sgEntry);
   ss('wp-saved-games',state.savedGames);
 
+  // If this save just minted a brand-new gameId, it needs a Games-tab row too —
+  // otherwise the Follow tab (and anyone else) can never discover this game.
+  if(isNewGame && sheetUrl){
+    const _myEmail=(state.session&&state.session.email)||'';
+    const _sc=(state.prefs&&state.prefs.standingCollaborators)||[];
+    const _creators=[_myEmail,..._sc].filter(Boolean).join(', ');
+    state.game.creatorEmail=_creators;
+    pushToSheet({action:'init',darkTeam:state.game.darkTeamFull||darkTeam,whiteTeam:state.game.whiteTeamFull||whiteTeam,date,gameId:existingGameId,creatorEmail:_creators});
+  }
+
   const dk=state.game.darkRoster.length, wh=state.game.whiteRoster.length;
 
   // Show a toast instead of alert (alert is suppressed on mobile PWA home-screen apps).
@@ -3651,6 +3748,7 @@ function saveGame(){
   if(finalDarkId && !dk)  setTimeout(()=>showEventToast('Tip — Dark roster empty','Enter cap #s in the roster builder','#e8c84a'),2200);
   if(finalWhiteId && !wh) setTimeout(()=>showEventToast('Tip — White roster empty','Enter cap #s in the roster builder','#e8c84a'),2200);
 
+  document.getElementById('modal-overlay').style.display='none';
   // Refresh the Setup tab builder so the user can see what was saved,
   // then update the Game tab with the new roster.
   renderSetupUI();
