@@ -1822,11 +1822,22 @@ function capSVG(num, isDark) {
 function renderCapPicker(roster,isDk,title,field,optional){
   const caps=roster&&roster.length?roster:Array.from({length:13},(_,i)=>({cap:String(i+1),name:'',playerId:null}));
   const gridId='cap-grid-'+field;
+  // More players -> more columns (smaller caps) so a full roster fits with less scrolling.
+  const n=caps.length;
+  const cols = n<=6?3 : n<=9?4 : n<=13?5 : 6;
+  const skipOnclick = optional
+    ? `nextStep('${field}',null,null,null)`
+    : `nextStep('${field}','?','Unknown',null)`;
+  // Search + Unknown share the top row so Unknown is reachable without scrolling
+  // past a long roster — common when e.g. "drawn by" isn't known.
   let html=`<p style="color:#7a9bb8;font-size:13px;margin-bottom:7px;">${title}</p>
-  <input id="cap-search-${field}" type="search" placeholder="Search # or name…" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
-    style="width:100%;box-sizing:border-box;margin-bottom:9px;padding:8px 10px;font-size:14px;border-radius:8px;border:1px solid #1e3a5a;background:#0a1820;color:#c0d8f0;"
-    oninput="filterCaps('${field}')">
-  <div id="${gridId}" class="cap-grid">`;
+  <div style="display:flex;gap:8px;margin-bottom:9px;">
+    <input id="cap-search-${field}" type="search" placeholder="Search #/name…" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
+      style="flex:1;min-width:0;box-sizing:border-box;padding:8px 10px;font-size:14px;border-radius:8px;border:1px solid #1e3a5a;background:#0a1820;color:#c0d8f0;"
+      oninput="filterCaps('${field}')">
+    <button class="btn-s" style="flex:0 0 auto;padding:8px 14px;white-space:nowrap;" onclick="${skipOnclick}">Unknown</button>
+  </div>
+  <div id="${gridId}" class="cap-grid" style="grid-template-columns:repeat(${cols},1fr);">`;
   caps.forEach(p=>{
     const pid=p.playerId?`'${p.playerId}'`:'null';
     const safeName=(p.name||'#'+p.cap).replace(/'/g,"\\'");
@@ -1834,11 +1845,6 @@ function renderCapPicker(roster,isDk,title,field,optional){
     html+=`<button class="cap-btn ${isDk?'dk':'wh'}" data-search="${searchVal}" title="${p.name||'#'+p.cap}" onclick="nextStep('${field}','${p.cap}','${safeName}',${pid})">${capSVG(p.cap,isDk)}</button>`;
   });
   html+=`</div>`;
-  if(optional){
-    html+=`<button class="btn-s" style="width:100%;margin-top:4px;" onclick="nextStep('${field}',null,null,null)">Skip / Unknown</button>`;
-  } else {
-    html+=`<button class="btn-s" style="width:100%;margin-top:4px;" onclick="nextStep('${field}','?','Unknown',null)">Skip / Unknown</button>`;
-  }
   document.getElementById('modal-body').innerHTML=html;
   // Auto-focus search on non-touch devices
   const inp=document.getElementById('cap-search-'+field);
