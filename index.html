@@ -1841,7 +1841,8 @@ function capSVG(num, isDark) {
 }
 
 function renderCapPicker(roster,isDk,title,field,optional){
-  const caps=roster&&roster.length?roster:Array.from({length:13},(_,i)=>({cap:String(i+1),name:'',playerId:null}));
+  const caps=(roster&&roster.length?roster:Array.from({length:13},(_,i)=>({cap:String(i+1),name:'',playerId:null})))
+    .slice().sort((a,b)=>(Number(a.cap)||0)-(Number(b.cap)||0));
   const gridId='cap-grid-'+field;
   // More players -> more columns (smaller caps) so a full roster fits with less scrolling.
   const n=caps.length;
