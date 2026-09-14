@@ -647,7 +647,62 @@ const DEFAULT_SHEET_URL  = 'https://script.google.com/macros/s/AKfycbykAOLhV7Jq_
 //  UTILITIES
 // ═══════════════════════════════════════════════════════════
 const ls = (k,d)=>{ try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;} };
-const ss = (k,v)=>{ try{localStorage.setItem(k,JSON.stringify(v));}catch{}; };
+// Silently failing here (e.g. storage quota exceeded) used to mean a save
+// looked successful but never actually persisted — surfaced only much later
+// as an empty roster after a reload with no clue why. Surface it once instead.
+let _storageWarnShown = false;
+const ss = (k,v)=>{
+  try{
+    localStorage.setItem(k,JSON.stringify(v));
+  }catch(e){
+    console.error('[wp] localStorage save failed for key "'+k+'" — changes may not persist after reload.', e);
+    if(!_storageWarnShown){
+      _storageWarnShown = true;
+      if(typeof showEventToast==='function'){
+        try{ showEventToast('⚠️ Local save failed', 'Device storage may be full — recent changes may not survive a reload', '#ef4444'); }catch(_){}
+      }
+    }
+  }
+};
+
+// Builds a team's roster from Roster-tab player data (each player's default
+// cap). Shared by the New Game wizard and by healGameRoster() below.
+function buildTeamRoster(teamId){
+  if(!teamId) return [];
+  return state.players
+    .filter(p=>(p.teamIds||[]).map(String).includes(String(teamId))&&p.defaultCap)
+    .filter(p=>!((p.first||'').toLowerCase().includes('placeholder')||(p.last||'').toLowerCase().includes('placeholder')))
+    .sort((a,b)=>Number(a.defaultCap)-Number(b.defaultCap))
+    .map(p=>({ playerId:p.id, cap:p.defaultCap, name:(p.first||'')+' '+(p.last||'').trim() }));
+}
+
+// Self-heals a game's roster when the cached snapshot comes back empty but
+// the team is still known (e.g. a prior localStorage write silently failed —
+// see ss() above). Rebuilding from each player's default cap isn't a perfect
+// substitute for any per-game cap overrides made in Setup, but it's a real
+// roster with real names instead of the anonymous 1-13 fallback.
+function healGameRoster(){
+  const g=state.game;
+  if(!g) return;
+  let healed=false;
+  if(g.darkTeamId && (!g.darkRoster || !g.darkRoster.length)){
+    const rebuilt=buildTeamRoster(g.darkTeamId);
+    if(rebuilt.length){ g.darkRoster=rebuilt; healed=true; }
+  }
+  if(g.whiteTeamId && (!g.whiteRoster || !g.whiteRoster.length)){
+    const rebuilt=buildTeamRoster(g.whiteTeamId);
+    if(rebuilt.length){ g.whiteRoster=rebuilt; healed=true; }
+  }
+  if(healed){
+    console.warn('[wp] Rebuilt game roster from default caps — the cached roster snapshot was empty.');
+    ss('wp-game', g);
+    const idx=(state.savedGames||[]).findIndex(x=>x.gameId===g.gameId);
+    if(idx>=0){
+      state.savedGames[idx]={...state.savedGames[idx], darkRoster:g.darkRoster, whiteRoster:g.whiteRoster};
+      ss('wp-saved-games', state.savedGames);
+    }
+  }
+}
 
 function genId() {
   try { return crypto.randomUUID(); } catch(e) {}
@@ -2278,6 +2333,7 @@ function renderEventButtons(){
 }
 
 function renderGameUI(){
+  healGameRoster();
   const g=state.game;
   const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
   document.getElementById('dark-name-score').textContent=dN;
@@ -3585,14 +3641,7 @@ function _ngwCommitNewGame(){
   const g=state.game;
 
   // Build roster from players with defaultCap for each team
-  const buildRoster=teamId=>{
-    if(!teamId) return [];
-    return state.players
-      .filter(p=>(p.teamIds||[]).map(String).includes(String(teamId))&&p.defaultCap)
-      .filter(p=>!((p.first||'').toLowerCase().includes('placeholder')||(p.last||'').toLowerCase().includes('placeholder')))
-      .sort((a,b)=>Number(a.defaultCap)-Number(b.defaultCap))
-      .map(p=>({ playerId:p.id, cap:p.defaultCap, name:(p.first||'')+' '+(p.last||'').trim() }));
-  };
+  const buildRoster=buildTeamRoster;
 
   // Apply to game state
   const sheetUrl=g.sheetUrl||'';
