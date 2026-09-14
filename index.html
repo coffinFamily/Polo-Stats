@@ -5068,7 +5068,7 @@ function parseVoiceTranscript(text) {
     else if (has5m) eventType = 'goal-5m';
     else if (/\b(counter|fast.?break)\b/.test(t)) eventType = 'goal-counter';
     else eventType = 'goal-reg';
-  } else if (/\b(kickout|kick.?out|ejection|kicked.?out)\b/.test(t)) {
+  } else if (/\b(kickout|kick.?out|ejection|eject(ed)?|kicked.?out)\b/.test(t)) {
     eventType = 'ejection';
   } else if (/\b(miss(ed)?(\s+shot)?)\b/.test(t)) {
     // Must be checked before the 5m-penalty branch — "missed 5 meter shot"
@@ -5128,7 +5128,7 @@ function parseVoiceTranscript(text) {
     // Strip event/team phrases, then look for a number word ("six", "five", etc.)
     const numWords = 'one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen';
     const strippedForNum = tokenSource
-      .replace(/\b(counter|fast\s*break|kickout|kick\s*out|ejection|steal|steel|steele|goal|turnover|miss\w*|save|block|field\s*block|goalie\s*block|sprint|won|foul|penalty|dark|white|light|by|the|a|cap|number|pound|hashtag|offensive|defensive|effort|lost|ball|scored|on|against|shot|clock)\b/gi, ' ')
+      .replace(/\b(counter|fast\s*break|kickout|kick\s*out|ejection|eject(ed)?|steal|steel|steele|goal|turnover|miss\w*|save|block|field\s*block|goalie\s*block|sprint|won|foul|penalty|dark|white|light|by|the|a|cap|number|pound|hashtag|offensive|defensive|effort|lost|ball|scored|on|against|shot|clock)\b/gi, ' ')
       .replace(/\s+/g, ' ').trim();
     const numWordM = strippedForNum.match(new RegExp('\\b(' + numWords + ')\\b', 'i'));
     if (numWordM) {
@@ -5136,7 +5136,7 @@ function parseVoiceTranscript(text) {
       mainToken = numWordM[1];
     } else {
       // Fall back to name: strip all event/team noise, remainder is a player name
-      const nameNoise = /\b(goal|kickout|kick|out|ejection|foul|penalty|steal|steel|steele|turnover|miss(ed)?|shot|save|block|field|goalie|sprint|won|counter|fast\s*break|dark|white|light|a|the|by|cap|number|pound|hashtag|assist(ed)?|drawn|from|stolen|offensive|defensive|effort|lost|ball|scored|against|clock)\b/g;
+      const nameNoise = /\b(goal|kickout|kick|out|ejection|eject(ed)?|foul|penalty|steal|steel|steele|turnover|miss(ed)?|shot|save|block|field|goalie|sprint|won|counter|fast\s*break|dark|white|light|a|the|by|cap|number|pound|hashtag|assist(ed)?|drawn|from|stolen|offensive|defensive|effort|lost|ball|scored|against|clock)\b/g;
       mainToken = tokenSource.replace(nameNoise, ' ').replace(/\s+/g, ' ').trim() || null;
     }
   }
