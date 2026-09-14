@@ -825,6 +825,7 @@ function changeQ(d){
   state.q=Math.min(6,Math.max(1,state.q+d));
   document.getElementById('q-display').textContent=qName(state.q);
   ss('wp-q',state.q);
+  if(typeof renderEventButtons!=='undefined') renderEventButtons(); // Sprint Won button resets per-quarter
   // Quarter-end foul summary when advancing to a new quarter
   if(d > 0 && state.q > prevQ && typeof sendQuarterFoulSummary !== 'undefined'){
     const gameId = state.game && state.game.gameId;
@@ -1474,7 +1475,7 @@ function finalizeEvent(){
   state.events.push(row);
   ss('wp-events',state.events); syncGameEvents();
   autoPauseIfNeeded(row.type);
-  closeModal(); renderEventLog(); updateScores();
+  closeModal(); renderEventLog(); updateScores(); renderEventButtons();
   const isGoal=row.type.match(/^Goal \(/);
   showEventToast('✓ '+row.type,(row.team||'')+(row.cap?' · #'+row.cap:''),isGoal?'#22c55e':'#0a84c8');
   // Push to sheet after UI update so sheet errors never block the UI
@@ -2201,18 +2202,10 @@ function prefIcon(key){
   return '';
 }
 
-function renderGameUI(){
-  const g=state.game;
-  const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
-  document.getElementById('dark-name-score').textContent=dN;
-  document.getElementById('white-name-score').textContent=wN;
-  const _gl=document.getElementById('game-label'); if(_gl) _gl.textContent=dN+' vs '+wN;
-  document.getElementById('q-display').textContent=qName(state.q);
-  populateGameSelector();
-  updateTimerDisplay(); updateScores();
-  const _rb=document.getElementById('reset-timer-btn');
-  if(_rb) _rb.textContent='Reset '+(g.quarterMins||8)+'m';
-
+// Builds the main event-button grid. Split out from renderGameUI so it can be
+// refreshed on its own whenever the event log changes (Sprint Won needs to
+// disappear/reappear without redrawing everything else).
+function renderEventButtons(){
   const p=state.prefs||{}, dp=p.dark||{}, wp=p.white||{};
 
   // A single button now serves both teams (team is picked on the cap screen
@@ -2238,12 +2231,17 @@ function renderGameUI(){
     return check(dp) || check(wp);
   }
 
+  // Only one sprint per quarter (whoever wins it) — hide the button once
+  // it's been recorded for the current quarter, regardless of which team.
+  const sprintDoneThisQ = state.events.some(e=>e.type==='Sprint Won' && String(e.q)===String(state.q));
+
   // Buttons stretch to fill each row — rows with fewer buttons get wider buttons.
   function buildRow(types){
     const btnStyle = `flex:1;min-width:0;`;
     let btns='';
     types.forEach(t=>{
       if(!prefEnabled(t)) return;
+      if(t==='sprint-won' && sprintDoneThisQ) return;
       const ico = evtIcon(t);
       const icoLg = ico ? `<span class="evt-icon-lg">${ico}</span>` : '';
       const label = EVENT_DEFS[t].btnLabel||EVENT_DEFS[t].label;
@@ -2263,6 +2261,21 @@ function renderGameUI(){
   ];
 
   document.getElementById('event-btns').innerHTML = ROWS.map(buildRow).join('');
+}
+
+function renderGameUI(){
+  const g=state.game;
+  const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
+  document.getElementById('dark-name-score').textContent=dN;
+  document.getElementById('white-name-score').textContent=wN;
+  const _gl=document.getElementById('game-label'); if(_gl) _gl.textContent=dN+' vs '+wN;
+  document.getElementById('q-display').textContent=qName(state.q);
+  populateGameSelector();
+  updateTimerDisplay(); updateScores();
+  const _rb=document.getElementById('reset-timer-btn');
+  if(_rb) _rb.textContent='Reset '+(g.quarterMins||8)+'m';
+
+  renderEventButtons();
   renderEventLog();
 
   // Show the "Start New Game" hero when no game has been configured yet
@@ -2385,7 +2398,7 @@ function renderEventLog(){
 function deleteEvent(id){
   state.events=state.events.filter(e=>e.id!==id);
   ss('wp-events',state.events); syncGameEvents();
-  renderEventLog(); updateScores();
+  renderEventLog(); updateScores(); renderEventButtons();
   pushToSheet({action:'delete-event',groupId:id});
 }
 
@@ -2537,14 +2550,14 @@ function saveEditedEvent(){
     drawnBy:drawnEl?(drawnEl.value.trim()?'#'+drawnEl.value.trim():''):ev.drawnBy,
   };
   ss('wp-events',state.events); syncGameEvents();
-  closeModal(); renderEventLog(); updateScores();
+  closeModal(); renderEventLog(); updateScores(); renderEventButtons();
   const gameId=g.gameId||'', date=g.date||'';
   pushToSheet({action:'update-event',groupId:id,rows:eventToRows({...state.events[idx],gameId,date})});
 }
 
 function clearEvents(){
   if(!confirm('Clear all events?')) return;
-  state.events=[]; ss('wp-events',[]); renderEventLog(); updateScores();
+  state.events=[]; ss('wp-events',[]); renderEventLog(); updateScores(); renderEventButtons();
 }
 
 // ─── Undo last event ──────────────────────────────────────────
@@ -2553,7 +2566,7 @@ function undoLastEvent(){
   const last=state.events[state.events.length-1];
   state.events.pop();
   ss('wp-events',state.events); syncGameEvents();
-  renderEventLog(); updateScores();
+  renderEventLog(); updateScores(); renderEventButtons();
   pushToSheet({action:'delete-event',groupId:last.id});
   showEventToast('↩ Undone', last.type+(last.cap?' · #'+last.cap:''), '#e8c84a');
 }
