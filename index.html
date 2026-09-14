@@ -43,6 +43,10 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:1000;}
 .modal{background:#111d2c;border-radius:14px;padding:16px;max-width:520px;width:98%;max-height:98vh;overflow-y:auto;border:1px solid #1e3a5a;}
 .modal h3{font-size:16px;font-weight:600;margin-bottom:10px;}
+/* Cap-picker screens only (team/subtype/cap grid) claim more vertical room so
+   the caps themselves can render bigger; other popups keep their natural size. */
+.modal.modal-tall{min-height:78vh;display:flex;flex-direction:column;}
+.modal.modal-tall #modal-body{flex:1;display:flex;flex-direction:column;}
 .cap-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;}
 .cap-btn{display:block;border:none;padding:2px;background:transparent;cursor:pointer;width:100%;border-radius:6px;-webkit-tap-highlight-color:transparent;transition:transform 0.12s,filter 0.12s;}
 .cap-btn:hover{transform:scale(1.1);}
@@ -290,7 +294,7 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
   <div id="setup-midgame-notice" style="display:none;background:#0a2030;border:1px solid #1a5a40;border-radius:8px;padding:9px 14px;margin-bottom:8px;font-size:12px;color:#5bc8a0;line-height:1.5;">
     🔄 <strong>Game in progress</strong> — Save will update the active roster without affecting recorded events. Add or correct cap numbers above, then save.
   </div>
-  <button class="btn-p" style="width:100%;padding:12px;font-size:15px;" onclick="saveGame()">Save game setup →</button>
+  <button id="save-game-btn" class="btn-p" style="width:100%;padding:12px;font-size:15px;" onclick="saveGame()">Save game setup →</button>
 </div>
 
 <!-- ═══ ROSTER TAB ═════════════════════════════════════════════════════ -->
@@ -1657,9 +1661,15 @@ function eventToRows(ev){
 // ═══════════════════════════════════════════════════════════
 //  MODAL RENDERING
 // ═══════════════════════════════════════════════════════════
+const CAP_PICKER_STEPS=new Set(['cap','drawn','5m-shooter','turnover','stolen-by','assist','goalie-cap','shooter-cap']);
 function showModalStep(step){
   document.getElementById('modal-title').textContent=state.flowCtx.eventLabel;
   const body=document.getElementById('modal-body');
+  // Only cap-picker screens (team/subtype/cap grid, and any cap-style step
+  // later in the same flow) get the taller modal — zone/gm pickers, team-pick,
+  // and goalie-team keep their normal compact size.
+  const modalEl=body.closest('.modal');
+  if(modalEl) modalEl.classList.toggle('modal-tall', CAP_PICKER_STEPS.has(step));
   const g=state.game;
   const dN=g.darkTeam||'Dark', wN=g.whiteTeam||'White';
   const isDk=state.flowCtx.team==='dark';
@@ -1850,8 +1860,10 @@ function renderCapPicker(roster,isDk,title,field,optional){
     .slice().sort((a,b)=>(Number(a.cap)||0)-(Number(b.cap)||0));
   const gridId='cap-grid-'+field;
   // More players -> more columns (smaller caps) so a full roster fits with less scrolling.
+  // The modal now claims extra vertical room on this screen (see .modal-tall), so
+  // fewer columns are needed per bucket than before — caps render correspondingly bigger.
   const n=caps.length;
-  const cols = n<=6?3 : n<=9?4 : n<=13?5 : 6;
+  const cols = n<=6?3 : n<=9?3 : n<=13?4 : 5;
   const skipOnclick = optional
     ? `nextStep('${field}',null,null,null)`
     : `nextStep('${field}','?','Unknown',null)`;
@@ -1864,6 +1876,7 @@ function renderCapPicker(roster,isDk,title,field,optional){
       oninput="filterCaps('${field}')">
     <button class="btn-s" style="flex:0 0 auto;padding:8px 14px;white-space:nowrap;" onclick="${skipOnclick}">Unknown</button>
   </div>
+  <div style="flex:1 1 auto;display:flex;flex-direction:column;justify-content:center;min-height:0;">
   <div id="${gridId}" class="cap-grid" style="grid-template-columns:repeat(${cols},1fr);">`;
   caps.forEach(p=>{
     const pid=p.playerId?`'${p.playerId}'`:'null';
@@ -1871,7 +1884,7 @@ function renderCapPicker(roster,isDk,title,field,optional){
     const searchVal=(p.cap+' '+(p.name||'')).toLowerCase();
     html+=`<button class="cap-btn ${isDk?'dk':'wh'}" data-search="${searchVal}" title="${p.name||'#'+p.cap}" onclick="nextStep('${field}','${p.cap}','${safeName}',${pid})">${capSVG(p.cap,isDk)}</button>`;
   });
-  html+=`</div>`;
+  html+=`</div></div>`;
   document.getElementById('modal-body').innerHTML=html;
   // Auto-focus search on non-touch devices
   const inp=document.getElementById('cap-search-'+field);
@@ -2048,6 +2061,7 @@ function renderGMPicker(){
 
 function closeModal(){
   document.getElementById('modal-overlay').style.display='none';
+  document.querySelector('.modal')?.classList.remove('modal-tall');
   state.flow=null;state.flowIdx=0;state.flowCtx={};state.pendingData={};
   state.voiceCtxLabel=null;
 }
@@ -3337,7 +3351,7 @@ function ngwRender(){
   const nav=`<div style="display:flex;gap:8px;margin-top:18px;">
     ${w.stepIdx>0?`<button class="btn-s" style="flex:1;" onclick="ngwBack()">‹ Back</button>`:''}
     ${isLast
-      ?`<button class="btn-p" style="flex:2;padding:12px;font-size:15px;font-weight:700;" onclick="ngwSave()">✓ Save Game Setup</button>`
+      ?`<button id="ngw-save-btn" class="btn-p" style="flex:2;padding:12px;font-size:15px;font-weight:700;" onclick="ngwSave()">✓ Save Game Setup</button>`
       :`<button class="btn-p" style="flex:2;" onclick="ngwNext()">Next ›</button>`}
   </div>`;
 
@@ -3543,13 +3557,23 @@ function ngwResumeExisting(gameId){
 }
 
 async function ngwSave(){
-  const w=state._ngw;
-  // Best-effort refresh so a game created on another device shows up here
-  // even if this device has never seen it before. Never block on failure.
-  try { await refreshGameSelectorFromSheet(); } catch(e){}
-  const dup=findDuplicateActiveGame(w);
-  if(dup){ showNgwDuplicateWarning(dup); return; }
-  _ngwCommitNewGame();
+  if(_savingGame) return; // see saveGame() for why this guard exists
+  _savingGame = true;
+  const saveBtn=document.getElementById('ngw-save-btn');
+  const saveBtnLabel=saveBtn?saveBtn.textContent:null;
+  if(saveBtn){ saveBtn.disabled=true; saveBtn.textContent='Saving…'; }
+  try {
+    const w=state._ngw;
+    // Best-effort refresh so a game created on another device shows up here
+    // even if this device has never seen it before. Never block on failure.
+    try { await refreshGameSelectorFromSheet(); } catch(e){}
+    const dup=findDuplicateActiveGame(w);
+    if(dup){ showNgwDuplicateWarning(dup); return; }
+    _ngwCommitNewGame();
+  } finally {
+    _savingGame = false;
+    if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent=saveBtnLabel; }
+  }
 }
 
 function _ngwCommitNewGame(){
@@ -3638,7 +3662,22 @@ function _ngwCommitNewGame(){
   if(!wh&&!dk) setTimeout(()=>showEventToast('Tip: set Default # on players','so rosters load automatically','#e8c84a'),2200);
 }
 
+// Guards against a genuinely observed bug: saveGame/ngwSave are async (they
+// await a sheet fetch before deciding whether to mint a new gameId). A second
+// tap — a coach double-tapping because nothing visibly happened yet, or fixing
+// a cap number while the first save is still in flight — used to start a
+// second invocation before the first had set state.game.gameId, so both saw
+// "no game yet" and each created its own duplicate Games-tab row for the
+// same matchup. This flag makes a second concurrent call a no-op instead.
+let _savingGame = false;
+
 async function saveGame(){
+  if(_savingGame) return;
+  _savingGame = true;
+  const saveBtn=document.getElementById('save-game-btn');
+  const saveBtnLabel=saveBtn?saveBtn.textContent:null;
+  if(saveBtn){ saveBtn.disabled=true; saveBtn.textContent='Saving…'; }
+  try {
   const sheetUrl=document.getElementById('sheet-url-input').value.trim();
   const date=document.getElementById('game-date').value;
   const darkTeam=document.getElementById('dark-team-name').value.trim()||'Dark';
@@ -3722,6 +3761,10 @@ async function saveGame(){
     }
   }
   _saveGameCommit(params);
+  } finally {
+    _savingGame = false;
+    if(saveBtn){ saveBtn.disabled=false; saveBtn.textContent=saveBtnLabel; }
+  }
 }
 
 function _saveGameCommit(p){
