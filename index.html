@@ -1352,6 +1352,10 @@ function deletePlayerFromSheet(id){ rosterPost({action:'delete-player',id}); }
 function applyPrefFilters(flow, side, eventType){
   if(!side) return flow;
   const tp=(state.prefs||{})[side]||{};
+  // "Drawn by" always names a player on the OTHER team (whoever drew the foul),
+  // so that pref lives on the opposing side, not the fouling team's own prefs.
+  const oppSide=side==='dark'?'white':'dark';
+  const op=(state.prefs||{})[oppSide]||{};
   const isGoal  = eventType==='goal-reg'||eventType==='goal-65'||eventType==='goal-5m'||eventType==='goal-counter';
   const isMiss  = eventType==='miss';
   const isBlock = eventType==='goalie-block';
@@ -1360,8 +1364,8 @@ function applyPrefFilters(flow, side, eventType){
     if(s==='gm'   && isGoal)  return tp.goalGM    !== false;
     if(s==='zone' && isMiss)  return tp.missZone  !== false;
     if(s==='zone' && isBlock) return tp.blockZone !== false;
-    if(s==='drawn' && eventType==='ejection')     return tp.ejectionDrawn !== false;
-    if(s==='drawn' && eventType==='5m-penalty')   return tp.fiveMDrawn    !== false;
+    if(s==='drawn' && eventType==='ejection')     return op.ejectionDrawn !== false;
+    if(s==='drawn' && eventType==='5m-penalty')   return op.fiveMDrawn    !== false;
     if(s==='assist' && isGoal)                    return tp.assist        !== false;
     return true;
   });
