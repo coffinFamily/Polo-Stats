@@ -3847,6 +3847,16 @@ function _saveGameCommit(p){
   };
   ss('wp-game',state.game);
 
+  // A cap set for this specific game becomes that player's new default —
+  // so if this roster snapshot is ever lost (see healGameRoster()), rebuilding
+  // from defaults reflects the cap they were actually wearing last, not
+  // whatever was set once at the start of the season.
+  [...state.game.darkRoster, ...state.game.whiteRoster].forEach(r=>{
+    if(!r.playerId||!r.cap) return;
+    const pl=state.players.find(x=>String(x.id)===String(r.playerId));
+    if(pl && pl.defaultCap!==r.cap) setDefaultCap(pl.id, r.cap);
+  });
+
   // Keep savedGames entry in sync
   const _sgIdx=state.savedGames.findIndex(g=>g.gameId===existingGameId);
   const _sgEntry={...state.game,activeGoalie:state.activeGoalie};
