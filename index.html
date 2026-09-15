@@ -34,11 +34,19 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
 .evt-btn{padding:16px 6px;font-weight:700;font-size:13px;text-align:center;line-height:1.25;cursor:pointer;transition:background 0.15s;-webkit-tap-highlight-color:transparent;}
 .evt-btn:active{transform:scale(0.96);}
 
-/* Offense — warm amber, soft rounded corners */
-.evt-group-offense{background:#241705;border-color:#5a3d10;}
-.evt-group-offense .evt-group-title{color:#f0c040;}
-.evt-btn.evt-offense{border-radius:14px;background:#3a2a10;border:1.5px solid #6a4a18;color:#f5dca0;}
-.evt-btn.evt-offense:hover{background:#4a3616;}
+/* Sprint Won — large standalone button above the groups; it's always the
+   first thing that happens in a quarter, so it gets its own spot rather than
+   living inside any one theme. */
+.evt-sprint{display:block;width:100%;box-sizing:border-box;padding:18px 10px;margin-bottom:12px;border-radius:12px;font-weight:800;font-size:16px;text-align:center;cursor:pointer;background:#123a1c;border:2px solid #2a7a44;color:#8ee6a8;-webkit-tap-highlight-color:transparent;}
+.evt-sprint:hover{background:#184c26;}
+.evt-sprint:active{transform:scale(0.98);}
+
+/* Offense — light tan section so the dark-brown buttons stand out against it,
+   soft rounded corners */
+.evt-group-offense{background:#c9a876;border-color:#8a6a3a;}
+.evt-group-offense .evt-group-title{color:#3a2405;}
+.evt-btn.evt-offense{border-radius:14px;background:#241705;border:1.5px solid #5a3d10;color:#f5dca0;}
+.evt-btn.evt-offense:hover{background:#33230a;}
 
 /* Turnover — muted orange-red, medium rounding (between offense and defense) */
 .evt-group-turnover{background:#26140a;border-color:#5a2f10;border-radius:10px;}
@@ -2316,9 +2324,11 @@ function prefIcon(key){
 //
 // Buttons are grouped into three themed sections — Offense / Turnover /
 // Defense — each with its own corner shape and color so the grouping reads
-// at a glance, not just from position on the page.
+// at a glance, not just from position on the page. Sprint Won sits above all
+// three as its own large button, since it's always the first thing that
+// happens in a quarter — and disappears once recorded until the next one.
 const EVENT_GROUPS = [
-  { title:'Offense',  cls:'offense',  types:['goal-reg','miss','offensive','offensive-hustle','gp-2m','new-shot-clock'] },
+  { title:'Offense',  cls:'offense',  types:['new-shot-clock','offensive-hustle','gp-2m','offensive','miss','goal-reg'] },
   { title:'Turnover', cls:'turnover', types:['turnover','lost-ball','bad-pass','ball-under'] },
   { title:'Defense',  cls:'defense',  types:['steal','ejection','5m-penalty','field-block','goalie-block','def-effort','shot-clock','scored-on'] },
 ];
@@ -2370,7 +2380,19 @@ function renderEventButtons(){
     </div>`;
   }
 
-  document.getElementById('event-btns').innerHTML = EVENT_GROUPS.map(buildGroup).join('');
+  // Sprint Won — only one per quarter, so hide it once recorded (by either
+  // team) until the quarter advances.
+  let sprintHTML = '';
+  if(prefEnabled('sprint-won')){
+    const sprintDoneThisQ = state.events.some(e=>e.type==='Sprint Won' && String(e.q)===String(state.q));
+    if(!sprintDoneThisQ){
+      const ico = evtIcon('sprint-won');
+      const icoLg = ico ? `<span class="evt-icon-lg">${ico}</span>` : '';
+      sprintHTML = `<button class="evt-btn evt-sprint" onclick="startFlow('sprint-won')">${icoLg}${EVENT_DEFS['sprint-won'].label}</button>`;
+    }
+  }
+
+  document.getElementById('event-btns').innerHTML = sprintHTML + EVENT_GROUPS.map(buildGroup).join('');
 }
 
 function renderGameUI(){
