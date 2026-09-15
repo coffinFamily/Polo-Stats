@@ -51,6 +51,9 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
 /* Turnover — muted orange-red, medium rounding (between offense and defense) */
 .evt-group-turnover{background:#26140a;border-color:#5a2f10;border-radius:10px;}
 .evt-group-turnover .evt-group-title{color:#e0813a;}
+/* auto-fit (not auto-fill) so its 4 buttons stretch to fill the row instead
+   of leaving empty leftover space to the right */
+.evt-group-turnover .evt-group-grid{grid-template-columns:repeat(auto-fit,minmax(98px,1fr));}
 .evt-btn.evt-turnover{border-radius:8px;background:#3a2010;border:1.5px solid #6a3a18;color:#f0c8a0;}
 .evt-btn.evt-turnover:hover{background:#4a2a16;}
 
