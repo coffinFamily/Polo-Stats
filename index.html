@@ -24,14 +24,33 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
 .btn-d{padding:6px 12px;border-radius:6px;background:#8b1a1a;color:#ffaaaa;}
 .btn-d:hover{background:#a02020;}
 .btn-round{border-radius:50%;width:32px;height:32px;padding:0;font-size:16px;background:#1e3a5a;color:#b0c8e0;border:1px solid #2a4a6a;}
-.evt-dk{padding:10px 6px;border-radius:8px;font-weight:600;font-size:12px;text-align:center;line-height:1.3;background:#0e1d56;color:#ffffff;border:1px solid #4060b0;}
-.evt-dk:hover{background:#162878;}
-.evt-wh{padding:10px 6px;border-radius:8px;font-weight:600;font-size:12px;text-align:center;line-height:1.3;background:#dde8f0;color:#1a2a3a;border:1px solid #aac0d0;}
-.evt-wh:hover{background:#c8d8e8;}
-.evt-nt{padding:18px 8px;border-radius:11px;font-weight:700;font-size:15px;text-align:center;line-height:1.3;background:#123252;color:#dceaf8;border:1.5px solid #2c5a82;}
-.evt-nt:hover{background:#173e64;}
-.evt-nt:active{transform:scale(0.97);}
 .evt-icon-lg{display:inline-block;transform:scale(1.6);margin-right:2px;vertical-align:middle;}
+
+/* Event button groups — Offense / Turnover / Defense get their own shape and
+   color theme so the grouping reads at a glance, not just from position. */
+.evt-group{border-radius:16px;padding:10px 10px 9px;margin-bottom:10px;border:1.5px solid;}
+.evt-group-title{font-size:10px;font-weight:800;letter-spacing:0.09em;margin-bottom:8px;text-transform:uppercase;}
+.evt-group-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(98px,1fr));gap:8px;}
+.evt-btn{padding:16px 6px;font-weight:700;font-size:13px;text-align:center;line-height:1.25;cursor:pointer;transition:background 0.15s;-webkit-tap-highlight-color:transparent;}
+.evt-btn:active{transform:scale(0.96);}
+
+/* Offense — warm amber, soft rounded corners */
+.evt-group-offense{background:#241705;border-color:#5a3d10;}
+.evt-group-offense .evt-group-title{color:#f0c040;}
+.evt-btn.evt-offense{border-radius:14px;background:#3a2a10;border:1.5px solid #6a4a18;color:#f5dca0;}
+.evt-btn.evt-offense:hover{background:#4a3616;}
+
+/* Turnover — muted orange-red, medium rounding (between offense and defense) */
+.evt-group-turnover{background:#26140a;border-color:#5a2f10;border-radius:10px;}
+.evt-group-turnover .evt-group-title{color:#e0813a;}
+.evt-btn.evt-turnover{border-radius:8px;background:#3a2010;border:1.5px solid #6a3a18;color:#f0c8a0;}
+.evt-btn.evt-turnover:hover{background:#4a2a16;}
+
+/* Defense — cool steel blue, hard/sharp corners */
+.evt-group-defense{background:#08202c;border-color:#123c50;border-radius:6px;}
+.evt-group-defense .evt-group-title{color:#4ab8e0;}
+.evt-btn.evt-defense{border-radius:3px;background:#0e2c3a;border:1.5px solid #1a5070;color:#b8e0f0;}
+.evt-btn.evt-defense:hover{background:#153a4a;}
 .timer{font-size:52px;font-weight:300;font-variant-numeric:tabular-nums;letter-spacing:3px;}
 .timer.run{color:#22c55e;}
 .timer.low{color:#ef4444;}
@@ -755,7 +774,7 @@ if(DEFAULT_SHEET_URL)  { state.game.sheetUrl=DEFAULT_SHEET_URL;   ss('wp-sheet-u
 
 // Ensure prefs exist with full defaults
 {
-  const defTeam = () => ({goals:true,miss:true,assist:true,ejection:true,ejectionDrawn:true,fiveM:true,fiveMDrawn:true,steal:true,turnover:true,goalieBlock:true,fieldBlock:true,sprintWon:true,goalZone:true,goalGM:true,missZone:true,blockZone:true,offensive:true,defEffort:true,lostBall:true,scoredOn:true,shotClock:true});
+  const defTeam = () => ({goals:true,miss:true,assist:true,ejection:true,ejectionDrawn:true,fiveM:true,fiveMDrawn:true,steal:true,turnover:true,goalieBlock:true,fieldBlock:true,sprintWon:true,goalZone:true,goalGM:true,missZone:true,blockZone:true,offensive:true,offensiveHustle:true,gp2m:true,newShotClock:true,defEffort:true,lostBall:true,badPass:true,ballUnder:true,scoredOn:true,shotClock:true});
   if(!state.prefs) state.prefs = {};
   if(!state.prefs.dark)  state.prefs.dark  = defTeam();
   if(!state.prefs.white) state.prefs.white = defTeam();
@@ -796,8 +815,13 @@ const EVENT_DEFS = {
   'field-block':    {label:'Field Block',       flow:['cap']},
   'sprint-won':     {label:'Sprint Won',        flow:['cap']},
   'offensive':      {label:'Offensive',         flow:['cap']},
-  'def-effort':     {label:'Defensive Effort',  flow:['cap']},
+  'offensive-hustle':{label:'Offensive Hustle', flow:['cap']},
+  'gp-2m':          {label:'GP into 2m',        flow:['cap']},
+  'new-shot-clock': {label:'New Shot Clock',    flow:['cap']},
+  'def-effort':     {label:'Defensive Hustle',  flow:['cap']},
   'lost-ball':      {label:'Lost Ball',         flow:['cap']},
+  'bad-pass':       {label:'Bad Pass',          flow:['cap']},
+  'ball-under':     {label:'Ball Under',        flow:['cap']},
   'scored-on':      {label:'Scored On',         flow:['cap']},
   'shot-clock':     {label:'Shot Clock',        flow:[]},
   'team-defense':   {label:'Team Defense',      flow:[]},
@@ -2147,11 +2171,16 @@ const PREF_CATS = [
   {key:'fieldBlock',     label:'Field Blocks',       emoji:'🛡️', section:'detail'},
   {key:'sprintWon',      label:'Sprint Won',         emoji:'🏃',  section:'detail'},
   // ── Effort & Discipline ─────────────────────────────────────
-  {key:'offensive', label:'Offensive Foul',   emoji:'⚠️',  section:'effort'},
-  {key:'defEffort', label:'Defensive Effort', emoji:'🛡️', section:'effort'},
-  {key:'lostBall',  label:'Lost Ball',        emoji:'💧',  section:'effort'},
-  {key:'scoredOn',  label:'Scored On',        emoji:'🥅',  section:'effort'},
-  {key:'shotClock', label:'Shot Clock',       emoji:'⏱️', section:'effort'},
+  {key:'offensive',      label:'Offensive Foul',   emoji:'⚠️',  section:'effort'},
+  {key:'offensiveHustle',label:'Offensive Hustle', emoji:'🔥',  section:'effort'},
+  {key:'gp2m',           label:'GP into 2m',       emoji:'➡️',  section:'effort'},
+  {key:'newShotClock',   label:'New Shot Clock',   emoji:'⏳',  section:'effort'},
+  {key:'defEffort',      label:'Defensive Hustle', emoji:'🛡️', section:'effort'},
+  {key:'lostBall',       label:'Lost Ball',        emoji:'💧',  section:'effort'},
+  {key:'badPass',        label:'Bad Pass',         emoji:'❌',  section:'effort'},
+  {key:'ballUnder',      label:'Ball Under',       emoji:'🌊',  section:'effort'},
+  {key:'scoredOn',       label:'Scored On',        emoji:'🥅',  section:'effort'},
+  {key:'shotClock',      label:'Shot Clock',       emoji:'⏱️', section:'effort'},
 ];
 
 function renderPrefsTab(){
@@ -2238,8 +2267,13 @@ function evtIcon(type){
   if(type==='sprint-won')                                    return `<svg width="11" height="13" viewBox="0 0 11 14" style="vertical-align:middle;margin-right:3px;flex-shrink:0;display:inline-block;"><polygon points="7,0 2,7 5.5,7 4,14 9,7 5.5,7 7,0" fill="#22c55e" stroke="#16a34a" stroke-width="0.5" stroke-linejoin="round"/></svg>`;
   if(type==='field-block'||type==='goalie-block')            return '😄 ';
   if(type==='offensive')                                     return '⚠️ ';
+  if(type==='offensive-hustle')                              return '🔥 ';
+  if(type==='gp-2m')                                         return '➡️ ';
+  if(type==='new-shot-clock')                                return '⏳ ';
   if(type==='def-effort')                                    return '🛡 ';
   if(type==='lost-ball')                                     return '💧 ';
+  if(type==='bad-pass')                                      return '❌ ';
+  if(type==='ball-under')                                    return '🌊 ';
   if(type==='scored-on')                                     return '🥅 ';
   if(type==='shot-clock')                                    return '⏱ ';
   if(type==='team-defense')                                  return '🛡 ';
@@ -2264,8 +2298,13 @@ function prefIcon(key){
   if(key==='missZone')      return '📍 ';
   if(key==='blockZone')     return '🗺️ ';
   if(key==='offensive')     return '⚠️ ';
+  if(key==='offensiveHustle') return '🔥 ';
+  if(key==='gp2m')          return '➡️ ';
+  if(key==='newShotClock')  return '⏳ ';
   if(key==='defEffort')     return '🛡️ ';
   if(key==='lostBall')      return '💧 ';
+  if(key==='badPass')       return '❌ ';
+  if(key==='ballUnder')     return '🌊 ';
   if(key==='scoredOn')      return '🥅 ';
   if(key==='shotClock')     return '⏱️ ';
   return '';
@@ -2274,6 +2313,16 @@ function prefIcon(key){
 // Builds the main event-button grid. Split out from renderGameUI so it can be
 // refreshed on its own whenever the event log changes (Sprint Won needs to
 // disappear/reappear without redrawing everything else).
+//
+// Buttons are grouped into three themed sections — Offense / Turnover /
+// Defense — each with its own corner shape and color so the grouping reads
+// at a glance, not just from position on the page.
+const EVENT_GROUPS = [
+  { title:'Offense',  cls:'offense',  types:['goal-reg','miss','offensive','offensive-hustle','gp-2m','new-shot-clock'] },
+  { title:'Turnover', cls:'turnover', types:['turnover','lost-ball','bad-pass','ball-under'] },
+  { title:'Defense',  cls:'defense',  types:['steal','ejection','5m-penalty','field-block','goalie-block','def-effort','shot-clock','scored-on'] },
+];
+
 function renderEventButtons(){
   const p=state.prefs||{}, dp=p.dark||{}, wp=p.white||{};
 
@@ -2291,8 +2340,13 @@ function renderEventButtons(){
       if(type==='field-block')                 return prefs.fieldBlock     !== false;
       if(type==='sprint-won')                  return prefs.sprintWon      !== false;
       if(type==='offensive')                   return prefs.offensive      !== false;
+      if(type==='offensive-hustle')            return prefs.offensiveHustle!== false;
+      if(type==='gp-2m')                       return prefs.gp2m           !== false;
+      if(type==='new-shot-clock')               return prefs.newShotClock   !== false;
       if(type==='def-effort')                  return prefs.defEffort      !== false;
       if(type==='lost-ball')                   return prefs.lostBall       !== false;
+      if(type==='bad-pass')                    return prefs.badPass        !== false;
+      if(type==='ball-under')                  return prefs.ballUnder      !== false;
       if(type==='scored-on')                   return prefs.scoredOn       !== false;
       if(type==='shot-clock')                  return prefs.shotClock      !== false;
       return true;
@@ -2300,36 +2354,23 @@ function renderEventButtons(){
     return check(dp) || check(wp);
   }
 
-  // Only one sprint per quarter (whoever wins it) — hide the button once
-  // it's been recorded for the current quarter, regardless of which team.
-  const sprintDoneThisQ = state.events.some(e=>e.type==='Sprint Won' && String(e.q)===String(state.q));
-
-  // Buttons stretch to fill each row — rows with fewer buttons get wider buttons.
-  function buildRow(types){
-    const btnStyle = `flex:1;min-width:0;`;
+  function buildGroup(grp){
     let btns='';
-    types.forEach(t=>{
+    grp.types.forEach(t=>{
       if(!prefEnabled(t)) return;
-      if(t==='sprint-won' && sprintDoneThisQ) return;
       const ico = evtIcon(t);
       const icoLg = ico ? `<span class="evt-icon-lg">${ico}</span>` : '';
       const label = EVENT_DEFS[t].btnLabel||EVENT_DEFS[t].label;
-      btns+=`<button class="evt-nt" style="${btnStyle}" onclick="startFlow('${t}')">${icoLg}${label}</button>`;
+      btns+=`<button class="evt-btn evt-${grp.cls}" onclick="startFlow('${t}')">${icoLg}${label}</button>`;
     });
     if(!btns) return '';
-    return `<div style="display:flex;gap:8px;margin-bottom:8px;">${btns}</div>`;
+    return `<div class="evt-group evt-group-${grp.cls}">
+      <div class="evt-group-title">${grp.title}</div>
+      <div class="evt-group-grid">${btns}</div>
+    </div>`;
   }
 
-  // Row layout — one grid for both teams; team is chosen on the cap screen.
-  const ROWS = [
-    ['goal-reg'],
-    ['miss','steal','turnover'],
-    ['ejection','5m-penalty'],
-    ['field-block','goalie-block','sprint-won'],
-    ['offensive','def-effort','lost-ball','shot-clock','scored-on'],
-  ];
-
-  document.getElementById('event-btns').innerHTML = ROWS.map(buildRow).join('');
+  document.getElementById('event-btns').innerHTML = EVENT_GROUPS.map(buildGroup).join('');
 }
 
 function renderGameUI(){
@@ -3370,7 +3411,7 @@ function toggleRbRow(side,pid){
 const NGW_STEPS=['date','quarter-length','white-team','white-name','white-prefs','white-gk','dark-team','dark-name','dark-prefs','dark-gk'];
 const NGW_LABELS={'date':'Game date','quarter-length':'Quarter length','white-team':'White caps — select team','white-name':'White caps — display name','white-prefs':'White caps — stats to capture','white-gk':'White caps — goalkeeper','dark-team':'Dark caps — select team','dark-name':'Dark caps — display name','dark-prefs':'Dark caps — stats to capture','dark-gk':'Dark caps — goalkeeper'};
 
-function _defPrefs(){ return {goals:true,miss:true,assist:true,ejection:true,ejectionDrawn:true,fiveM:true,fiveMDrawn:true,steal:true,turnover:true,goalieBlock:true,fieldBlock:true,sprintWon:true,goalZone:true,goalGM:true,missZone:true,blockZone:true,offensive:true,defEffort:true,lostBall:true,scoredOn:true,shotClock:true}; }
+function _defPrefs(){ return {goals:true,miss:true,assist:true,ejection:true,ejectionDrawn:true,fiveM:true,fiveMDrawn:true,steal:true,turnover:true,goalieBlock:true,fieldBlock:true,sprintWon:true,goalZone:true,goalGM:true,missZone:true,blockZone:true,offensive:true,offensiveHustle:true,gp2m:true,newShotClock:true,defEffort:true,lostBall:true,badPass:true,ballUnder:true,scoredOn:true,shotClock:true}; }
 
 function startNewGameWizard(){
   const g=state.game;
