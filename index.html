@@ -785,7 +785,7 @@ if(DEFAULT_SHEET_URL)  { state.game.sheetUrl=DEFAULT_SHEET_URL;   ss('wp-sheet-u
 
 // Ensure prefs exist with full defaults
 {
-  const defTeam = () => ({goals:true,miss:true,assist:true,ejection:true,ejectionDrawn:true,fiveM:true,fiveMDrawn:true,steal:true,turnover:true,goalieBlock:true,fieldBlock:true,sprintWon:true,goalZone:true,goalGM:true,missZone:true,blockZone:true,offensive:true,offensiveHustle:true,gp2m:true,newShotClock:true,defEffort:true,lostBall:true,badPass:true,ballUnder:true,scoredOn:true,shotClock:true});
+  const defTeam = () => ({goals:true,miss:true,assist:true,ejection:true,ejectionDrawn:true,fiveM:true,fiveMDrawn:true,steal:true,turnover:true,goalieBlock:true,fieldBlock:true,sprintWon:true,goalZone:true,goalGM:true,missZone:true,blockZone:true,offensive:true,offensiveHustle:true,gp2m:true,newShotClock:true,defEffort:true,lostBall:true,badPass:true,ballUnder:true,ballUnderDrawn:true,scoredOn:true,shotClock:true});
   if(!state.prefs) state.prefs = {};
   if(!state.prefs.dark)  state.prefs.dark  = defTeam();
   if(!state.prefs.white) state.prefs.white = defTeam();
@@ -832,7 +832,7 @@ const EVENT_DEFS = {
   'def-effort':     {label:'Defensive Hustle',  flow:['cap']},
   'lost-ball':      {label:'Lost Ball',         flow:['cap']},
   'bad-pass':       {label:'Bad Pass',          flow:['cap']},
-  'ball-under':     {label:'Ball Under',        flow:['cap']},
+  'ball-under':     {label:'Ball Under',        flow:['cap','drawn']},
   'scored-on':      {label:'Scored On',         flow:['cap']},
   'shot-clock':     {label:'Shot Clock',        flow:[]},
   'team-defense':   {label:'Team Defense',      flow:[]},
@@ -1461,6 +1461,7 @@ function applyPrefFilters(flow, side, eventType){
     if(s==='zone' && isBlock) return tp.blockZone !== false;
     if(s==='drawn' && eventType==='ejection')     return op.ejectionDrawn !== false;
     if(s==='drawn' && eventType==='5m-penalty')   return op.fiveMDrawn    !== false;
+    if(s==='drawn' && eventType==='ball-under')   return op.ballUnderDrawn!== false;
     if(s==='assist' && isGoal)                    return tp.assist        !== false;
     return true;
   });
@@ -1724,9 +1725,12 @@ function eventToRows(ev){
     rows.push({...base, event:'Assist', team:fullTeam, cap:ev.assist.replace('#',''), playerId:ev.assistPlayerId||'', zone:'', gm:''});
   }
 
-  // Ejection drawn / 5m drawn
+  // Ejection drawn / 5m drawn / ball under drawn
   if(ev.drawnBy){
-    const drawnType=ev.type.includes('Ejection')?'Ejection Drawn':'5M Drawn';
+    let drawnType;
+    if(ev.type.includes('Ejection')) drawnType='Ejection Drawn';
+    else if(ev.type==='Ball Under') drawnType='Ball Under Drawn';
+    else drawnType='5M Drawn';
     rows.push({...base, event:drawnType, team:fullOpp, cap:ev.drawnBy.replace('#',''), playerId:ev.drawnPlayerId||'', zone:'', gm:''});
   }
 
@@ -2190,6 +2194,7 @@ const PREF_CATS = [
   {key:'lostBall',       label:'Lost Ball',        emoji:'💧',  section:'effort'},
   {key:'badPass',        label:'Bad Pass',         emoji:'❌',  section:'effort'},
   {key:'ballUnder',      label:'Ball Under',       emoji:'🌊',  section:'effort'},
+  {key:'ballUnderDrawn', label:'Ball Under Drawn', emoji:'🎯',  section:'effort'},
   {key:'scoredOn',       label:'Scored On',        emoji:'🥅',  section:'effort'},
   {key:'shotClock',      label:'Shot Clock',       emoji:'⏱️', section:'effort'},
 ];
@@ -2316,6 +2321,7 @@ function prefIcon(key){
   if(key==='lostBall')      return '💧 ';
   if(key==='badPass')       return '❌ ';
   if(key==='ballUnder')     return '🌊 ';
+  if(key==='ballUnderDrawn')return '🎯 ';
   if(key==='scoredOn')      return '🥅 ';
   if(key==='shotClock')     return '⏱️ ';
   return '';
@@ -3436,7 +3442,7 @@ function toggleRbRow(side,pid){
 const NGW_STEPS=['date','quarter-length','white-team','white-name','white-prefs','white-gk','dark-team','dark-name','dark-prefs','dark-gk'];
 const NGW_LABELS={'date':'Game date','quarter-length':'Quarter length','white-team':'White caps — select team','white-name':'White caps — display name','white-prefs':'White caps — stats to capture','white-gk':'White caps — goalkeeper','dark-team':'Dark caps — select team','dark-name':'Dark caps — display name','dark-prefs':'Dark caps — stats to capture','dark-gk':'Dark caps — goalkeeper'};
 
-function _defPrefs(){ return {goals:true,miss:true,assist:true,ejection:true,ejectionDrawn:true,fiveM:true,fiveMDrawn:true,steal:true,turnover:true,goalieBlock:true,fieldBlock:true,sprintWon:true,goalZone:true,goalGM:true,missZone:true,blockZone:true,offensive:true,offensiveHustle:true,gp2m:true,newShotClock:true,defEffort:true,lostBall:true,badPass:true,ballUnder:true,scoredOn:true,shotClock:true}; }
+function _defPrefs(){ return {goals:true,miss:true,assist:true,ejection:true,ejectionDrawn:true,fiveM:true,fiveMDrawn:true,steal:true,turnover:true,goalieBlock:true,fieldBlock:true,sprintWon:true,goalZone:true,goalGM:true,missZone:true,blockZone:true,offensive:true,offensiveHustle:true,gp2m:true,newShotClock:true,defEffort:true,lostBall:true,badPass:true,ballUnder:true,ballUnderDrawn:true,scoredOn:true,shotClock:true}; }
 
 function startNewGameWizard(){
   const g=state.game;
