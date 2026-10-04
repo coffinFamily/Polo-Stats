@@ -602,6 +602,22 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
     <div id="follow-flow-view"     style="display:none;"></div>
     <div id="follow-recap-view"    style="display:none;"></div>
 
+    <!-- Online article: builds a prompt (facts + writing rules) to paste into Claude -->
+    <div class="card" id="follow-article-card" style="margin-top:10px;">
+      <div class="stitle" style="margin:0 0 4px;">✍️ Online article</div>
+      <div style="font-size:11px;color:#5a7a9a;line-height:1.5;margin-bottom:8px;">Builds a prompt from this game's events (no clock times; players without a roster name are left out). Add quotes below if you have them, then paste the copied prompt into Claude.</div>
+      <textarea id="article-notes" rows="3" oninput="saveArticleNotes()"
+        placeholder="Quotes or context (optional) — e.g. “We moved the ball well.” — Coach Smith"
+        style="width:100%;font-size:12px;padding:8px 10px;border-radius:8px;border:1px solid #1e3a5a;background:#0a1820;color:#c0d8f0;box-sizing:border-box;resize:vertical;margin-bottom:8px;"></textarea>
+      <button class="btn-p" style="width:100%;padding:9px;font-size:13px;" onclick="copyArticlePrompt(this)">✍️ Copy article prompt</button>
+      <div id="article-status" style="font-size:11px;color:#ef9a4a;margin-top:6px;"></div>
+      <details id="article-prompt-details" style="display:none;margin-top:8px;">
+        <summary style="font-size:11px;color:#5a9abb;cursor:pointer;">View prompt</summary>
+        <textarea id="article-prompt-box" readonly rows="10"
+          style="width:100%;margin-top:6px;font-size:11px;font-family:ui-monospace,Menlo,Consolas,monospace;padding:8px;border-radius:8px;border:1px solid #1e3a5a;background:#08141e;color:#9ab8d0;box-sizing:border-box;"></textarea>
+      </details>
+    </div>
+
   </div>
 </div>
 
@@ -5739,6 +5755,7 @@ async function initFollowTab(){
   const content = document.getElementById('follow-content');
   if(content) content.style.display = 'none';
   setFollowHeader(_followGameLabel(savedId));
+  loadArticleNotes();
   updateFoulAlertBtn();
   followSetStatus('⟳ Loading…');
   await followLoadEvents();
@@ -5995,6 +6012,217 @@ function openScoreGame(gameId){
   if(!gameId) return;
   localStorage.setItem('follow-last-gameId', gameId);
   showTab('follow');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  ARTICLE PROMPT — fact sheet + writing rules, to paste into Claude
+//  All numbers are computed here from the event log; the model only writes
+//  the prose. Players without a real roster name are never mentioned.
+//  Game-clock times are deliberately NOT used.
+// ═══════════════════════════════════════════════════════════
+const ART_NOTES_KEY = 'wp-article-notes';
+
+// Roster name for an event row, or null (no playerId, not on a roster, or "Placeholder")
+function _artName(e){
+  if(!e || !e.playerId) return null;
+  const p = state.players.find(p=>String(p.id)===String(e.playerId));
+  if(!p) return null;
+  const n = ((p.first||'')+' '+(p.last||'')).trim();
+  return (!n || /placeholder/i.test(n)) ? null : n;
+}
+
+function buildArticlePrompt(){
+  const game = _follow.games.find(g=>g.gameId===_follow.gameId);
+  const ev = _follow.events;
+  if(!game || !ev.length) return null;
+  const wN = game.whiteTeam||'White', dN = game.darkTeam||'Dark';
+  const opp = t => t===wN ? dN : wN;
+  const isGoal = e => /^Goal \(/i.test(e.event||'');
+  const qLbl = q => q>0 ? qName(q) : 'Unknown quarter';
+
+  // One entry per recorded play (rows sharing a groupId), ordered by quarter then entry order.
+  // (Edited plays get re-appended in the sheet, so sort by quarter to keep them in place.)
+  const groups = [], byId = {};
+  ev.forEach((e,i)=>{
+    const k = e.groupId || ('row'+i);
+    if(!byId[k]){ byId[k] = {q:Number(e.q)||0, rows:[]}; groups.push(byId[k]); }
+    byId[k].rows.push(e);
+  });
+  groups.sort((a,b)=>a.q-b.q);
+
+  const score = {[wN]:0, [dN]:0};
+  const qGoals = {}, qEnd = {}, log = {};
+  const flow = { leadChanges:0, ties:0, maxLead:{[wN]:{n:0,q:0}, [dN]:{n:0,q:0}}, bestRun:{[wN]:{n:0,q:0}, [dN]:{n:0,q:0}} };
+  let prevLead = null, runTeam = null, runLen = 0;
+  const GOAL_LABEL = {'Goal (6-5)':'man-up (6-on-5) goal', 'Goal (5M)':'penalty-shot goal', 'Goal (Counter)':'counter-attack goal'};
+  const scoreStr = () => wN+' '+score[wN]+', '+dN+' '+score[dN];
+
+  groups.forEach(gr=>{
+    const m = gr.rows[0], q = gr.q;
+    const find = ev2 => gr.rows.find(r=>r.event===ev2);
+    const drawn = gr.rows.find(r=>/^(Ejection|5M|5m) Drawn$/.test(r.event||''));
+    (log[q] = log[q] || []);
+    (qGoals[q] = qGoals[q] || {[wN]:0, [dN]:0});
+
+    if(isGoal(m) && (m.team===wN || m.team===dN)){
+      score[m.team]++; qGoals[q][m.team]++;
+      const scorer = _artName(m), assist = _artName(find('Assist'));
+      const kind = GOAL_LABEL[m.event] ? ' a '+GOAL_LABEL[m.event] : '';
+      log[q].push((scorer ? m.team+': '+scorer+' scored'+kind : m.team+' scored'+kind)
+        +(assist ? ', assisted by '+assist : '')+'  [score: '+scoreStr()+']');
+      // flow: lead changes, ties, biggest lead, longest unanswered run
+      const diff = score[wN]-score[dN];
+      const lead = diff>0 ? wN : diff<0 ? dN : null;
+      if(prevLead && lead && lead!==prevLead) flow.leadChanges++;
+      if(diff===0) flow.ties++;
+      if(lead && Math.abs(diff) > flow.maxLead[lead].n) flow.maxLead[lead] = {n:Math.abs(diff), q};
+      prevLead = lead || prevLead;
+      if(runTeam===m.team) runLen++; else { runTeam = m.team; runLen = 1; }
+      if(runLen > flow.bestRun[m.team].n) flow.bestRun[m.team] = {n:runLen, q};
+    } else if(m.event==='Ejection'){
+      const who = _artName(m), by = _artName(drawn);
+      log[q].push(m.team+': '+(who ? who+' was' : 'a player was')+' ejected'+(by ? ' (drawn by '+by+')' : ''));
+    } else if(m.event==='5M Foul'){
+      const who = _artName(m), by = _artName(drawn);
+      log[q].push(m.team+': 5-meter penalty called'+(who ? ' on '+who : '')+(by ? ', drawn by '+by : ''));
+    } else if(m.event==='Goalie Block'){
+      const g = _artName(m), shooter = _artName(find('Shot On Goal'));
+      log[q].push(m.team+': '+(g ? 'goalie '+g : 'the goalie')+' made a save'+(shooter ? ' on a shot by '+shooter : ''));
+    }
+    qEnd[q] = {w:score[wN], d:score[dN]};
+  });
+
+  // ── Team-level totals (safe even when players are unnamed) ──
+  const cnt = (t,fn) => ev.filter(e=>e.team===t && fn(e)).length;
+  const plural = (n,s) => n+' '+s+(n===1?'':'s');
+  const pen = n => n+(n===1?' 5-meter penalty':' 5-meter penalties');
+  const teamLine = t =>
+    '  '+t+': '+plural(cnt(t,isGoal),'goal')+' ('+cnt(t,e=>e.event==='Goal (6-5)')+' man-up, '+
+    cnt(t,e=>e.event==='Goal (5M)')+' penalty, '+cnt(t,e=>e.event==='Goal (Counter)')+' counter), '+
+    plural(cnt(t,e=>e.event==='Ejection'),'ejection')+' committed, '+pen(cnt(t,e=>e.event==='5M Foul'))+' committed, '+
+    plural(cnt(t,e=>e.event==='Goalie Block'),'goalie save')+', '+plural(cnt(t,e=>e.event==='Steal'),'steal');
+
+  // ── Named-player stat lines (unnamed players are skipped entirely) ──
+  const pl = {};
+  ev.forEach(e=>{
+    const n = _artName(e);
+    if(!n) return;
+    const k = e.team+'|'+n;
+    const p = pl[k] = pl[k] || {team:e.team, name:n, g:0, a:0, stl:0, blk:0, ej:0, f5:0, drewEj:0, drew5:0};
+    if(isGoal(e)) p.g++;
+    else if(e.event==='Assist') p.a++;
+    else if(e.event==='Steal') p.stl++;
+    else if(e.event==='Goalie Block') p.blk++;
+    else if(e.event==='Ejection') p.ej++;
+    else if(e.event==='5M Foul') p.f5++;
+    else if(e.event==='Ejection Drawn') p.drewEj++;
+    else if(e.event==='5M Drawn' || e.event==='5m Drawn') p.drew5++;
+  });
+  const playerLine = p => {
+    const bits = [];
+    if(p.g) bits.push(plural(p.g,'goal'));
+    if(p.a) bits.push(plural(p.a,'assist'));
+    if(p.stl) bits.push(plural(p.stl,'steal'));
+    if(p.blk) bits.push(plural(p.blk,'save'));
+    if(p.drewEj) bits.push('drew '+plural(p.drewEj,'ejection'));
+    if(p.drew5) bits.push('drew '+pen(p.drew5));
+    if(p.ej) bits.push('was ejected '+(p.ej===1?'once':p.ej+' times'));
+    if(p.f5) bits.push('called for '+pen(p.f5));
+    return bits.length ? '  '+p.name+' ('+p.team+'): '+bits.join(', ') : null;
+  };
+  const playerLines = Object.values(pl).sort((a,b)=>(b.g-a.g)||(b.a-a.a)).map(playerLine).filter(Boolean);
+
+  // Which side is "ours"? The one with named players. Both/neither → balanced recap.
+  const namedTeams = [wN,dN].filter(t=>ev.some(e=>e.team===t && _artName(e)));
+  const focus = namedTeams.length===1 ? namedTeams[0] : null;
+
+  // ── Assemble ──
+  const D = [];
+  D.push('Date: '+fmtDate(game.date));
+  D.push('Teams: '+wN+' (white caps) and '+dN+' (dark caps)');
+  D.push('Final score (as recorded): '+scoreStr());
+  D.push('');
+  D.push('Score by quarter:');
+  Object.keys(qGoals).map(Number).sort((a,b)=>a-b).forEach(q=>{
+    D.push('  '+qLbl(q)+': '+wN+' '+qGoals[q][wN]+', '+dN+' '+qGoals[q][dN]+'  (running total: '+wN+' '+qEnd[q].w+', '+dN+' '+qEnd[q].d+')');
+  });
+  D.push('');
+  D.push('Game flow:');
+  D.push('  Lead changes hands '+flow.leadChanges+' time'+(flow.leadChanges===1?'':'s')+'; the score was tied '+flow.ties+' time'+(flow.ties===1?'':'s')+' after a goal.');
+  [wN,dN].forEach(t=>{
+    const ml = flow.maxLead[t], br = flow.bestRun[t];
+    if(ml.n) D.push('  '+t+' biggest lead: '+ml.n+' (in '+qLbl(ml.q)+').');
+    if(br.n>=3) D.push('  '+t+' longest run of unanswered goals: '+br.n+' (in '+qLbl(br.q)+').');
+  });
+  D.push('');
+  D.push('Team totals:');
+  D.push(teamLine(wN)); D.push(teamLine(dN));
+  D.push('  (An ejection by one team gives the other a man-up chance.)');
+  D.push('');
+  D.push('Named players (only these players may be mentioned by name):');
+  if(playerLines.length) playerLines.forEach(l=>D.push(l)); else D.push('  (none — write at the team level only)');
+  D.push('');
+  D.push('Key moments in order (running score in brackets; no clock times):');
+  Object.keys(log).map(Number).sort((a,b)=>a-b).forEach(q=>{
+    D.push(qLbl(q)+':');
+    if(log[q].length) log[q].forEach(l=>D.push('  - '+l)); else D.push('  - (no key moments recorded)');
+  });
+
+  const notes = (_artNotesGet(game.gameId)||'').trim();
+  const rules = [
+    'Write an online game recap article, under 500 words (aim for 350–450), with a headline on the first line.',
+    '',
+    'RULES',
+    '- Use ONLY the facts in GAME DATA and STORY NOTES below. Do not invent scores, players, records, venues, tournaments, injuries, or events. If it is not listed, leave it out.',
+    '- Do not use game-clock times or timestamps. Describe the flow by quarter and by sequence (for example, "opened the third quarter on a 3–0 run").',
+    '- Mention a player by name ONLY if that player appears by name under "Named players" or in a named key moment. Never mention a player by cap number. Any player without a name must not be mentioned individually; refer to their team instead (for example, "Newport answered with two goals").',
+    '- Ejections and 5-meter penalties: describe them factually and neutrally. Do not assign blame or motive beyond the data.',
+    '- Quotes: use only the quotes in STORY NOTES, word for word, attributed to the speaker given. If there are no quotes, include none.',
+    '- Tone: engaging, upbeat and fair to both teams. Lead with the story of the game (momentum swings, runs, standout performers), not a list of statistics.',
+    focus ? '- Write from the perspective of '+focus+' (as its local sports page would), but stay respectful of the opponent.'
+          : '- Write a balanced recap that does not favor either team.',
+    '- The game may still have been in progress when the data was captured; if the score looks incomplete, do not claim a final result beyond what is recorded.',
+  ];
+  return rules.join('\n')+'\n\nGAME DATA\n'+D.join('\n')+'\n\nSTORY NOTES (quotes, context)\n'+(notes || '(none)')+'\n';
+}
+
+function _artNotesGet(gameId){
+  const all = ls(ART_NOTES_KEY, {});
+  return all[gameId] || '';
+}
+
+function saveArticleNotes(){
+  const gid = _follow.gameId; if(!gid) return;
+  const el = document.getElementById('article-notes'); if(!el) return;
+  const all = ls(ART_NOTES_KEY, {});
+  if(el.value.trim()) all[gid] = el.value; else delete all[gid];
+  ss(ART_NOTES_KEY, all);
+}
+
+function loadArticleNotes(){
+  const el = document.getElementById('article-notes');
+  if(el) el.value = _artNotesGet(_follow.gameId);
+  const box = document.getElementById('article-prompt-box');
+  if(box) box.value = '';
+  const det = document.getElementById('article-prompt-details');
+  if(det) det.style.display = 'none';
+}
+
+async function copyArticlePrompt(btn){
+  const st = document.getElementById('article-status');
+  const prompt = buildArticlePrompt();
+  if(!prompt){ if(st) st.textContent = 'No events loaded yet.'; return; }
+  const box = document.getElementById('article-prompt-box');
+  const det = document.getElementById('article-prompt-details');
+  if(box) box.value = prompt;
+  if(det) det.style.display = 'block';
+  const orig = btn.textContent;
+  let copied = false;
+  try { await navigator.clipboard.writeText(prompt); copied = true; } catch(e){}
+  if(!copied && box){ try { box.focus(); box.select(); copied = document.execCommand('copy'); } catch(e){} }
+  btn.textContent = copied ? '✓ Copied — paste into Claude' : '⚠ Copy blocked — select the text below';
+  if(st) st.textContent = copied ? '' : 'Your browser blocked copying. Open "View prompt", select all and copy.';
+  setTimeout(()=>{ btn.textContent = orig; }, 3000);
 }
 
 function followSetView(v){
