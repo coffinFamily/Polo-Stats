@@ -796,7 +796,7 @@ if(DEFAULT_SHEET_URL)  { state.game.sheetUrl=DEFAULT_SHEET_URL;   ss('wp-sheet-u
 
 // Ensure prefs exist with full defaults
 {
-  const defTeam = () => ({goals:true,miss:true,assist:true,ejection:true,ejectionDrawn:true,fiveM:true,fiveMDrawn:true,steal:true,turnover:true,goalieBlock:true,fieldBlock:true,sprintWon:true,goalZone:true,goalGM:true,missZone:true,blockZone:true,offensive:true,offensiveHustle:true,gp2m:true,newShotClock:true,defEffort:true,lostBall:true,badPass:true,ballUnder:true,ballUnderDrawn:true,scoredOn:true,shotClock:true});
+  const defTeam = () => ({goals:true,miss:true,assist:true,ejection:true,ejectionDrawn:true,fiveM:true,fiveMDrawn:true,steal:true,turnover:true,goalieBlock:true,fieldBlock:true,sprintWon:true,goalZone:true,goalGM:true,missZone:true,blockZone:true,offensive:true,offensiveHustle:true,gp2m:true,newShotClock:true,defEffort:true,lostBall:true,badPass:true,ballUnder:true,ballUnderDrawn:true,scoredOn:true,shotClock:true,rebound:true});
   if(!state.prefs) state.prefs = {};
   if(!state.prefs.dark)  state.prefs.dark  = defTeam();
   if(!state.prefs.white) state.prefs.white = defTeam();
@@ -843,6 +843,7 @@ const EVENT_DEFS = {
   'def-effort':     {label:'Defensive Hustle',  flow:['cap']},
   'lost-ball':      {label:'Lost Ball',         flow:['cap']},
   'bad-pass':       {label:'Bad Pass',          flow:['cap']},
+  'rebound':        {label:'Rebound',           flow:['cap']},
   'ball-under':     {label:'Ball Under',        flow:['cap','drawn']},
   'scored-on':      {label:'Scored On',         flow:['cap']},
   'shot-clock':     {label:'Shot Clock',        flow:[]},
@@ -2209,6 +2210,7 @@ const PREF_CATS = [
   {key:'defEffort',      label:'Defensive Hustle', emoji:'🛡️', section:'effort'},
   {key:'lostBall',       label:'Lost Ball',        emoji:'💧',  section:'effort'},
   {key:'badPass',        label:'Bad Pass',         emoji:'❌',  section:'effort'},
+  {key:'rebound',        label:'Rebound',          emoji:'↩️',  section:'effort'},
   {key:'ballUnder',      label:'Ball Under',       emoji:'🌊',  section:'effort'},
   {key:'ballUnderDrawn', label:'Ball Under Drawn', emoji:'🎯',  section:'effort'},
   {key:'scoredOn',       label:'Scored On',        emoji:'🥅',  section:'effort'},
@@ -2305,6 +2307,7 @@ function evtIcon(type){
   if(type==='def-effort')                                    return '🛡 ';
   if(type==='lost-ball')                                     return '💧 ';
   if(type==='bad-pass')                                      return '❌ ';
+  if(type==='rebound')                                       return '↩️ ';
   if(type==='ball-under')                                    return '🌊 ';
   if(type==='scored-on')                                     return '🥅 ';
   if(type==='shot-clock')                                    return '⏱ ';
@@ -2336,6 +2339,7 @@ function prefIcon(key){
   if(key==='defEffort')     return '🛡️ ';
   if(key==='lostBall')      return '💧 ';
   if(key==='badPass')       return '❌ ';
+  if(key==='rebound')       return '↩️ ';
   if(key==='ballUnder')     return '🌊 ';
   if(key==='ballUnderDrawn')return '🎯 ';
   if(key==='scoredOn')      return '🥅 ';
@@ -2354,7 +2358,7 @@ function prefIcon(key){
 // happens in a quarter — and disappears once recorded until the next one.
 const EVENT_GROUPS = [
   { title:'Offense',  cls:'offense',  types:['new-shot-clock','offensive-hustle','gp-2m','offensive','miss','goal-reg'] },
-  { title:'Turnover', cls:'turnover', types:['turnover','lost-ball','bad-pass','ball-under'] },
+  { title:'',         cls:'turnover', types:['turnover','lost-ball','bad-pass','ball-under','rebound'] },  // no header on this group
   { title:'Defense',  cls:'defense',  types:['steal','ejection','5m-penalty','field-block','goalie-block','def-effort','shot-clock','scored-on'] },
 ];
 
@@ -2381,6 +2385,7 @@ function renderEventButtons(){
       if(type==='def-effort')                  return prefs.defEffort      !== false;
       if(type==='lost-ball')                   return prefs.lostBall       !== false;
       if(type==='bad-pass')                    return prefs.badPass        !== false;
+      if(type==='rebound')                     return prefs.rebound        !== false;
       if(type==='ball-under')                  return prefs.ballUnder      !== false;
       if(type==='scored-on')                   return prefs.scoredOn       !== false;
       if(type==='shot-clock')                  return prefs.shotClock      !== false;
@@ -2400,7 +2405,7 @@ function renderEventButtons(){
     });
     if(!btns) return '';
     return `<div class="evt-group evt-group-${grp.cls}">
-      <div class="evt-group-title">${grp.title}</div>
+      ${grp.title ? `<div class="evt-group-title">${grp.title}</div>` : ''}
       <div class="evt-group-grid">${btns}</div>
     </div>`;
   }
@@ -3458,7 +3463,7 @@ function toggleRbRow(side,pid){
 const NGW_STEPS=['date','quarter-length','white-team','white-name','white-prefs','white-gk','dark-team','dark-name','dark-prefs','dark-gk'];
 const NGW_LABELS={'date':'Game date','quarter-length':'Quarter length','white-team':'White caps — select team','white-name':'White caps — display name','white-prefs':'White caps — stats to capture','white-gk':'White caps — goalkeeper','dark-team':'Dark caps — select team','dark-name':'Dark caps — display name','dark-prefs':'Dark caps — stats to capture','dark-gk':'Dark caps — goalkeeper'};
 
-function _defPrefs(){ return {goals:true,miss:true,assist:true,ejection:true,ejectionDrawn:true,fiveM:true,fiveMDrawn:true,steal:true,turnover:true,goalieBlock:true,fieldBlock:true,sprintWon:true,goalZone:true,goalGM:true,missZone:true,blockZone:true,offensive:true,offensiveHustle:true,gp2m:true,newShotClock:true,defEffort:true,lostBall:true,badPass:true,ballUnder:true,ballUnderDrawn:true,scoredOn:true,shotClock:true}; }
+function _defPrefs(){ return {goals:true,miss:true,assist:true,ejection:true,ejectionDrawn:true,fiveM:true,fiveMDrawn:true,steal:true,turnover:true,goalieBlock:true,fieldBlock:true,sprintWon:true,goalZone:true,goalGM:true,missZone:true,blockZone:true,offensive:true,offensiveHustle:true,gp2m:true,newShotClock:true,defEffort:true,lostBall:true,badPass:true,ballUnder:true,ballUnderDrawn:true,scoredOn:true,shotClock:true,rebound:true}; }
 
 function startNewGameWizard(){
   const g=state.game;
@@ -5295,6 +5300,8 @@ function parseVoiceTranscript(text) {
     eventType = 'def-effort';
   } else if (/\blost\s*ball\b/.test(t)) {
     eventType = 'lost-ball';
+  } else if (/\brebound\b/.test(t)) {
+    eventType = 'rebound';
   } else if (/\b(scored\s*on|scored\s*against)\b/.test(t)) {
     eventType = 'scored-on';
   } else if (/\bshot\s*clock\b/.test(t)) {
