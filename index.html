@@ -14,6 +14,11 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
 .nav-btn{padding:6px 14px;border-radius:20px;background:transparent;color:#7a9bb8;border:1px solid transparent;font-weight:500;}
 .nav-btn.active{background:#0a84c8;color:#fff;border-color:#0a84c8;}
 .nav-btn:hover:not(.active){background:#1e3a5a;}
+/* Scores tab game card (visitor / home / date) */
+.score-card{background:#0d1e2e;border:1px solid #1e3a5a;border-radius:12px;padding:10px 14px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .12s,border-color .12s;}
+.score-card:hover{border-color:#2a6a9a;}
+.score-card:active{background:#12304a;}
+.score-card:focus-visible{outline:2px solid #0a84c8;outline-offset:2px;}
 .auth-tab{display:none;}/* hidden until signed in */
 .page{padding:12px;max-width:700px;margin:0 auto;}
 .card{background:#111d2c;border:1px solid #1e3a5a;border-radius:10px;padding:14px;margin-bottom:10px;}
@@ -142,7 +147,7 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
 <body>
 
 <div class="nav">
-  <button class="nav-btn active" onclick="showTab('follow')">Follow</button>
+  <button class="nav-btn active" onclick="showTab('scores')">Scores</button>
   <button class="nav-btn auth-tab" onclick="showTab('game')">Game</button>
   <button class="nav-btn auth-tab" onclick="showTab('setup')">Game Setup</button>
   <button class="nav-btn auth-tab" onclick="showTab('roster')">Roster</button>
@@ -455,8 +460,8 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
   </div>
 </div>
 
-<!-- ═══ FOLLOW TAB ════════════════════════════════════════════════════ -->
-<div id="tab-follow" class="tab-panel active page">
+<!-- ═══ SCORES TAB (landing page) ══════════════════════════════════════ -->
+<div id="tab-scores" class="tab-panel active page">
 
   <!-- ─── App Banner ────────────────────────────────────────── -->
   <div style="text-align:center;padding:18px 8px 14px;margin-bottom:10px;">
@@ -522,44 +527,34 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
     </div>
   </div>
 
+  <!-- ─── Scores list ───────────────────────────────────────── -->
+  <div class="card" id="scores-card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div class="stitle" style="margin:0;">Scores</div>
+      <span id="scores-status" style="font-size:10px;color:#3a5a7a;"></span>
+    </div>
+    <div id="scores-no-url" class="warn" style="display:none;">⚠️ No sheet URL configured — set it in Game Setup.</div>
+    <div id="scores-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+    <div id="scores-archived-wrap"></div>
+  </div>
+
+</div>
+
+<!-- ═══ FOLLOW TAB (single-game detail; opened from a Scores card) ════ -->
+<div id="tab-follow" class="tab-panel page">
+
+  <!-- Game detail header: back to Scores, game label, alerts, archive -->
   <div class="card" id="follow-selector-card">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-      <div class="stitle" style="margin:0;">Follow a game</div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span id="follow-sync-status" style="font-size:10px;color:#3a5a7a;"></span>
-        <button id="foul-alert-subscribe-btn" onclick="toggleFoulAlerts()" style="font-size:10px;padding:3px 9px;border-radius:8px;border:1px solid #1e3a5a;background:#0a1420;color:#5a7a9a;cursor:pointer;white-space:nowrap;">🔔 Enable Alerts</button>
-      </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button onclick="showTab('scores')" style="flex:0 0 auto;font-size:12px;font-weight:700;padding:6px 11px;border-radius:8px;border:1px solid #1e3a5a;background:#0a1e2e;color:#7abcdc;cursor:pointer;white-space:nowrap;">← Scores</button>
+      <span id="follow-selected-label" style="flex:1;min-width:0;font-size:13px;font-weight:600;color:#c0d8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
+      <button onclick="archiveGame(_follow.gameId)" style="flex:0 0 auto;font-size:11px;padding:4px 10px;border-radius:7px;border:1px solid #2a3a4a;background:#0a1420;color:#4a6a8a;cursor:pointer;white-space:nowrap;">Archive</button>
     </div>
-    <div id="follow-no-url" class="warn" style="display:none;">⚠️ No sheet URL configured — set it in Game Setup.</div>
-
-    <!-- Collapsed state: shown once a game is selected -->
-    <div id="follow-selector-collapsed" style="display:none;">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span id="follow-selected-label" style="flex:1;font-size:13px;font-weight:600;color:#c0d8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></span>
-        <button onclick="archiveGame(_follow.gameId)" style="flex:0 0 auto;font-size:11px;padding:4px 10px;border-radius:7px;border:1px solid #2a3a4a;background:#0a1420;color:#4a6a8a;cursor:pointer;white-space:nowrap;">Archive</button>
-        <button onclick="expandFollowSelector()" style="flex:0 0 auto;font-size:11px;padding:4px 10px;border-radius:7px;border:1px solid #1e3a5a;background:#0a1e2e;color:#5a9abb;cursor:pointer;white-space:nowrap;">Change ▾</button>
-      </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;">
+      <span id="follow-sync-status" style="font-size:10px;color:#3a5a7a;"></span>
+      <button id="foul-alert-subscribe-btn" onclick="toggleFoulAlerts()" style="font-size:10px;padding:3px 9px;border-radius:8px;border:1px solid #1e3a5a;background:#0a1420;color:#5a7a9a;cursor:pointer;white-space:nowrap;">🔔 Enable Alerts</button>
     </div>
-
-    <!-- Expanded state: sort + search + dropdown -->
-    <div id="follow-selector-expanded">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        <div style="display:flex;border:1px solid #1e3a5a;border-radius:8px;overflow:hidden;flex-shrink:0;">
-          <button id="follow-sort-btn-recent" onclick="setFollowSort('recent')"
-            style="flex:1;padding:6px 10px;font-size:12px;border:none;border-right:1px solid #1e3a5a;background:#0a3a5a;color:#7abcdc;font-weight:700;cursor:pointer;white-space:nowrap;">🕐 Recent</button>
-          <button id="follow-sort-btn-alpha" onclick="setFollowSort('alpha')"
-            style="flex:1;padding:6px 10px;font-size:12px;border:none;background:transparent;color:#3a5a7a;font-weight:400;cursor:pointer;white-space:nowrap;">A–Z</button>
-        </div>
-        <input id="follow-game-search" type="search" placeholder="🔍 Filter games…"
-          oninput="renderFollowGameList()"
-          style="flex:1;min-width:0;font-size:12px;padding:5px 9px;border-radius:7px;border:1px solid #1e3a5a;background:#0a1820;color:#c0d8f0;" />
-      </div>
-      <select id="follow-game-sel" onchange="followSelectGame(this.value)"
-        style="width:100%;font-size:13px;padding:9px 10px;border-radius:8px;border:1px solid #1e3a5a;background:#0a1820;color:#c0d8f0;">
-        <option value="">— Select a game —</option>
-      </select>
-      <div id="follow-archived-wrap"></div>
-    </div>
+    <div id="follow-no-url" class="warn" style="display:none;margin-top:8px;">⚠️ No sheet URL configured — set it in Game Setup.</div>
   </div>
 
   <div id="follow-content" style="display:none;">
@@ -1255,7 +1250,7 @@ async function validateSessionRemote(){
       state.session=null;
       ss('wp-session',null);
       updateAuthUI();
-      showTab('follow');
+      showTab('scores');
     }
   }catch(e){ /* network error — keep local session, retry on next load */ }
 }
@@ -1264,7 +1259,7 @@ function logout(){
   state.session=null;
   ss('wp-session',null);
   updateAuthUI();
-  showTab('follow');
+  showTab('scores');
 }
 
 function checkAuthOnLoad(){
@@ -1293,19 +1288,24 @@ function showTab(name){
   // Guard: protected tabs require a valid session
   const PROTECTED=['game','setup','roster','prefs'];
   if(PROTECTED.includes(name)&&!_sessValid()){
-    name='follow';
+    name='scores';
   }
-  // Stop follow refresh whenever we leave that tab
+  // Stop live refreshes whenever we leave their tab
   if(typeof _followTimer!=='undefined' && _followTimer){ clearInterval(_followTimer); _followTimer=null; }
+  if(typeof _scoresTimer!=='undefined' && _scoresTimer){ clearInterval(_scoresTimer); _scoresTimer=null; }
   document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
-  document.querySelectorAll('.nav-btn').forEach(b=>{ if(b.textContent.trim().toLowerCase()===name||b.textContent.trim().toLowerCase()==='game setup'&&name==='setup') b.classList.add('active'); });
+  // The single-game view (follow) is reached from Scores, so Scores stays highlighted
+  const navName = name==='follow' ? 'scores' : name;
+  document.querySelectorAll('.nav-btn').forEach(b=>{ if(b.textContent.trim().toLowerCase()===navName||b.textContent.trim().toLowerCase()==='game setup'&&navName==='setup') b.classList.add('active'); });
   if(name==='game')   { renderGameUI(); refreshGameSelectorFromSheet(); refreshEventsFromSheet(state.game&&state.game.gameId); }
   if(name==='setup')  renderSetupUI();
   if(name==='roster') renderRosterUI();
   if(name==='prefs')  renderPrefsTab();
+  if(name==='scores') initScoresTab();
   if(name==='follow') initFollowTab();
+  window.scrollTo(0,0);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -5720,28 +5720,34 @@ async function initFollowTab(){
   if(!url){ if(noUrl) noUrl.style.display='block'; return; }
   if(noUrl) noUrl.style.display='none';
 
-  // Restore last-selected game + view from localStorage (survives page refresh)
-  const savedId   = localStorage.getItem('follow-last-gameId');
+  // The game to show is the one tapped on the Scores tab (or the last one viewed)
+  const savedId = localStorage.getItem('follow-last-gameId');
   // Always default to Players view on load
   _follow.view = 'players';
 
-  await followLoadGames();
+  // Scores already loaded the games list; only fetch it if we came in cold
+  if(!_follow.games.length) await followLoadGames();
 
-  // Re-select the previously chosen game if it still exists in the list
-  if(savedId && _follow.games.find(g=>g.gameId===savedId)){
-    _follow.gameId = savedId;
-    renderFollowGameList(); // re-render selector with correct option highlighted
-    await followLoadEvents();
-    collapseFollowSelector(_followGameLabel(savedId));
-    const content = document.getElementById('follow-content');
-    if(content) content.style.display = 'block';
+  if(!savedId || !_follow.games.find(g=>g.gameId===savedId)){
+    showTab('scores');   // nothing to show — back to the list
+    return;
   }
+
+  // Start clean so a previous game's numbers never flash under the new header
+  _follow.gameId = savedId;
+  _follow.events = [];
+  const content = document.getElementById('follow-content');
+  if(content) content.style.display = 'none';
+  setFollowHeader(_followGameLabel(savedId));
+  updateFoulAlertBtn();
+  followSetStatus('⟳ Loading…');
+  await followLoadEvents();
+  if(content) content.style.display = 'block';
 
   // Clear any old timer before starting a new one (guards against double-init)
   if(_followTimer){ clearInterval(_followTimer); _followTimer=null; }
   _followTimer = setInterval(async()=>{
-    if(_follow.gameId) await followLoadEvents();
-    else await followLoadGames();
+    if(_follow.gameId && !document.hidden) await followLoadEvents();
   }, FOLLOW_INTERVAL);
 }
 
@@ -5753,7 +5759,6 @@ async function followLoadGames(){
     const resp = await fetch(url+'?action=games', {cache:'no-store'});
     const data = await resp.json();
     _follow.games = data.games || [];
-    renderFollowGameList();
     followSetStatus('');
   } catch(e){
     followSetStatus('✕ Could not load games');
@@ -5782,87 +5787,6 @@ function followSetStatus(msg){
   if(el) el.textContent = msg;
 }
 
-function setFollowSort(mode){
-  _follow.sortMode = mode;
-  const btnR = document.getElementById('follow-sort-btn-recent');
-  const btnA = document.getElementById('follow-sort-btn-alpha');
-  if(btnR && btnA){
-    const activeStyle  = {background:'#0a3a5a', color:'#7abcdc', fontWeight:'700'};
-    const inactiveStyle = {background:'transparent', color:'#3a5a7a', fontWeight:'400'};
-    const s = mode === 'recent' ? activeStyle : inactiveStyle;
-    const s2 = mode === 'alpha'  ? activeStyle : inactiveStyle;
-    Object.assign(btnR.style, s);
-    Object.assign(btnA.style, s2);
-  }
-  renderFollowGameList();
-}
-
-function renderFollowGameList(){
-  const sel = document.getElementById('follow-game-sel');
-  if(!sel) return;
-  const cur = _follow.gameId;
-
-  // Read sort preference
-  const sortMode = _follow.sortMode || 'recent';
-
-  // Read search filter
-  const searchEl = document.getElementById('follow-game-search');
-  const q = (searchEl ? searchEl.value : '').toLowerCase().trim();
-
-  // Sort
-  let games = [..._follow.games];
-  if(sortMode === 'alpha'){
-    games.sort((a,b)=>{
-      const la = ((a.whiteTeam||'')+(a.darkTeam||'')).toLowerCase();
-      const lb = ((b.whiteTeam||'')+(b.darkTeam||'')).toLowerCase();
-      return la.localeCompare(lb);
-    });
-  } else {
-    // Most recent first — parse dates properly regardless of format
-    games.sort((a,b)=>parseDate(b.date)-parseDate(a.date));
-  }
-
-  // Filter by search
-  if(q){
-    games = games.filter(g=>{
-      const hay = ((g.whiteTeam||'')+' '+(g.darkTeam||'')+' '+(g.date||'')).toLowerCase();
-      return hay.includes(q);
-    });
-  }
-
-  // Separate active vs archived (check both sheet status and legacy localStorage)
-  const _isInactiveG = g => g.status==='inactive' || !!_archivedGames[g.gameId];
-  const active   = games.filter(g=>!_isInactiveG(g));
-  const archived = games.filter(g=>_isInactiveG(g));
-
-  sel.innerHTML = '<option value="">— Select a game —</option>';
-  active.forEach(g=>{
-    const label = (g.whiteTeam||'White')+' vs '+(g.darkTeam||'Dark')+' — '+fmtDate(g.date);
-    const isSel = g.gameId===cur ? ' selected' : '';
-    sel.innerHTML += '<option value="'+g.gameId+'"'+isSel+'>'+label+'</option>';
-  });
-
-  // Archived section — render below the select as a collapsible list
-  const arcWrap = document.getElementById('follow-archived-wrap');
-  if(arcWrap){
-    if(!archived.length){ arcWrap.innerHTML=''; return; }
-    const open = arcWrap.dataset.open==='1';
-    arcWrap.innerHTML =
-      '<button onclick="(function(w){w.dataset.open=w.dataset.open===\'1\'?\'0\':\'1\';renderFollowGameList();})(document.getElementById(\'follow-archived-wrap\'))"'+
-        ' style="width:100%;margin-top:8px;padding:5px 10px;font-size:11px;font-weight:600;border-radius:8px;border:1px solid #1e3a5a;background:#0a1420;color:#5a7a9a;cursor:pointer;text-align:left;">'+
-        (open?'▾':'▸')+' Archived ('+archived.length+')</button>'+
-      (open ? '<div style="margin-top:4px;display:flex;flex-direction:column;gap:4px;">' +
-        archived.map(g=>{
-          const label=(g.whiteTeam||'White')+' vs '+(g.darkTeam||'Dark')+' — '+fmtDate(g.date);
-          return '<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:#0a1420;border-radius:7px;border:1px solid #1a2a3a;">'+
-            '<span style="flex:1;font-size:12px;color:#4a6a8a;">'+label+'</span>'+
-            '<button onclick="unarchiveGame(\''+g.gameId+'\')" style="flex:0 0 auto;font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid #1e3a5a;background:#0a1e30;color:#5a9abb;cursor:pointer;">Restore</button>'+
-          '</div>';
-        }).join('')+
-      '</div>' : '');
-  }
-}
-
 function _setGameInactive(gameId, inactive) {
   // Update localStorage (legacy, device-local fallback)
   if (inactive) _archivedGames[gameId] = true;
@@ -5882,22 +5806,22 @@ function _setGameInactive(gameId, inactive) {
 function archiveGame(gameId){
   if(!gameId) return;
   _setGameInactive(gameId, true);
-  renderFollowGameList();
+  _scoreOverride[gameId] = { inactive:true, t:Date.now() };
+  // Back to the list — the archived game drops out of it immediately
+  _follow.gameId = null; _follow.events = [];
+  localStorage.removeItem('follow-last-gameId');
+  const content = document.getElementById('follow-content');
+  if(content) content.style.display = 'none';
   populateGameSelector();
-  // If the currently-viewed game was just archived, collapse back to selector
-  if(_follow.gameId===gameId){
-    _follow.gameId=null; _follow.events=[];
-    const content=document.getElementById('follow-content');
-    if(content) content.style.display='none';
-    expandFollowSelector();
-  }
+  showTab('scores');
 }
 
 function unarchiveGame(gameId){
   if(!gameId) return;
   _setGameInactive(gameId, false);
-  renderFollowGameList();
+  _scoreOverride[gameId] = { inactive:false, t:Date.now() };
   populateGameSelector();
+  renderScores();
 }
 
 function _followGameLabel(gameId){
@@ -5906,40 +5830,171 @@ function _followGameLabel(gameId){
   return (game.whiteTeam||'White') + ' vs ' + (game.darkTeam||'Dark') + ' — ' + fmtDate(game.date);
 }
 
-function collapseFollowSelector(label){
-  const exp  = document.getElementById('follow-selector-expanded');
-  const coll = document.getElementById('follow-selector-collapsed');
-  const lbl  = document.getElementById('follow-selected-label');
-  if(exp)  exp.style.display  = 'none';
-  if(coll) coll.style.display = 'block';
-  if(lbl)  lbl.textContent    = label || '';
+function setFollowHeader(label){
+  const lbl = document.getElementById('follow-selected-label');
+  if(lbl) lbl.textContent = label || '';
 }
 
-function expandFollowSelector(){
-  const exp  = document.getElementById('follow-selector-expanded');
-  const coll = document.getElementById('follow-selector-collapsed');
-  if(exp)  exp.style.display  = 'block';
-  if(coll) coll.style.display = 'none';
-  // Focus search so the user can start typing immediately
-  setTimeout(()=>{ document.getElementById('follow-game-search')?.focus(); }, 80);
+// ═══════════════════════════════════════════════════════════
+//  SCORES TAB — landing page
+//  One call (?action=scoreboard) returns every active game with its goal
+//  counts, so the list needs no per-game event fetches. Visitor = dark caps
+//  (top row), home = white caps (bottom row).
+// ═══════════════════════════════════════════════════════════
+let _scores = { games:[], archived:[], hasScores:true, loadedOnce:false, loading:false };
+let _scoresTimer = null;
+let _scoreOverride = {};          // gameId -> {inactive, t}: a just-made local archive/restore beats a stale response
+const SCORES_INTERVAL = 30000;    // refresh while the Scores tab is open and visible
+const SCORES_CACHE_KEY = 'wp-scoreboard-cache';
+
+function _scEsc(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-function followSelectGame(gameId){
-  _follow.gameId = gameId || null;
-  _follow.events = [];
-  // Persist selection so a page refresh lands back on the same game
-  if(gameId) localStorage.setItem('follow-last-gameId', gameId);
-  else localStorage.removeItem('follow-last-gameId');
-  const content = document.getElementById('follow-content');
-  if(!gameId){
-    if(content) content.style.display='none';
-    expandFollowSelector(); // no game → show full selector again
-    return;
+function _scoreInactive(g){
+  const o = _scoreOverride[g.gameId];
+  if(o && Date.now()-o.t < 60000) return o.inactive;
+  return g.status === 'inactive';
+}
+
+function setScoresStatus(msg){
+  const el = document.getElementById('scores-status');
+  if(el) el.textContent = msg || '';
+}
+
+function initScoresTab(){
+  const url = state.game.sheetUrl;
+  const noUrl = document.getElementById('scores-no-url');
+  if(!url){ if(noUrl) noUrl.style.display='block'; return; }
+  if(noUrl) noUrl.style.display='none';
+
+  // Paint the last known scoreboard instantly while the fresh one loads
+  if(!_scores.loadedOnce){
+    const c = ls(SCORES_CACHE_KEY, null);
+    if(c && Array.isArray(c.games)){
+      _scores.games = c.games; _scores.archived = c.archived||[]; _scores.hasScores = c.hasScores!==false;
+      _follow.games = _scores.games.concat(_scores.archived);
+    }
   }
-  if(content) content.style.display='block';
-  collapseFollowSelector(_followGameLabel(gameId));
-  updateFoulAlertBtn();
-  followLoadEvents();
+  renderScores();
+  loadScores();
+  if(_scoresTimer){ clearInterval(_scoresTimer); _scoresTimer=null; }
+  _scoresTimer = setInterval(()=>{ if(!document.hidden) loadScores(); }, SCORES_INTERVAL);
+}
+
+async function loadScores(){
+  const url = state.game.sheetUrl;
+  if(!url || _scores.loading) return;
+  _scores.loading = true;
+  if(!_scores.games.length && !_scores.archived.length) setScoresStatus('⟳ Loading…');
+  try {
+    let data = null, hasScores = true;
+    try {
+      const r = await fetch(url+'?action=scoreboard',{cache:'no-store'});
+      data = await r.json();
+    } catch(e){ data = null; }
+    if(!data || !Array.isArray(data.games)){
+      // Script without the scoreboard endpoint yet: plain game list, no scores
+      const r = await fetch(url+'?action=games',{cache:'no-store'});
+      const d = await r.json();
+      const all = d.games || [];
+      data = { games: all.filter(g=>g.status!=='inactive'), archived: all.filter(g=>g.status==='inactive') };
+      hasScores = false;
+    }
+    _scores.games = data.games;
+    _scores.archived = data.archived || [];
+    _scores.hasScores = hasScores;
+    _scores.loadedOnce = true;
+    _follow.games = _scores.games.concat(_scores.archived);   // the game view reads team names / date from here
+    _syncArchiveFlags();
+    ss(SCORES_CACHE_KEY, { games:_scores.games, archived:_scores.archived, hasScores });
+    setScoresStatus('');
+    renderScores();
+  } catch(e){
+    setScoresStatus((_scores.games.length||_scores.archived.length) ? '⚠ Offline — showing last known scores' : '✕ Could not load games');
+  } finally {
+    _scores.loading = false;
+  }
+}
+
+// The sheet is authoritative for archive status; keep the Game tab's local flags matching it.
+function _syncArchiveFlags(){
+  _scores.games.concat(_scores.archived).forEach(g=>{
+    const o = _scoreOverride[g.gameId];
+    if(o && Date.now()-o.t < 60000) return;
+    if(g.status==='inactive') _archivedGames[g.gameId] = true;
+    else delete _archivedGames[g.gameId];
+  });
+  localStorage.setItem('wp-archived-games', JSON.stringify(_archivedGames));
+}
+
+function _scoreCard(g){
+  const v = g.darkTeam||'Dark', h = g.whiteTeam||'White';
+  const known = _scores.hasScores && typeof g.darkScore==='number' && typeof g.whiteScore==='number';
+  const vWin = known && g.darkScore > g.whiteScore;
+  const hWin = known && g.whiteScore > g.darkScore;
+  const row = (name, pts, win, lose) =>
+    '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:3px 0;">'+
+      '<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px;'+
+        'font-weight:'+(win?'700':'500')+';color:'+(win?'#e8f3ff':lose?'#6f8aa5':'#c0d8f0')+';">'+_scEsc(name)+'</span>'+
+      '<span style="flex:0 0 auto;font-size:17px;font-variant-numeric:tabular-nums;'+
+        'font-weight:'+(win?'800':'500')+';color:'+(win?'#e8f3ff':lose?'#6f8aa5':'#c0d8f0')+';">'+(known?pts:'–')+'</span>'+
+    '</div>';
+  const id = _scEsc(g.gameId);
+  return '<div class="score-card" role="button" tabindex="0" onclick="openScoreGame(\''+id+'\')" '+
+      'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();openScoreGame(\''+id+'\');}">'+
+    row(v, g.darkScore, vWin, hWin)+
+    row(h, g.whiteScore, hWin, vWin)+
+    '<div style="margin-top:6px;padding-top:6px;border-top:1px solid #12263a;font-size:11px;color:#4a6a8a;">'+_scEsc(fmtDate(g.date))+'</div>'+
+  '</div>';
+}
+
+function renderScores(){
+  const list = document.getElementById('scores-list');
+  if(!list) return;
+  const all = _scores.games.concat(_scores.archived);
+  // Newest first (stable sort keeps the server's order for games on the same date)
+  const byDate = (a,b)=>parseDate(b.date)-parseDate(a.date);
+  const active   = all.filter(g=>!_scoreInactive(g)).sort(byDate);
+  const archived = all.filter(g=>_scoreInactive(g)).sort(byDate);
+
+  if(active.length){
+    list.innerHTML = active.map(_scoreCard).join('');
+  } else if(_scores.loadedOnce){
+    list.innerHTML = '<div style="font-size:13px;color:#5a7a9a;padding:6px 2px;">No active games yet.</div>';
+  } else {
+    list.innerHTML = '';
+  }
+
+  const arc = document.getElementById('scores-archived-wrap');
+  if(!arc) return;
+  if(!archived.length){ arc.innerHTML=''; return; }
+  const open = arc.dataset.open==='1';
+  arc.innerHTML =
+    '<button onclick="toggleScoresArchived()" style="width:100%;margin-top:10px;padding:5px 10px;font-size:11px;font-weight:600;border-radius:8px;border:1px solid #1e3a5a;background:#0a1420;color:#5a7a9a;cursor:pointer;text-align:left;">'+
+      (open?'▾':'▸')+' Archived ('+archived.length+')</button>'+
+    (open ? '<div style="margin-top:4px;display:flex;flex-direction:column;gap:4px;">'+
+      archived.map(g=>
+        '<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:#0a1420;border-radius:7px;border:1px solid #1a2a3a;">'+
+          '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:#4a6a8a;">'+
+            _scEsc((g.darkTeam||'Dark')+' at '+(g.whiteTeam||'White')+' — '+fmtDate(g.date))+'</span>'+
+          '<button onclick="unarchiveGame(\''+_scEsc(g.gameId)+'\')" style="flex:0 0 auto;font-size:10px;padding:3px 8px;border-radius:6px;border:1px solid #1e3a5a;background:#0a1e30;color:#5a9abb;cursor:pointer;">Restore</button>'+
+        '</div>').join('')+
+    '</div>' : '');
+}
+
+function toggleScoresArchived(){
+  const arc = document.getElementById('scores-archived-wrap');
+  if(!arc) return;
+  arc.dataset.open = arc.dataset.open==='1' ? '0' : '1';
+  renderScores();
+}
+
+// Tap a score card → the full game view (Players / Timeline / Flow / Recap)
+function openScoreGame(gameId){
+  if(!gameId) return;
+  localStorage.setItem('follow-last-gameId', gameId);
+  showTab('follow');
 }
 
 function followSetView(v){
@@ -7719,7 +7774,7 @@ function showPlayerShotChart(regKey){
 // ═══════════════════════════════════════════════════════════
 updateTimerDisplay();
 checkAuthOnLoad();        // restore session, handle magic-link hash, show/hide auth tabs
-initFollowTab();          // Follow is the landing page — load games immediately, no login needed
+initScoresTab();          // Scores is the landing page — load the scoreboard immediately, no login needed
 // Silently refresh roster from sheet and populate game selector on every page load
 if(state.rosterSheetUrl) loadRosterFromSheet(false);
 refreshGameSelectorFromSheet();
