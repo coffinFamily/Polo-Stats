@@ -605,7 +605,7 @@ input,select{font-family:inherit;font-size:13px;border:1px solid #1e3a5a;border-
     <!-- Online article: builds a prompt (facts + writing rules) to paste into Claude -->
     <div class="card" id="follow-article-card" style="margin-top:10px;">
       <div class="stitle" style="margin:0 0 4px;">✍️ Online article</div>
-      <div style="font-size:11px;color:#5a7a9a;line-height:1.5;margin-bottom:8px;">Builds a prompt from this game's events (no clock times; players without a roster name are left out). Add quotes below if you have them, then paste the copied prompt into Claude.</div>
+      <div style="font-size:11px;color:#5a7a9a;line-height:1.5;margin-bottom:8px;">Builds a prompt from this game's events (no clock times; players without a roster name are left out). Paste it into Claude: it will ask for team nicknames, which players to feature, any quotes (a cap number or Coach), and one photo, then write the article and build a one-page PDF. Quotes typed below are passed along so Claude won't ask for them again.</div>
       <textarea id="article-notes" rows="3" oninput="saveArticleNotes()"
         placeholder="Quotes or context (optional) — e.g. “We moved the ball well.” — Coach Smith"
         style="width:100%;font-size:12px;padding:8px 10px;border-radius:8px;border:1px solid #1e3a5a;background:#0a1820;color:#c0d8f0;box-sizing:border-box;resize:vertical;margin-bottom:8px;"></textarea>
@@ -6115,7 +6115,8 @@ function buildArticlePrompt(){
     const n = _artName(e);
     if(!n) return;
     const k = e.team+'|'+n;
-    const p = pl[k] = pl[k] || {team:e.team, name:n, g:0, a:0, stl:0, blk:0, ej:0, f5:0, drewEj:0, drew5:0};
+    const p = pl[k] = pl[k] || {team:e.team, name:n, cap:'', g:0, a:0, stl:0, blk:0, ej:0, f5:0, drewEj:0, drew5:0};
+    if(!p.cap && e.cap) p.cap = e.cap;
     if(isGoal(e)) p.g++;
     else if(e.event==='Assist') p.a++;
     else if(e.event==='Steal') p.stl++;
@@ -6135,7 +6136,7 @@ function buildArticlePrompt(){
     if(p.drew5) bits.push('drew '+pen(p.drew5));
     if(p.ej) bits.push('was ejected '+(p.ej===1?'once':p.ej+' times'));
     if(p.f5) bits.push('called for '+pen(p.f5));
-    return bits.length ? '  '+p.name+' ('+p.team+'): '+bits.join(', ') : null;
+    return bits.length ? '  '+(p.cap ? '#'+p.cap+' ' : '')+p.name+' ('+p.team+'): '+bits.join(', ') : null;
   };
   const playerLines = Object.values(pl).sort((a,b)=>(b.g-a.g)||(b.a-a.a)).map(playerLine).filter(Boolean);
 
@@ -6166,31 +6167,70 @@ function buildArticlePrompt(){
   D.push(teamLine(wN)); D.push(teamLine(dN));
   D.push('  (An ejection by one team gives the other a man-up chance.)');
   D.push('');
-  D.push('Named players (only these players may be mentioned by name):');
+  D.push('Named players (cap numbers are for our conversation only; only these players may be mentioned by name):');
   if(playerLines.length) playerLines.forEach(l=>D.push(l)); else D.push('  (none — write at the team level only)');
   D.push('');
-  D.push('Key moments in order (running score in brackets; no clock times):');
+  D.push('Key moments by quarter (in the order recorded, which may be slightly off within a quarter; running score in brackets; no clock times):');
   Object.keys(log).map(Number).sort((a,b)=>a-b).forEach(q=>{
     D.push(qLbl(q)+':');
     if(log[q].length) log[q].forEach(l=>D.push('  - '+l)); else D.push('  - (no key moments recorded)');
   });
 
   const notes = (_artNotesGet(game.gameId)||'').trim();
+  // The sheet stores full team names ("Serra 2026 V"); the names shown in Game Setup ("Serra")
+  // are only on a device that has this game saved. pairs = [[full, shown], …], longest full first.
+  const sg = (state.savedGames||[]).find(g=>g.gameId===game.gameId);
+  const nameMap = sg
+    ? [[sg.whiteTeamFull, sg.whiteTeam], [sg.darkTeamFull, sg.darkTeam]]
+        .filter(([full,shown])=>full && shown && full!==shown)
+        .sort((a,b)=>b[0].length-a[0].length)
+    : [];
+  const shownName = t => { const m = nameMap.find(([full])=>full===t); return m ? m[1] : t; };
   const rules = [
-    'Write an online game recap article, under 500 words (aim for 350–450), with a headline on the first line.',
+    'You are a sports writer and page designer for a high school / club water polo program. Produce a one-page, newspaper-style game recap (a PDF to share with parents) using ONLY the facts in GAME DATA below plus what I tell you in the interview.',
     '',
-    'RULES',
-    '- Use ONLY the facts in GAME DATA and STORY NOTES below. Do not invent scores, players, records, venues, tournaments, injuries, or events. If it is not listed, leave it out.',
+    'STEP 1 — INTERVIEW (do this first; do NOT write the article yet)',
+    'Ask these questions ONE AT A TIME, keep each short, and wait for my answer before asking the next. I can answer "skip" or "none" to any of them.',
+    '1. TEAM NICKNAMES: The teams are '+shownName(wN)+' and '+shownName(dN)+'. Ask whether either team has a nickname I want used (for example, "Serra is the Padres, Sequoia is the Ravens").',
+    '2. FEATURED PLAYERS: List the named players from GAME DATA with their cap numbers and ask which ones to feature. Featured players get a little more space and credit for what they did; everyone else is still covered normally.',
+    '3. A QUOTE: Ask who said it (a cap number, or "Coach") and what they said. If it is the coach, also ask how the coach\'s name should appear.',
+    '4. MORE QUOTES: Ask whether there are any more quotes, the same way. Repeat until I say that is all.',
+    '5. PHOTO: Ask me to attach ONE photo (optional) and to tell you who is in it and what is happening, for the caption.',
+    'If STORY NOTES at the bottom already contain nicknames, quotes, or context, treat that part as answered and do not ask for it again. Cap numbers are only for our conversation: when I give a cap number, use the matching name from GAME DATA in the article. If I give a cap number that is not in the named list, tell me and ask for the player\'s name.',
+    'After my last answer, write the article and build the PDF without asking anything else.',
+    '',
+    'STEP 2 — WRITE THE ARTICLE',
+    '- Under 500 words (aim for 400–480), plus a headline and a deck (a one-sentence subhead).',
+    '- Headline: a punchy news headline in active voice, ideally built around the top performer and ending with the score, for example "Wright Nets Eight as Serra Surges Past Sequoia, 19–10". Deck: one sentence that gives the game\'s key storyline.',
+    '- Open with a lede that tells the story of the game (the turning point, a run, or a comeback), then move through the game in order, quarter by quarter. Use the key moments for sequence and the totals for color; do not list every goal.',
+    '- Quotes: work each quote into the story at a natural point, word for word, attributed by name (for the coach, by the name I gave). Never invent or paraphrase a quote. If there are no quotes, include none.',
+    '- Featured players: give them a little more focus on their contributions (goals, assists, steals, saves, and ejections or 5-meter penalties drawn).',
+    '- Use only facts in GAME DATA, STORY NOTES, and my interview answers. Do not invent scores, players, records, venues, tournaments, injuries, or events, and use no nickname I did not give you. If it is not listed, leave it out. You may state the weekday of the date.',
+    '- Nicknames: if I gave nicknames, use them sparingly in the body for variety (for example, "the Padres were tough to slow down"). Keep the school name in the headline, the dateline score, and the leaders line. If I gave none, use the school names throughout.',
     '- Do not use game-clock times or timestamps. Describe the flow by quarter and by sequence (for example, "opened the third quarter on a 3–0 run").',
-    '- Mention a player by name ONLY if that player appears by name under "Named players" or in a named key moment. Never mention a player by cap number. Any player without a name must not be mentioned individually; refer to their team instead (for example, "Newport answered with two goals").',
+    '- Mention a player by name ONLY if the player appears by name under "Named players". Never print a cap number. Players without a name must not be mentioned individually; refer to their team instead (for example, "Sequoia answered with two goals").',
+    '- Events are sometimes recorded slightly out of order WITHIN a quarter, so do not rely on the exact order of plays inside a quarter; the order of quarters is reliable. You may connect related plays in the same quarter when the totals support it (for example, a player who drew three ejections and scored three man-up goals), but do not add details the data does not show, such as who passed to whom beyond the listed assists, or how a play developed.',
     '- Ejections and 5-meter penalties: describe them factually and neutrally. Do not assign blame or motive beyond the data.',
-    '- Quotes: use only the quotes in STORY NOTES, word for word, attributed to the speaker given. If there are no quotes, include none.',
-    '- Tone: engaging, upbeat and fair to both teams. Lead with the story of the game (momentum swings, runs, standout performers), not a list of statistics.',
-    focus ? '- Write from the perspective of '+focus+' (as its local sports page would), but stay respectful of the opponent.'
+    '- Tone: engaging, upbeat, and fair to both teams; credit the opponent where it is earned. Refer to teams by school or club name without level or year (for example "Serra" for "Serra 2026 V").',
+    focus ? '- Write from the perspective of '+focus+' (as its local sports page would).'
           : '- Write a balanced recap that does not favor either team.',
     '- The game may still have been in progress when the data was captured; if the score looks incomplete, do not claim a final result beyond what is recorded.',
+    '',
+    'STEP 3 — BUILD THE PAGE AS A PDF',
+    'Create the finished page as a downloadable PDF file. If you cannot create files, give me one self-contained HTML page that prints to a single US Letter page. Layout (a classic newspaper sports page; ONE US Letter page; no emojis):',
+    '- Masthead: a thick navy rule across the top, then the title in very large bold italic serif capitals, centered. The title is "<SCHOOL> SPORTS", where <SCHOOL> is the short name of the team the article is written for (for example "SERRA SPORTS"). Small letter-spaced navy labels sit at either end of the title line: "WATER POLO" at left and "GAME RECAP" at right.',
+    '- Dateline strip under a thin rule: the weekday and date at left in small gray capitals; the score centered in bold navy capitals with the winner first (for example "SERRA 19, SEQUOIA 10"); "FINAL" at right; a thick rule below.',
+    '- Headline in bold serif (about 28 pt, left-aligned, two lines at most), then the deck in italic serif (about 12 pt, gray).',
+    '- If I gave you a photo: full width under the deck, cropped to about 2.5 inches tall, with a one-sentence italic caption underneath using only what I told you about it. If there is no photo, leave out that space.',
+    '- Body in two columns with a thin vertical rule between them (about 10 pt clean sans-serif); the first letter of the first paragraph is a large navy serif drop cap spanning three lines.',
+    '- At the bottom of the left column, a "SCORE BY QUARTER" box: the label in navy small capitals above a navy rule, then a compact table with the columns 1, 2, 3, 4, and Final and one row per team (the winner\'s row in bold, the Final scores in bold navy). Use the quarter-by-quarter goal numbers under "Score by quarter" in GAME DATA. Below the table, a line that starts with a bold "<School> leaders:" and lists the top performers from "Named players" (goals, assists, steals, saves), separated by "·".',
+    '- Navy accent (about #1F3A7A) on white. Keep everything on one page.',
+    'When the PDF is ready, show it to me and tell me in one line anything you left out or were unsure of.',
   ];
-  return rules.join('\n')+'\n\nGAME DATA\n'+D.join('\n')+'\n\nSTORY NOTES (quotes, context)\n'+(notes || '(none)')+'\n';
+  // Show the Game Setup names in the data section only — the rules text has its own example names.
+  let data = D.join('\n');
+  nameMap.forEach(([full,shown])=>{ data = data.split(full).join(shown); });
+  return rules.join('\n')+'\n\nGAME DATA\n'+data+'\n\nSTORY NOTES (quotes, context)\n'+(notes || '(none)')+'\n';
 }
 
 function _artNotesGet(gameId){
