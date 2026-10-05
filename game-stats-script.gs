@@ -14,6 +14,16 @@
 // ═══════════════════════════════════════════════════════════
 
 function doPost(e) {
+  // One write at a time. Without this, two requests arriving close together can
+  // both pick the same "next empty row" and one overwrites the other's rows
+  // (this is how a goal went missing from the sheet).
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000);
+  } catch (err) {
+    return jsonOut({status: 'error', message: 'busy — try again'});
+  }
+
   try {
     const data = JSON.parse(e.postData.contents);
     const ss   = SpreadsheetApp.getActiveSpreadsheet();
@@ -21,6 +31,7 @@ function doPost(e) {
     switch (data.action) {
       case 'init':         initGame(ss, data);              invalidateScoreboard_(); break;
       case 'events':       appendEvents(ss, data.rows);     break;
+      case 'sync-events':  syncEvents_(ss, data.rows);      invalidateScoreboard_(); break;
       case 'delete-event': deleteEventRows_(ss, data.groupId); break;
       case 'update-event': updateEvent(ss, data);           break;
       case 'updateGameStatus': setGameStatus(ss, data);     invalidateScoreboard_(); break;
@@ -30,6 +41,8 @@ function doPost(e) {
 
   } catch (err) {
     return jsonOut({status: 'error', message: err.toString()});
+  } finally {
+    lock.releaseLock();
   }
 }
 
@@ -257,6 +270,31 @@ function appendEvents(ss, rows) {
     sheet.getRange(sheet.getLastRow() + 1, 1, toAppend.length, toAppend[0].length)
          .setValues(toAppend);
   }
+}
+
+// Resend from the app's "Sync check": append only the rows the sheet doesn't
+// already have, so sending twice (or sending a row that did arrive) never duplicates.
+function syncKey_(gameId, groupId, event, team, cap) {
+  return [gameId, groupId, event, team, cap]
+    .map(v => String(v == null ? '' : v).trim()).join('|');
+}
+
+function syncEvents_(ss, rows) {
+  if (!rows || !rows.length) return;
+  const sheet = getOrCreateSheet(ss, 'Events', [
+    'GameID', 'GroupID', 'Q', 'Time', 'Date',
+    'Event', 'Team', 'Cap', 'PlayerID', 'Zone', 'GM'
+  ]);
+  const have = {};
+  const last = sheet.getLastRow();
+  if (last >= 2) {
+    // Columns A..H: GameID, GroupID, Q, Time, Date, Event, Team, Cap
+    sheet.getRange(2, 1, last - 1, 8).getValues().forEach(r => {
+      have[syncKey_(r[0], r[1], r[5], r[6], r[7])] = true;
+    });
+  }
+  const fresh = rows.filter(r => !have[syncKey_(r.gameId, r.groupId, r.event, r.team, r.cap)]);
+  appendEvents(ss, fresh);
 }
 
 function deleteEventRows_(ss, groupId) {
